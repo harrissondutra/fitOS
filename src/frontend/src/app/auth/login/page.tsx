@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,6 @@ export default function LoginPage() {
       alert("Login realizado com sucesso!");
       router.push("/dashboard");
     } catch (error: any) {
-      console.error("Login error:", error);
       alert("Erro ao fazer login");
     } finally {
       setIsLoading(false);
