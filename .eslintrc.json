@@ -1,0 +1,56 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "rules": {
+    "no-console": "warn",
+    "no-debugger": "warn",
+    "prefer-const": "error",
+    "no-var": "error",
+    "no-unused-vars": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["src/frontend/**/*.{ts,tsx}"],
+      "extends": [
+        "next/core-web-vitals"
+      ],
+      "rules": {
+        "react/prop-types": "off",
+        "react/react-in-jsx-scope": "off"
+      }
+    },
+    {
+      "files": ["src/backend/**/*.ts"],
+      "env": {
+        "node": true,
+        "es6": true
+      },
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "dist/",
+    "build/",
+    "out/",
+    "*.config.js",
+    "*.config.ts"
+  ]
+}

@@ -367,7 +367,7 @@ export class TenantService {
         prisma.tenant.count({ where }),
       ]);
 
-      const result: Tenant[] = tenants.map(tenant => ({
+      const result: Tenant[] = tenants.map((tenant: any) => ({
         id: tenant.id,
         name: tenant.name,
         subdomain: tenant.subdomain,
