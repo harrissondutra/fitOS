@@ -10,7 +10,7 @@ const nextConfig = {
   
   // Configuração de imagens
   images: {
-    domains: ['localhost', 'fitos.com', '*.localhost', 'images.unsplash.com'],
+    domains: ['localhost', 'fitos.com', 'images.unsplash.com'],
     unoptimized: process.env.NODE_ENV === 'development',
   },
   
@@ -32,7 +32,7 @@ const nextConfig = {
     ];
   },
   
-  // Configuração de webpack para desenvolvimento
+  // Configuração de webpack
   webpack: (config, { dev, isServer }) => {
     // Fallbacks para Node.js modules
     config.resolve.fallback = {
@@ -43,19 +43,8 @@ const nextConfig = {
       crypto: false,
     };
     
-    // Otimizações para desenvolvimento
-    if (dev) {
-      config.watchOptions = {
-        poll: 1000,
-        aggregateTimeout: 300,
-      };
-    }
-    
     return config;
   },
-  
-  // Configuração de desenvolvimento
-  serverExternalPackages: ['@prisma/client'],
   
   // Configuração de headers para desenvolvimento
   async headers() {
