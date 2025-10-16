@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,6 @@ export default function RegisterPage() {
       alert("Conta criada com sucesso!");
       router.push("/auth/login");
     } catch (error: any) {
-      console.error("Registration error:", error);
       alert("Erro ao criar conta");
     } finally {
       setIsLoading(false);
