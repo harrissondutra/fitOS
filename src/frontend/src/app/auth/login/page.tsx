@@ -8,12 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { useAuth } from "@/components/providers/auth-provider";
 import { Eye, EyeOff, Mail, Lock, ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, socialLogin, isLoading } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -22,19 +21,22 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     try {
-      await login(formData.email, formData.password);
+      // Simulação de login - substitua pela lógica real
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      alert("Login realizado com sucesso!");
+      router.push("/dashboard");
     } catch (error: any) {
-      // Error is already handled in the auth provider
+      console.error("Login error:", error);
+      alert("Erro ao fazer login");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSocialLogin = async (provider: "google" | "microsoft" | "facebook") => {
-    try {
-      await socialLogin(provider);
-    } catch (error: any) {
-      // Error is already handled in the auth provider
-    }
+    alert(`Login com ${provider} em desenvolvimento`);
   };
 
   return (

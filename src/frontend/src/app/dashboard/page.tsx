@@ -2,13 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/components/providers/auth-provider';
-import { DashboardLayout } from '@/components/dashboard/sidebar';
-import { StatsCards } from '@/components/dashboard/stats-cards';
-import { RecentWorkouts } from '@/components/dashboard/recent-workouts';
-import { AIRecommendations } from '@/components/dashboard/ai-recommendations';
-import { QuickActions } from '@/components/dashboard/quick-actions';
-import { WeeklyProgress } from '@/components/dashboard/weekly-progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,18 +11,15 @@ import {
   Users, 
   BarChart3, 
   Zap, 
-  ArrowRight,
-  Play,
-  Calendar,
-  Target,
-  TrendingUp,
-  Activity,
-  Sparkles,
+  ArrowRight, 
+  Play, 
+  Calendar, 
+  Target, 
+  TrendingUp 
 } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -40,137 +30,184 @@ export default function DashboardPage() {
     return null;
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    router.push('/auth/login');
-    return null;
-  }
-
   return (
-    <DashboardLayout>
-      {/* Welcome Section */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">
-              Bem-vindo de volta, {user.firstName}! 👋
-            </h1>
-            <p className="text-muted-foreground">
-              Aqui está um resumo do seu progresso e próximos passos.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="hidden sm:inline-flex">
-              <Activity className="mr-1 h-3 w-3" />
-              Online
-            </Badge>
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted">
+      {/* Header */}
+      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Dumbbell className="h-8 w-8 text-primary" />
+              <span className="text-2xl font-bold">FitOS Dashboard</span>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" onClick={() => router.push('/auth/login')}>
+                Sair
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Stats Cards */}
-      <div className="mb-8">
-        <StatsCards />
-      </div>
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Bem-vindo ao FitOS!</h1>
+          <p className="text-muted-foreground">
+            Seu painel de controle para uma jornada fitness completa.
+          </p>
+        </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        {/* Recent Workouts */}
-        <div className="lg:col-span-2">
-          <RecentWorkouts />
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Treinos Hoje</CardTitle>
+              <Dumbbell className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground">
+                +0% em relação ao mês passado
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Calorias Queimadas</CardTitle>
+              <Zap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground">
+                +0% em relação ao mês passado
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Tempo de Treino</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0min</div>
+              <p className="text-xs text-muted-foreground">
+                +0% em relação ao mês passado
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Objetivos</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0/5</div>
+              <p className="text-xs text-muted-foreground">
+                +0% em relação ao mês passado
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Quick Actions */}
-        <div>
-          <QuickActions />
-        </div>
-      </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ações Rápidas</CardTitle>
+              <CardDescription>
+                Comece seu treino ou explore recursos
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+                <Play className="mr-2 h-4 w-4" />
+                Iniciar Treino
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+                <Brain className="mr-2 h-4 w-4" />
+                Recomendações IA
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Ver Estatísticas
+              </Button>
+            </CardContent>
+          </Card>
 
-      {/* Secondary Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* AI Recommendations */}
-        <div>
-          <AIRecommendations />
+          <Card>
+            <CardHeader>
+              <CardTitle>Próximos Passos</CardTitle>
+              <CardDescription>
+                Configure sua conta para começar
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-primary rounded-full"></div>
+                <span className="text-sm">Complete seu perfil</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-muted rounded-full"></div>
+                <span className="text-sm text-muted-foreground">Configure seus objetivos</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-muted rounded-full"></div>
+                <span className="text-sm text-muted-foreground">Adicione suas medidas</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Weekly Progress */}
-        <div>
-          <WeeklyProgress />
-        </div>
-      </div>
+        {/* Features Preview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <Brain className="h-5 w-5 text-blue-500" />
+                <CardTitle>Personal Trainer IA</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <CardDescription>
+                Receba recomendações personalizadas de treinos alimentadas por IA.
+              </CardDescription>
+            </CardContent>
+          </Card>
 
-      {/* Bottom Section - Additional Features */}
-      <div className="mt-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
-              Recursos em Destaque
-            </CardTitle>
-            <CardDescription>
-              Explore as funcionalidades mais populares da plataforma
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 border rounded-lg hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                    <Brain className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <h3 className="font-semibold">Personal Trainer IA</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Receba treinos personalizados e sugestões inteligentes baseadas no seu progresso.
-                </p>
-                <Button size="sm" variant="outline">
-                  Experimentar
-                </Button>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <Users className="h-5 w-5 text-green-500" />
+                <CardTitle>Multi-Inquilino</CardTitle>
               </div>
-              
-              <div className="p-4 border rounded-lg hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                    <Users className="h-5 w-5 text-green-600" />
-                  </div>
-                  <h3 className="font-semibold">Comunidade</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Conecte-se com outros usuários, participe de desafios e compartilhe conquistas.
-                </p>
-                <Button size="sm" variant="outline">
-                  Entrar
-                </Button>
+            </CardHeader>
+            <CardContent>
+              <CardDescription>
+                Perfeito para academias e personal trainers.
+              </CardDescription>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="h-5 w-5 text-purple-500" />
+                <CardTitle>Analytics</CardTitle>
               </div>
-              
-              <div className="p-4 border rounded-lg hover:shadow-md transition-shadow">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
-                    <BarChart3 className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <h3 className="font-semibold">Analytics Avançado</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Acompanhe seu progresso com gráficos detalhados e relatórios personalizados.
-                </p>
-                <Button size="sm" variant="outline">
-                  Ver Analytics
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </DashboardLayout>
+            </CardHeader>
+            <CardContent>
+              <CardDescription>
+                Acompanhe seu progresso com insights detalhados.
+              </CardDescription>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </div>
   );
 }
