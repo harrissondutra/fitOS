@@ -6,14 +6,14 @@ const path = require('path');
 console.log('🚀 Starting FitOS in production mode...');
 
 // Start backend
-const backend = spawn('npm', ['run', 'start:backend'], {
+const backend = spawn('node', ['dist/index.js'], {
   cwd: path.join(__dirname, 'src', 'backend'),
   stdio: 'inherit',
   shell: true
 });
 
 // Start frontend
-const frontend = spawn('npm', ['run', 'start:frontend'], {
+const frontend = spawn('npm', ['start'], {
   cwd: path.join(__dirname, 'src', 'frontend'),
   stdio: 'inherit',
   shell: true
