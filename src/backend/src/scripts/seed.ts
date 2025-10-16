@@ -1,0 +1,567 @@
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import { logger } from '../utils/logger';
+
+const prisma = new PrismaClient();
+
+async function seed() {
+  try {
+    logger.info('🌱 Starting database seeding...');
+
+    // Create test tenants
+    const tenant1 = await prisma.tenant.upsert({
+      where: { subdomain: 'demo-gym' },
+      update: {},
+      create: {
+        name: 'Demo Gym',
+        subdomain: 'demo-gym',
+        customDomain: 'demo.fitOS.com',
+        billingEmail: 'admin@demogym.com',
+        plan: 'professional',
+        status: 'active',
+        settings: {
+          theme: 'dark',
+          features: {
+            aiAgents: true,
+            wearables: true,
+            computerVision: false,
+            marketplace: false,
+            whiteLabel: false,
+          },
+        },
+      },
+    });
+
+    const tenant2 = await prisma.tenant.upsert({
+      where: { subdomain: 'test-academy' },
+      update: {},
+      create: {
+        name: 'Test Academy',
+        subdomain: 'test-academy',
+        billingEmail: 'admin@testacademy.com',
+        plan: 'starter',
+        status: 'active',
+        settings: {
+          theme: 'light',
+          features: {
+            aiAgents: true,
+            wearables: false,
+            computerVision: false,
+            marketplace: false,
+            whiteLabel: false,
+          },
+        },
+      },
+    });
+
+    logger.info('✅ Tenants created');
+
+    // Create admin users for each tenant
+    const adminPassword = await bcrypt.hash('admin123', 12);
+
+    const admin1 = await prisma.user.upsert({
+      where: { 
+        tenantId_email: {
+          email: 'admin@demogym.com',
+          tenantId: tenant1.id
+        }
+      },
+      update: {},
+      create: {
+        email: 'admin@demogym.com',
+        password: adminPassword,
+        firstName: 'Admin',
+        lastName: 'Demo',
+        role: 'owner',
+        status: 'ACTIVE',
+        tenantId: tenant1.id,
+        profile: {
+          bio: 'Gym owner and fitness enthusiast',
+          avatar: null,
+        },
+      },
+    });
+
+    const admin2 = await prisma.user.upsert({
+      where: { 
+        tenantId_email: {
+          email: 'admin@testacademy.com',
+          tenantId: tenant2.id
+        }
+      },
+      update: {},
+      create: {
+        email: 'admin@testacademy.com',
+        password: adminPassword,
+        firstName: 'Test',
+        lastName: 'Admin',
+        role: 'owner',
+        status: 'ACTIVE',
+        tenantId: tenant2.id,
+        profile: {
+          bio: 'Academy administrator',
+          avatar: null,
+        },
+      },
+    });
+
+    logger.info('✅ Admin users created');
+
+    // Create Harrison Dutra admin user
+    const harrisonPassword = await bcrypt.hash('123456', 12);
+    
+    // Verificar se já existe um tenant padrão para o Harrison
+    let defaultTenant = await prisma.tenant.findFirst({
+      where: { subdomain: 'default' }
+    });
+
+    if (!defaultTenant) {
+      defaultTenant = await prisma.tenant.create({
+        data: {
+          name: 'FitOS Default',
+          subdomain: 'default',
+          plan: 'premium',
+          status: 'active',
+          billingEmail: 'harrissondutra@gmail.com',
+          settings: {}
+        }
+      });
+    }
+
+    const harrisonAdmin = await prisma.user.upsert({
+      where: { 
+        tenantId_email: {
+          email: 'harrissondutra@gmail.com',
+          tenantId: defaultTenant.id
+        }
+      },
+      update: {},
+      create: {
+        email: 'harrissondutra@gmail.com',
+        password: harrisonPassword,
+        firstName: 'Harrison',
+        lastName: 'Dutra',
+        role: 'admin',
+        status: 'ACTIVE',
+        tenantId: defaultTenant.id,
+        profile: {
+          bio: 'Administrador do sistema FitOS',
+          avatar: null,
+          preferences: {
+            theme: 'light',
+            language: 'pt-BR',
+            notifications: true
+          }
+        }
+      }
+    });
+
+    // Criar também um registro de membro para o Harrison
+    const existingMember = await prisma.member.findFirst({
+      where: {
+        email: 'harrissondutra@gmail.com',
+        tenantId: defaultTenant.id
+      }
+    });
+
+    if (!existingMember) {
+      await prisma.member.create({
+        data: {
+          tenantId: defaultTenant.id,
+          userId: harrisonAdmin.id,
+          name: 'Harrison Dutra',
+          email: 'harrissondutra@gmail.com',
+          membershipType: 'admin',
+          status: 'active',
+          biometricData: {},
+          goals: {
+            role: 'admin',
+            permissions: ['all']
+          }
+        }
+      });
+    }
+
+    logger.info('✅ Harrison Dutra admin user created');
+
+    // Create trainer users
+    const trainerPassword = await bcrypt.hash('trainer123', 12);
+
+    const trainer1 = await prisma.user.upsert({
+      where: { 
+        tenantId_email: {
+          email: 'trainer@demogym.com',
+          tenantId: tenant1.id
+        }
+      },
+      update: {},
+      create: {
+        email: 'trainer@demogym.com',
+        password: trainerPassword,
+        firstName: 'John',
+        lastName: 'Trainer',
+        role: 'trainer',
+        status: 'ACTIVE',
+        tenantId: tenant1.id,
+        profile: {
+          bio: 'Certified personal trainer with 5 years experience',
+          avatar: null,
+          specialties: ['Weight Training', 'Cardio', 'Nutrition'],
+        },
+      },
+    });
+
+    const trainer2 = await prisma.user.upsert({
+      where: { 
+        tenantId_email: {
+          email: 'trainer@testacademy.com',
+          tenantId: tenant2.id
+        }
+      },
+      update: {},
+      create: {
+        email: 'trainer@testacademy.com',
+        password: trainerPassword,
+        firstName: 'Jane',
+        lastName: 'Coach',
+        role: 'trainer',
+        status: 'ACTIVE',
+        tenantId: tenant2.id,
+        profile: {
+          bio: 'Fitness coach specializing in group classes',
+          avatar: null,
+          specialties: ['Group Classes', 'Yoga', 'Pilates'],
+        },
+      },
+    });
+
+    logger.info('✅ Trainer users created');
+
+    // Create member users
+    const memberPassword = await bcrypt.hash('member123', 12);
+
+    const member1 = await prisma.user.upsert({
+      where: { 
+        tenantId_email: {
+          email: 'member@demogym.com',
+          tenantId: tenant1.id
+        }
+      },
+      update: {},
+      create: {
+        email: 'member@demogym.com',
+        password: memberPassword,
+        firstName: 'Alice',
+        lastName: 'Member',
+        role: 'member',
+        status: 'ACTIVE',
+        tenantId: tenant1.id,
+        profile: {
+          bio: 'Fitness enthusiast',
+          avatar: null,
+          goals: ['Weight Loss', 'Muscle Gain'],
+        },
+      },
+    });
+
+    const member2 = await prisma.user.upsert({
+      where: { 
+        tenantId_email: {
+          email: 'member@testacademy.com',
+          tenantId: tenant2.id
+        }
+      },
+      update: {},
+      create: {
+        email: 'member@testacademy.com',
+        password: memberPassword,
+        firstName: 'Bob',
+        lastName: 'Student',
+        role: 'member',
+        status: 'ACTIVE',
+        tenantId: tenant2.id,
+        profile: {
+          bio: 'New to fitness',
+          avatar: null,
+          goals: ['General Fitness'],
+        },
+      },
+    });
+
+    logger.info('✅ Member users created');
+
+    // Create members (separate from users for gym management)
+    let member1Data = await prisma.member.findFirst({
+      where: { 
+        email: 'alice.member@demogym.com',
+        tenantId: tenant1.id,
+      }
+    });
+
+    if (!member1Data) {
+      member1Data = await prisma.member.create({
+        data: {
+          name: 'Alice Member',
+          email: 'alice.member@demogym.com',
+          phone: '+1234567890',
+          tenantId: tenant1.id,
+          status: 'active',
+          membershipType: 'premium',
+          biometricData: {
+            age: 28,
+            gender: 'female',
+            height: 165,
+            weight: 60,
+            goals: ['Weight Loss', 'Muscle Gain'],
+            medicalConditions: [],
+            emergencyContact: {
+              name: 'John Doe',
+              phone: '+1234567891',
+              relationship: 'Spouse',
+            },
+          },
+          goals: {
+            primary: 'Weight Loss',
+            secondary: 'Muscle Gain'
+          }
+        },
+      });
+    }
+
+    let member2Data = await prisma.member.findFirst({
+      where: { 
+        email: 'bob.student@testacademy.com',
+        tenantId: tenant2.id,
+      }
+    });
+
+    if (!member2Data) {
+      member2Data = await prisma.member.create({
+        data: {
+          name: 'Bob Student',
+          email: 'bob.student@testacademy.com',
+          phone: '+1234567892',
+          tenantId: tenant2.id,
+          status: 'active',
+          membershipType: 'basic',
+          biometricData: {
+            age: 25,
+            gender: 'male',
+            height: 175,
+            weight: 70,
+            goals: ['General Fitness'],
+            medicalConditions: [],
+            emergencyContact: {
+              name: 'Jane Doe',
+              phone: '+1234567893',
+              relationship: 'Sister',
+            },
+          },
+          goals: {
+            primary: 'General Fitness'
+          }
+        },
+      });
+    }
+
+    logger.info('✅ Members created');
+
+    // Create sample workouts
+    const workout1 = await prisma.workout.create({
+      data: {
+        name: 'Upper Body Strength',
+        description: 'Focus on chest, back, and arms',
+        exercises: [
+          {
+            name: 'Bench Press',
+            sets: 4,
+            reps: 8,
+            weight: 80,
+            restTime: 120,
+            notes: 'Focus on controlled movement',
+          },
+          {
+            name: 'Pull-ups',
+            sets: 3,
+            reps: 10,
+            weight: 0,
+            restTime: 90,
+            notes: 'Use assistance if needed',
+          },
+          {
+            name: 'Shoulder Press',
+            sets: 3,
+            reps: 12,
+            weight: 25,
+            restTime: 60,
+            notes: 'Keep core engaged',
+          },
+        ],
+        tenantId: tenant1.id,
+        memberId: member1Data.id,
+        userId: trainer1.id,
+        aiGenerated: false,
+        completed: false,
+        feedback: {}
+      },
+    });
+
+    const workout2 = await prisma.workout.create({
+      data: {
+        name: 'Cardio Blast',
+        description: 'High-intensity cardio workout',
+        exercises: [
+          {
+            name: 'Jumping Jacks',
+            sets: 1,
+            reps: 50,
+            weight: 0,
+            restTime: 30,
+            notes: 'Keep knees soft',
+          },
+          {
+            name: 'Burpees',
+            sets: 3,
+            reps: 10,
+            weight: 0,
+            restTime: 60,
+            notes: 'Modify if needed',
+          },
+          {
+            name: 'Mountain Climbers',
+            sets: 3,
+            reps: 20,
+            weight: 0,
+            restTime: 45,
+            notes: 'Keep core tight',
+          },
+        ],
+        tenantId: tenant2.id,
+        memberId: member2Data.id,
+        userId: trainer2.id,
+        aiGenerated: false,
+        completed: false,
+        feedback: {}
+      },
+    });
+
+    logger.info('✅ Workouts created');
+
+    // Create sample chat messages
+    await prisma.chatMessage.createMany({
+      data: [
+        {
+          content: 'Hi! I need help with my workout routine.',
+          role: 'user',
+          tenantId: tenant1.id,
+          userId: member1.id,
+          sessionId: 'session-1',
+          metadata: {
+            context: 'workout-help',
+          },
+        },
+        {
+          content: 'I\'d be happy to help you with your workout routine! What are your fitness goals?',
+          role: 'assistant',
+          tenantId: tenant1.id,
+          userId: member1.id,
+          sessionId: 'session-1',
+          metadata: {
+            model: 'gpt-4',
+            tokens: 25,
+          },
+        },
+        {
+          content: 'I want to lose weight and build muscle.',
+          role: 'user',
+          tenantId: tenant1.id,
+          userId: member1.id,
+          sessionId: 'session-1',
+          metadata: {
+            context: 'goals',
+          },
+        },
+        {
+          content: 'Great goals! I recommend a combination of strength training and cardio. Let me create a personalized workout plan for you.',
+          role: 'assistant',
+          tenantId: tenant1.id,
+          userId: member1.id,
+          sessionId: 'session-1',
+          metadata: {
+            model: 'gpt-4',
+            tokens: 35,
+          },
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    logger.info('✅ Chat messages created');
+
+    // Create sample biometric data
+    await prisma.biometricData.createMany({
+      data: [
+        {
+          memberId: member1Data.id,
+          tenantId: tenant1.id,
+          dataType: 'weight',
+          value: 60.5,
+          unit: 'kg',
+          recordedAt: new Date(),
+          source: 'smart-scale',
+        },
+        {
+          memberId: member1Data.id,
+          tenantId: tenant1.id,
+          dataType: 'height',
+          value: 165,
+          unit: 'cm',
+          recordedAt: new Date(),
+          source: 'manual',
+        },
+        {
+          memberId: member2Data.id,
+          tenantId: tenant2.id,
+          dataType: 'weight',
+          value: 70.2,
+          unit: 'kg',
+          recordedAt: new Date(),
+          source: 'smart-scale',
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    logger.info('✅ Biometric data created');
+
+    logger.info('🎉 Database seeding completed successfully!');
+    logger.info('📊 Summary:');
+    logger.info(`   - Tenants: 3`);
+    logger.info(`   - Users: 6 (2 admins, 2 trainers, 2 members)`);
+    logger.info(`   - Members: 3`);
+    logger.info(`   - Workouts: 2`);
+    logger.info(`   - Chat messages: 4`);
+    logger.info(`   - Biometric records: 3`);
+
+  } catch (error) {
+    logger.error('❌ Database seeding failed:', error);
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// Run seed if called directly
+if (require.main === module) {
+  seed()
+    .then(() => {
+      logger.info('✅ Seeding completed');
+      process.exit(0);
+    })
+    .catch((error) => {
+      logger.error('❌ Seeding failed:', error);
+      process.exit(1);
+    });
+}
+
+export { seed };

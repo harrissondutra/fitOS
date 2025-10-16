@@ -1,0 +1,499 @@
+name: FitOS - Complete CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      force_deploy:
+        description: 'Force deployment even if tests fail'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: '20'
+  DOCKER_REGISTRY: 'docker.io'
+  APP_NAME: 'fitos'
+
+jobs:
+  # ===========================================
+  # JOB 1: VALIDATION & TESTING
+  # ===========================================
+  validate-and-test:
+    name: 🔍 Validate & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fitos_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: |
+          npm ci
+          cd src/backend && npm ci
+          cd ../frontend && npm ci
+
+      - name: 🔍 Lint Backend
+        run: |
+          cd src/backend
+          npm run lint
+          npm run lint:fix
+
+      - name: 🔍 Lint Frontend
+        run: |
+          cd src/frontend
+          npm run lint
+          npm run lint:fix
+
+      - name: 🏗️ Type Check Backend
+        run: |
+          cd src/backend
+          npm run type-check
+
+      - name: 🏗️ Type Check Frontend
+        run: |
+          cd src/frontend
+          npm run type-check
+
+      - name: 🧪 Run Backend Tests
+        run: |
+          cd src/backend
+          npm run test:coverage
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fitos_test
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+          JWT_SECRET: test-secret-key
+
+      - name: 🧪 Run Frontend Tests
+        run: |
+          cd src/frontend
+          npm run test:coverage
+
+      - name: 📊 Upload Coverage Reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./src/backend/coverage/lcov.info,./src/frontend/coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+  # ===========================================
+  # JOB 2: SECURITY SCANNING
+  # ===========================================
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: validate-and-test
+    if: always()
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: 📊 Upload Trivy Scan Results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: 🔍 Run Snyk Security Scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+      - name: 🔍 Audit Dependencies
+        run: |
+          npm audit --audit-level=high
+          cd src/backend && npm audit --audit-level=high
+          cd ../frontend && npm audit --audit-level=high
+
+  # ===========================================
+  # JOB 3: BUILD & PUSH DOCKER
+  # ===========================================
+  build-and-push:
+    name: 🐳 Build & Push Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [validate-and-test, security-scan]
+    if: always() && (needs.validate-and-test.result == 'success' || github.event.inputs.force_deploy == 'true')
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔐 Login to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 📋 Extract Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.APP_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ github.sha }}
+
+      - name: 🏗️ Build and Push Docker Image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            NODE_ENV=production
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+
+  # ===========================================
+  # JOB 4: DEPLOY TO STAGING
+  # ===========================================
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build-and-push]
+    if: |
+      always() && 
+      (needs.build-and-push.result == 'success' || github.event.inputs.force_deploy == 'true') &&
+      (github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging')
+
+    environment:
+      name: staging
+      url: https://staging.fitOS.com
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Setup SSH Key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: 🚀 Deploy to Staging
+        run: |
+          echo "🚀 Deploying to staging environment..."
+          
+          # Create deployment script
+          cat > deploy-staging.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          echo "📁 Navigating to application directory..."
+          cd ${{ secrets.STAGING_PATH || '/opt/fitos' }}
+          
+          echo "📥 Pulling latest Docker image..."
+          docker-compose pull
+          
+          echo "🔄 Stopping existing containers..."
+          docker-compose down --remove-orphans
+          
+          echo "🚀 Starting new containers..."
+          docker-compose up -d
+          
+          echo "🧹 Cleaning up unused Docker resources..."
+          docker system prune -f
+          
+          echo "📊 Checking container status..."
+          docker-compose ps
+          
+          echo "📝 Checking application logs..."
+          docker-compose logs --tail=50
+          EOF
+          
+          chmod +x deploy-staging.sh
+          
+          # Execute deployment
+          ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_USERNAME }}@${{ secrets.STAGING_HOST }} 'bash -s' < deploy-staging.sh
+
+      - name: 🏥 Health Check
+        run: |
+          echo "⏳ Waiting for application to start..."
+          sleep 30
+          
+          echo "🏥 Performing health check..."
+          for i in {1..10}; do
+            if curl -f -s "http://${{ secrets.STAGING_HOST }}/api/health" > /dev/null; then
+              echo "✅ Health check passed!"
+              break
+            else
+              echo "⏳ Attempt $i/10 - Application not ready yet..."
+              sleep 10
+            fi
+          done
+          
+          # Final health check
+          if ! curl -f -s "http://${{ secrets.STAGING_HOST }}/api/health" > /dev/null; then
+            echo "❌ Health check failed!"
+            exit 1
+          fi
+
+      - name: 🗄️ Run Database Migrations
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_USERNAME }}@${{ secrets.STAGING_HOST }} << 'EOF'
+          cd ${{ secrets.STAGING_PATH || '/opt/fitos' }}
+          docker-compose exec -T backend npm run migrate:prod
+          EOF
+
+      - name: 📊 Generate Deployment Report
+        run: |
+          echo "## 🚀 Staging Deployment Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Staging" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ needs.build-and-push.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://${{ secrets.STAGING_HOST }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Health Check:** https://${{ secrets.STAGING_HOST }}/api/health" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================
+  # JOB 5: DEPLOY TO PRODUCTION
+  # ===========================================
+  deploy-production:
+    name: 🌟 Deploy to Production
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build-and-push, deploy-staging]
+    if: |
+      always() && 
+      (needs.build-and-push.result == 'success' || github.event.inputs.force_deploy == 'true') &&
+      (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production')
+
+    environment:
+      name: production
+      url: https://fitOS.com
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Setup SSH Key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: 💾 Create Backup
+        run: |
+          echo "💾 Creating backup of current production..."
+          
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} << 'EOF'
+          set -e
+          
+          echo "📁 Navigating to application directory..."
+          cd ${{ secrets.PROD_PATH || '/opt/fitos' }}
+          
+          echo "💾 Creating backup..."
+          BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
+          mkdir -p "$BACKUP_DIR"
+          
+          # Backup database
+          docker-compose exec -T postgres pg_dump -U postgres fitos_prod > "$BACKUP_DIR/database.sql"
+          
+          # Backup application files
+          cp -r . "$BACKUP_DIR/app/"
+          
+          echo "✅ Backup created in $BACKUP_DIR"
+          EOF
+
+      - name: 🚀 Deploy to Production
+        run: |
+          echo "🚀 Deploying to production environment..."
+          
+          # Create deployment script
+          cat > deploy-production.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          echo "📁 Navigating to application directory..."
+          cd ${{ secrets.PROD_PATH || '/opt/fitos' }}
+          
+          echo "📥 Pulling latest Docker image..."
+          docker-compose pull
+          
+          echo "🔄 Gracefully stopping existing containers..."
+          docker-compose down --timeout 30
+          
+          echo "🚀 Starting new containers..."
+          docker-compose up -d
+          
+          echo "🧹 Cleaning up unused Docker resources..."
+          docker system prune -f
+          
+          echo "📊 Checking container status..."
+          docker-compose ps
+          
+          echo "📝 Checking application logs..."
+          docker-compose logs --tail=50
+          EOF
+          
+          chmod +x deploy-production.sh
+          
+          # Execute deployment
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' < deploy-production.sh
+
+      - name: 🏥 Health Check
+        run: |
+          echo "⏳ Waiting for application to start..."
+          sleep 60
+          
+          echo "🏥 Performing health check..."
+          for i in {1..15}; do
+            if curl -f -s "https://${{ secrets.PROD_HOST }}/api/health" > /dev/null; then
+              echo "✅ Health check passed!"
+              break
+            else
+              echo "⏳ Attempt $i/15 - Application not ready yet..."
+              sleep 10
+            fi
+          done
+          
+          # Final health check
+          if ! curl -f -s "https://${{ secrets.PROD_HOST }}/api/health" > /dev/null; then
+            echo "❌ Health check failed! Attempting rollback..."
+            
+            # Rollback
+            ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} << 'EOF'
+            cd ${{ secrets.PROD_PATH || '/opt/fitos' }}
+            docker-compose down
+            docker-compose up -d
+            EOF
+            
+            exit 1
+          fi
+
+      - name: 🗄️ Run Database Migrations
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} << 'EOF'
+          cd ${{ secrets.PROD_PATH || '/opt/fitos' }}
+          docker-compose exec -T backend npm run migrate:prod
+          EOF
+
+      - name: 🔥 Warm Up Application
+        run: |
+          echo "🔥 Warming up application..."
+          curl -s "https://${{ secrets.PROD_HOST }}/api/health" > /dev/null
+          curl -s "https://${{ secrets.PROD_HOST }}/api/tenants" > /dev/null
+          echo "✅ Application warmed up successfully"
+
+      - name: 📊 Generate Deployment Report
+        run: |
+          echo "## 🌟 Production Deployment Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ needs.build-and-push.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://${{ secrets.PROD_HOST }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Health Check:** https://${{ secrets.PROD_HOST }}/api/health" >> $GITHUB_STEP_SUMMARY
+          echo "**Backup:** Created before deployment" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================
+  # JOB 6: NOTIFICATION
+  # ===========================================
+  notify:
+    name: 📢 Send Notifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [validate-and-test, security-scan, build-and-push, deploy-staging, deploy-production]
+    if: always()
+
+    steps:
+      - name: 📊 Generate Summary
+        run: |
+          echo "## 🎯 FitOS Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Job Results:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validate & Test:** ${{ needs.validate-and-test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Scan:** ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build & Push:** ${{ needs.build-and-push.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deploy Staging:** ${{ needs.deploy-staging.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deploy Production:** ${{ needs.deploy-production.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Determine overall status
+          if [[ "${{ needs.validate-and-test.result }}" == "success" && 
+                "${{ needs.build-and-push.result }}" == "success" ]]; then
+            echo "### 🎉 Overall Status: ✅ SUCCESS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Overall Status: FAILED" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  fitos-app:
+    image: fitos:latest
+    container_name: fitos-app
+    ports:
+      - "3000:3000"  # Frontend
+      - "3001:3001"  # Backend API
+    environment:
+      # Database
+      DATABASE_URL: postgresql://fitos:${POSTGRES_PASSWORD}@postgres:5432/fitos
+      REDIS_URL: redis://redis:6379
+      
+      # API Keys (configure no Portainer)
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      
+      # JWT Secret
+      JWT_SECRET: ${JWT_SECRET}
+      
+      # App Config
+      NODE_ENV: production
+      PORT_BACKEND: 3001
+      PORT_FRONTEND: 3000
+      
+    volumes:
+      - fitos_uploads:/app/uploads
+      - fitos_logs:/app/logs
+    networks:
+      - fitos-network
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: fitos-postgres
+    environment:
+      POSTGRES_DB: fitos
+      POSTGRES_USER: fitos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - fitos-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: fitos-redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - fitos-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+  redis_data:
+  fitos_uploads:
+  fitos_logs:
+
+networks:
+  fitos-network:
+    driver: bridge

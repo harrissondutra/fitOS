@@ -1,0 +1,198 @@
+version: '3.8'
+
+services:
+  # Banco de dados PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: fitos-postgres
+    environment:
+      POSTGRES_DB: fitos
+      POSTGRES_USER: fitos
+      POSTGRES_PASSWORD: fitos123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - fitos-network
+    restart: unless-stopped
+
+  # Redis para cache e sessões
+  redis:
+    image: redis:7-alpine
+    container_name: fitos-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - fitos-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Ollama - IA Local
+  ollama:
+    image: ollama/ollama:latest
+    container_name: fitos-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - fitos-network
+    restart: unless-stopped
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+
+  # Chroma - Vector Database
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: fitos-chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - fitos-network
+    restart: unless-stopped
+
+  # MinIO - S3 Compatible Storage
+  minio:
+    image: minio/minio:latest
+    container_name: fitos-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - fitos-network
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+
+  # Prometheus - Metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: fitos-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - fitos-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  # Grafana - Monitoring Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: fitos-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - fitos-network
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+
+  # Jaeger - Distributed Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: fitos-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    networks:
+      - fitos-network
+    restart: unless-stopped
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+  # Aplicação FitOS (Frontend + Backend)
+  fitos-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: fitos-app
+    environment:
+      # Database
+      DATABASE_URL: postgresql://fitos:fitos123@postgres:5432/fitos
+      REDIS_URL: redis://redis:6379
+      
+      # API Keys
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-fitos-super-secret-key}
+      
+      # App Config
+      NODE_ENV: production
+      PORT_BACKEND: 3001
+      PORT_FRONTEND: 3000
+      
+      # External APIs
+      APPLE_HEALTH_API_URL: ${APPLE_HEALTH_API_URL}
+      GOOGLE_FIT_API_URL: ${GOOGLE_FIT_API_URL}
+      
+    ports:
+      - "3000:3000"  # Frontend
+      - "3001:3001"  # Backend API
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    networks:
+      - fitos-network
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx Reverse Proxy (opcional para produção)
+  nginx:
+    image: nginx:alpine
+    container_name: fitos-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+    networks:
+      - fitos-network
+    depends_on:
+      - fitos-app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+  chroma_data:
+  minio_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  fitos-network:
+    driver: bridge
