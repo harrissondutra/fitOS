@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # Aplicação FitOS SAAS
+  fitos-app:
+    image: fitos:production-latest
+    container_name: fitos-app
+    environment:
+      # Database
+      DATABASE_URL: postgresql://fitos:${POSTGRES_PASSWORD}@postgres:5432/fitos
+      REDIS_URL: redis://redis:6379
+      
+      # API Keys
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      
+      # Stripe
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      
+      # App Config
+      NODE_ENV: production
+      PORT_BACKEND: 3001
+      PORT_FRONTEND: 3000
+      
+      # Multi-tenant
+      DEFAULT_DOMAIN: ${DEFAULT_DOMAIN:-fitos.com}
+      
+      # Deployment info
+      APP_VERSION: ${APP_VERSION:-latest}
+      DEPLOY_DATE: ${DEPLOY_DATE:-unknown}
+      
+    ports:
+      - "3000:3000"  # Frontend
+      - "3001:3001"  # Backend API
+    volumes:
+      - fitos_uploads:/app/uploads
+      - fitos_logs:/app/logs
+    networks:
+      - fitos-network
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Banco de dados PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: fitos-postgres
+    environment:
+      POSTGRES_DB: fitos
+      POSTGRES_USER: fitos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-saas.sql:/docker-entrypoint-initdb.d/init-saas.sql
+    networks:
+      - fitos-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitos"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis para cache e sessões
+  redis:
+    image: redis:7-alpine
+    container_name: fitos-redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - fitos-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: fitos-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+      - ./docker/nginx/logs:/var/log/nginx
+    networks:
+      - fitos-network
+    depends_on:
+      - fitos-app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+  fitos_uploads:
+  fitos_logs:
+
+networks:
+  fitos-network:
+    driver: bridge

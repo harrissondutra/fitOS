@@ -1,0 +1,191 @@
+// FitOS - Schema do Banco de Dados para Schema-Level Multi-Tenancy
+// Este schema é um exemplo de como as tabelas seriam definidas
+// quando cada tenant tem seu próprio schema no banco de dados.
+
+generator client {
+  provider = "prisma-client-js"
+  // output = "../node_modules/@prisma/client/schema-multitenancy" // Pode ser necessário um output diferente
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// A tabela Tenant ainda reside no schema público (ou um schema central)
+// para gerenciar os metadados de todos os tenants.
+model Tenant {
+  id                    String   @id @default(cuid())
+  name                  String
+  subdomain             String   @unique
+  customDomain          String?  @unique @map("custom_domain")
+  plan                  String   @default("starter")
+  status                String   @default("active")
+  billingEmail          String   @map("billing_email")
+  stripeCustomerId      String?  @map("stripe_customer_id")
+  stripeSubscriptionId  String?  @map("stripe_subscription_id")
+  settings              Json     @default("{}")
+  schemaName            String?  @unique @map("schema_name")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Não há relacionamentos diretos com User, Member, etc. aqui,
+  // pois eles estarão em schemas separados.
+  // A conexão será feita dinamicamente no código da aplicação.
+
+  @@map("tenants")
+  @@schema("public") // A tabela tenants sempre estará no schema público
+}
+
+// As tabelas abaixo não terão mais o campo tenantId,
+// pois o isolamento será feito pelo schema.
+// O nome do schema será injetado dinamicamente pelo cliente Prisma.
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique // Email único dentro do seu próprio schema (tenant)
+  password  String   @map("password_hash")
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  phone     String?
+  role      String   // owner, admin, trainer, member
+  status    String   @default("ACTIVE")
+  profile   Json     @default("{}")
+  lastLogin DateTime? @map("last_login")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos dentro do mesmo schema
+  member        Member?
+  aiSessions    AiSession[]
+  refreshTokens RefreshToken[]
+  chatMessages  ChatMessage[]
+  workouts      Workout[]
+
+  @@map("users")
+  // @@schema("dynamic_tenant_schema") // Este será definido dinamicamente
+}
+
+model Member {
+  id             String   @id @default(cuid())
+  userId         String?  @unique @map("user_id") @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  email          String?  @unique // Email único dentro do seu próprio schema (tenant)
+  phone          String?
+  membershipType String   @map("membership_type")
+  status         String   @default("active")
+  biometricData  Json     @default("{}") @map("biometric_data")
+  goals          Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos dentro do mesmo schema
+  user            User?
+  workouts        Workout[]
+  biometricRecords BiometricData[]
+  churnPredictions ChurnPrediction[]
+
+  @@map("members")
+  // @@schema("dynamic_tenant_schema")
+}
+
+model Workout {
+  id           String   @id @default(cuid())
+  memberId     String   @map("member_id") @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  userId       String   @map("user_id") @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  exercises    Json     @default("[]")
+  aiGenerated  Boolean  @default(false) @map("ai_generated")
+  completed    Boolean  @default(false)
+  completedAt  DateTime? @map("completed_at")
+  feedback     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos dentro do mesmo schema
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("workouts")
+  // @@schema("dynamic_tenant_schema")
+}
+
+model AiSession {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id") @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentType String   @map("agent_type") // coach, nutrition, business
+  messages  Json     @default("[]")
+  context   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos dentro do mesmo schema
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_sessions")
+  // @@schema("dynamic_tenant_schema")
+}
+
+model BiometricData {
+  id         String   @id @default(cuid())
+  memberId   String   @map("member_id") @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  dataType   String   @map("data_type") // heart_rate, hrv, sleep, steps
+  value      Decimal  @db.Decimal(10, 2)
+  unit       String
+  recordedAt DateTime @map("recorded_at")
+  source     String   // apple_health, google_fit, manual
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relacionamentos dentro do mesmo schema
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("biometric_data")
+  // @@schema("dynamic_tenant_schema")
+}
+
+model ChurnPrediction {
+  id               String   @id @default(cuid())
+  memberId         String   @map("member_id") @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  churnProbability Decimal  @db.Decimal(5, 4) @map("churn_probability")
+  riskFactors      Json     @default("[]") @map("risk_factors")
+  suggestedActions Json     @default("[]") @map("suggested_actions")
+  predictedAt      DateTime @default(now()) @map("predicted_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relacionamentos dentro do mesmo schema
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("churn_predictions")
+  // @@schema("dynamic_tenant_schema")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String   @map("user_id") @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relacionamentos dentro do mesmo schema
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+  // @@schema("dynamic_tenant_schema")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id") @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId String   @map("session_id")
+  content   String
+  role      String   // user, assistant, system
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relacionamentos dentro do mesmo schema
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+  // @@schema("dynamic_tenant_schema")
+}

@@ -1,0 +1,289 @@
+// FitOS - Schema do Banco de Dados
+// Configurado para desenvolvimento local
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Tabela de Tenants (Organizações)
+model Tenant {
+  id                    String   @id @default(cuid())
+  name                  String
+  subdomain             String   @unique
+  customDomain          String?  @unique @map("custom_domain")
+  plan                  String   @default("starter")
+  status                String   @default("active")
+  billingEmail          String   @map("billing_email")
+  stripeCustomerId      String?  @map("stripe_customer_id")
+  stripeSubscriptionId  String?  @map("stripe_subscription_id")
+  settings              Json     @default("{}")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  users                 User[]
+  members               Member[]
+  workouts              Workout[]
+  aiSessions            AiSession[]
+  biometricData         BiometricData[]
+  churnPredictions      ChurnPrediction[]
+  chatMessages          ChatMessage[]
+  subscriptions         Subscription[]
+
+  @@map("tenants")
+}
+
+// Tabela de Usuários
+model User {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  email     String
+  password  String   @map("password_hash")
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  phone     String?
+  role      String   // owner, admin, trainer, member
+  status    String   @default("ACTIVE")
+  profile   Json     @default("{}")
+  lastLogin DateTime? @map("last_login")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member        Member?
+  aiSessions    AiSession[]
+  refreshTokens RefreshToken[]
+  chatMessages  ChatMessage[]
+  workouts      Workout[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+// Tabela de Membros
+model Member {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  userId         String?  @unique @map("user_id")
+  name           String
+  email          String?
+  phone          String?
+  membershipType String   @map("membership_type")
+  status         String   @default("active")
+  biometricData  Json     @default("{}") @map("biometric_data")
+  goals          Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workouts        Workout[]
+  biometricRecords BiometricData[]
+  churnPredictions ChurnPrediction[]
+
+  @@map("members")
+}
+
+// Tabela de Treinos
+model Workout {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  memberId     String   @map("member_id")
+  userId       String   @map("user_id")
+  name         String
+  description  String?
+  exercises    Json     @default("[]")
+  aiGenerated  Boolean  @default(false) @map("ai_generated")
+  completed    Boolean  @default(false)
+  completedAt  DateTime? @map("completed_at")
+  feedback     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("workouts")
+}
+
+// Tabela de Sessões de Chat IA
+model AiSession {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  agentType String   @map("agent_type") // coach, nutrition, business
+  messages  Json     @default("[]")
+  context   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_sessions")
+}
+
+// Tabela de Dados Biométricos
+model BiometricData {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  memberId   String   @map("member_id")
+  dataType   String   @map("data_type") // heart_rate, hrv, sleep, steps
+  value      Float
+  unit       String
+  recordedAt DateTime @map("recorded_at")
+  source     String   // apple_health, google_fit, manual
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relacionamentos
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("biometric_data")
+}
+
+// Tabela de Predições de Churn
+model ChurnPrediction {
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  memberId         String   @map("member_id")
+  churnProbability Float  @map("churn_probability")
+  riskFactors      Json     @default("[]") @map("risk_factors")
+  suggestedActions Json     @default("[]") @map("suggested_actions")
+  predictedAt      DateTime @default(now()) @map("predicted_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relacionamentos
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("churn_predictions")
+}
+
+// Tabela de Refresh Tokens
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// Tabela de Mensagens de Chat
+model ChatMessage {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  sessionId String   @map("session_id")
+  content   String
+  role      String   // user, assistant, system
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relacionamentos
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+// Tabela de Planos de Assinatura
+model SubscriptionPlan {
+  id              String   @id @default(cuid())
+  name            String   // starter, professional, enterprise
+  displayName     String   @map("display_name")
+  description     String?
+  price           Float
+  currency        String   @default("BRL")
+  interval        String   // month, year
+  stripePriceId   String?  @map("stripe_price_id")
+  mercadoPagoId  String?  @map("mercado_pago_id")
+  features        Json     @default("[]")
+  limits          Json     @default("{}")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  subscriptions   Subscription[]
+
+  @@map("subscription_plans")
+}
+
+// Tabela de Assinaturas
+model Subscription {
+  id                    String   @id @default(cuid())
+  tenantId              String   @map("tenant_id")
+  planId                String   @map("plan_id")
+  status                String   // active, cancelled, past_due, unpaid
+  currentPeriodStart    DateTime @map("current_period_start")
+  currentPeriodEnd      DateTime @map("current_period_end")
+  cancelAtPeriodEnd     Boolean  @default(false) @map("cancel_at_period_end")
+  cancelledAt           DateTime? @map("cancelled_at")
+  stripeSubscriptionId  String?  @map("stripe_subscription_id")
+  mercadoPagoId        String?  @map("mercado_pago_id")
+  paymentMethod         String?  @map("payment_method") // stripe, mercadopago
+  metadata              Json     @default("{}")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  tenant                Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan                  SubscriptionPlan  @relation(fields: [planId], references: [id])
+  invoices              Invoice[]
+
+  @@map("subscriptions")
+}
+
+// Tabela de Faturas
+model Invoice {
+  id                    String   @id @default(cuid())
+  subscriptionId        String   @map("subscription_id")
+  amount                Float
+  currency              String   @default("BRL")
+  status                String   // paid, pending, failed, refunded
+  stripeInvoiceId       String?  @map("stripe_invoice_id")
+  mercadoPagoId        String?  @map("mercado_pago_id")
+  paymentIntentId       String?  @map("payment_intent_id")
+  paidAt                DateTime? @map("paid_at")
+  dueDate               DateTime @map("due_date")
+  metadata              Json     @default("{}")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  subscription          Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+// Tabela de Webhooks de Pagamento
+model PaymentWebhook {
+  id            String   @id @default(cuid())
+  provider      String   // stripe, mercadopago
+  eventType     String   @map("event_type")
+  eventId       String   @map("event_id")
+  payload       Json
+  processed     Boolean  @default(false)
+  processedAt   DateTime? @map("processed_at")
+  error         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([provider, eventId])
+  @@map("payment_webhooks")
+}
