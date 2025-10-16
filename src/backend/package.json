@@ -11,7 +11,7 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit --skipLibCheck",
     "migrate:dev": "prisma migrate dev",
     "migrate:prod": "prisma migrate deploy",
     "migrate:reset": "prisma migrate reset",

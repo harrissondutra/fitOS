@@ -76,6 +76,7 @@ jobs:
           npm ci
           cd src/backend && npm ci
           cd ../frontend && npm ci
+          cd ../.. && npm ci
 
       - name: 🔍 Lint Backend
         run: |
