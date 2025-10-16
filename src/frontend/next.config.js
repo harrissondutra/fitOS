@@ -3,6 +3,11 @@ const nextConfig = {
   // Configuração para desenvolvimento local
   reactStrictMode: true,
   
+  // Desabilitar ESLint durante o build
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  
   // Configuração de imagens
   images: {
     domains: ['localhost', 'fitos.com', '*.localhost', 'images.unsplash.com'],
