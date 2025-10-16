@@ -8,13 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { useAuth } from "@/components/providers/auth-provider";
-import { toast } from "sonner";
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, socialLogin, isLoading } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -30,34 +28,31 @@ export default function RegisterPage() {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
-      toast.error("As senhas não coincidem");
+      alert("As senhas não coincidem");
       return;
     }
 
     if (formData.password.length < 8) {
-      toast.error("A senha deve ter pelo menos 8 caracteres");
+      alert("A senha deve ter pelo menos 8 caracteres");
       return;
     }
 
+    setIsLoading(true);
     try {
-      await register({
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        phone: formData.phone || undefined,
-      });
+      // Simulação de registro - substitua pela lógica real
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      alert("Conta criada com sucesso!");
+      router.push("/auth/login");
     } catch (error: any) {
-      // Error is already handled in the auth provider
+      console.error("Registration error:", error);
+      alert("Erro ao criar conta");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSocialLogin = async (provider: "google" | "microsoft" | "facebook") => {
-    try {
-      await socialLogin(provider);
-    } catch (error: any) {
-      // Error is already handled in the auth provider
-    }
+    alert(`Login com ${provider} em desenvolvimento`);
   };
 
   return (

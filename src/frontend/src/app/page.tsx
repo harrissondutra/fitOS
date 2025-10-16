@@ -17,11 +17,9 @@ import {
   Play,
   Star
 } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth';
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -102,23 +100,14 @@ export default function HomePage() {
             </nav>
 
             <div className="flex items-center space-x-4">
-              {isLoading ? (
-                <div className="h-9 w-20 bg-muted animate-pulse rounded-md" />
-              ) : user ? (
-                <Button onClick={() => router.push('/dashboard')}>
-                  Painel
-                  <ArrowRight className="ml-2 h-4 w-4" />
+              <div className="flex items-center space-x-2">
+                <Button variant="ghost" onClick={() => router.push('/auth/login')}>
+                  Entrar
                 </Button>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  <Button variant="ghost" onClick={() => router.push('/auth/login')}>
-                    Entrar
-                  </Button>
-                  <Button onClick={() => router.push('/auth/register')}>
-                    Começar
-                  </Button>
-                </div>
-              )}
+                <Button onClick={() => router.push('/auth/register')}>
+                  Começar
+                </Button>
+              </div>
             </div>
           </div>
         </div>
