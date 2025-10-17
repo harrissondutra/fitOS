@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+
+// Desabilitar pre-rendering estático para esta página
+export const dynamic = 'force-dynamic';
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
