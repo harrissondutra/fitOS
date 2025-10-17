@@ -6,6 +6,10 @@ const nextConfig = {
   // Desabilitar pre-rendering estático durante o build para evitar problemas com hooks
   output: 'standalone',
   
+  // Forçar renderização dinâmica para todas as páginas
+  trailingSlash: false,
+  generateEtags: false,
+  
   // Desabilitar ESLint durante o build
   eslint: {
     ignoreDuringBuilds: true,
@@ -47,6 +51,11 @@ const nextConfig = {
     };
     
     return config;
+  },
+  
+  // Desabilitar pre-rendering estático completamente
+  experimental: {
+    esmExternals: false,
   },
   
   // Configuração de headers para desenvolvimento
