@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+
+// Desabilitar pre-rendering estático para esta página
+export const dynamic = 'force-dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 // import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
