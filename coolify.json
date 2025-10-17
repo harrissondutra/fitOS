@@ -1,10 +1,10 @@
 {
   "name": "FitOS - Fitness Operating System",
-  "description": "Sistema completo de gestão de academias com IA integrada e arquitetura multi-tenant",
+  "description": "Sistema completo de gestão de academias com IA integrada",
   "version": "1.0.0",
   "gitRepository": "https://github.com/harrissondutra/fitOS.git",
   "type": "docker-compose",
-  "dockerfile": "Dockerfile.coolify",
+  "dockerfile": "Dockerfile.fixed",
   "dockerComposeFile": "docker-compose.coolify.yml",
   "ports": {
     "frontend": 3000,
@@ -17,7 +17,7 @@
   },
   "requiredEnvVars": [
     "DATABASE_URL",
-    "REDIS_URL", 
+    "REDIS_URL",
     "JWT_SECRET"
   ],
   "optionalEnvVars": [
@@ -36,7 +36,7 @@
   },
   "build": {
     "context": ".",
-    "dockerfile": "Dockerfile.coolify"
+    "dockerfile": "Dockerfile.fixed"
   },
   "volumes": [
     {
@@ -44,7 +44,7 @@
       "mountPath": "/app/uploads"
     },
     {
-      "name": "fitos_logs", 
+      "name": "fitos_logs",
       "mountPath": "/app/logs"
     }
   ],
@@ -52,5 +52,10 @@
   "resources": {
     "memory": "2Gi",
     "cpu": "1000m"
+  },
+  "autoDeploy": {
+    "enabled": true,
+    "branch": "main",
+    "previewBranches": ["develop", "staging"]
   }
 }
