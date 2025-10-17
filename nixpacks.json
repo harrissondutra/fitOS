@@ -8,7 +8,7 @@
   },
   "phases": {
     "setup": {
-      "nixPkgs": ["nodejs", "npm"]
+      "nixPkgs": ["nodejs", "nodePackages.npm"]
     },
     "install": {
       "cmds": ["npm ci"]
