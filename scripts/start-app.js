@@ -73,6 +73,13 @@ async function checkDependencies() {
 async function checkRemoteServices() {
   log('blue', '🔍 Verificando conexão com serviços remotos...');
   
+  // Em produção, pular verificação de banco se NODE_ENV=production
+  if (process.env.NODE_ENV === 'production') {
+    log('yellow', '⚠️  Modo produção: Pulando verificação de banco de dados');
+    log('yellow', '💡 A aplicação tentará conectar ao banco durante a inicialização');
+    return true;
+  }
+  
   // Verificar banco de dados remoto
   return new Promise((resolve) => {
     exec('npx dotenv-cli -e .env -- node -e "const { PrismaClient } = require(\'@prisma/client\'); const prisma = new PrismaClient(); prisma.$connect().then(() => { console.log(\'OK\'); process.exit(0); }).catch(() => { process.exit(1); });"', (error) => {
@@ -117,24 +124,48 @@ async function buildApp() {
 
 // Função para iniciar aplicação em modo dev
 async function startDev() {
-  log('blue', '🚀 Iniciando aplicação em modo desenvolvimento...');
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (isProduction) {
+    log('blue', '🚀 Iniciando aplicação em modo produção...');
+  } else {
+    log('blue', '🚀 Iniciando aplicação em modo desenvolvimento...');
+  }
   
   const backendPath = path.join(__dirname, '..', 'src', 'backend');
   const frontendPath = path.join(__dirname, '..', 'src', 'frontend');
   
-  // Iniciar backend com variáveis de ambiente
-  const backend = spawn('npx', ['dotenv-cli', '-e', '../../.env', '--', 'npm', 'run', 'dev'], {
-    cwd: backendPath,
-    stdio: 'pipe',
-    shell: true
-  });
+  let backend, frontend;
   
-  // Iniciar frontend
-  const frontend = spawn('npm', ['run', 'dev'], {
-    cwd: frontendPath,
-    stdio: 'pipe',
-    shell: true
-  });
+  if (isProduction) {
+    // Em produção, usar start ao invés de dev
+    backend = spawn('npm', ['run', 'start'], {
+      cwd: backendPath,
+      stdio: 'pipe',
+      shell: true,
+      env: { ...process.env }
+    });
+    
+    frontend = spawn('npm', ['run', 'start'], {
+      cwd: frontendPath,
+      stdio: 'pipe',
+      shell: true,
+      env: { ...process.env }
+    });
+  } else {
+    // Em desenvolvimento, usar dotenv-cli
+    backend = spawn('npx', ['dotenv-cli', '-e', '../../.env', '--', 'npm', 'run', 'dev'], {
+      cwd: backendPath,
+      stdio: 'pipe',
+      shell: true
+    });
+    
+    frontend = spawn('npm', ['run', 'dev'], {
+      cwd: frontendPath,
+      stdio: 'pipe',
+      shell: true
+    });
+  }
   
   // Configurar output colorido
   backend.stdout.on('data', (data) => {
