@@ -19,9 +19,9 @@ RUN npm ci --only=production
 COPY src/frontend ./src/frontend
 COPY src/shared ./src/shared
 
-# Instalar dependências do frontend
+# Instalar dependências do frontend (incluindo devDependencies para build)
 WORKDIR /app/src/frontend
-RUN npm ci --only=production
+RUN npm ci
 
 # Build do frontend
 RUN npm run build
@@ -44,9 +44,9 @@ RUN npm ci --only=production
 COPY src/backend ./src/backend
 COPY src/shared ./src/shared
 
-# Instalar dependências do backend
+# Instalar dependências do backend (incluindo devDependencies para build)
 WORKDIR /app/src/backend
-RUN npm ci --only=production
+RUN npm ci
 
 # Build do backend (TypeScript)
 RUN npm run build
