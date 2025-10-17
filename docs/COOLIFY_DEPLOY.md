@@ -57,9 +57,96 @@ Ou você pode usar bancos externos.
 
 ## 🚀 Deploy
 
-### Deploy Automático
-- Push para `main` = Deploy automático
-- Push para outras branches = Deploy de preview
+### **Opção 1: Webhook do GitHub (Recomendado)**
+
+#### **1.1. Configurar Webhook no Coolify**
+
+1. **Acesse seu projeto no Coolify**
+2. **Vá em Settings > Webhooks**
+3. **Clique em "Add Webhook"**
+4. **Configure:**
+   - **Name**: `GitHub Deploy`
+   - **URL**: `https://api.github.com/repos/harrissondutra/fitOS/hooks`
+   - **Events**: `push`, `pull_request`
+   - **Secret**: (opcional, mas recomendado)
+
+#### **1.2. Configurar Webhook no GitHub**
+
+1. **Vá para**: `https://github.com/harrissondutra/fitOS/settings/hooks`
+2. **Clique em "Add webhook"**
+3. **Configure:**
+   - **Payload URL**: `https://SEU-COOLIFY.com/api/v1/webhooks/github`
+   - **Content type**: `application/json`
+   - **Events**: `Just the push event`
+   - **Active**: ✅
+
+### **Opção 2: GitHub Actions (Mais Controle)**
+
+#### **2.1. Configurar Secrets no GitHub**
+
+1. **Vá para**: `https://github.com/harrissondutra/fitOS/settings/secrets/actions`
+2. **Adicione os secrets:**
+   - `COOLIFY_WEBHOOK_URL`: `https://SEU-COOLIFY.com/api/v1/applications/SEU_APP_ID/deploy`
+   - `COOLIFY_TOKEN`: `seu_token_api_do_coolify`
+
+#### **2.2. Obter Token do Coolify**
+
+1. **Acesse seu Coolify**
+2. **Settings > API Tokens**
+3. **Create New Token**
+4. **Copie o token gerado**
+
+#### **2.3. Workflow do GitHub Actions**
+
+O arquivo `.github/workflows/coolify-deploy.yml` já está configurado:
+
+```yaml
+name: Deploy to Coolify
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to Coolify
+      run: |
+        curl --request GET "${COOLIFY_WEBHOOK_URL}" \
+             --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
+             --header "Content-Type: application/json"
+             
+    env:
+      COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+```
+
+### **Opção 3: Auto-Deploy no Coolify**
+
+#### **3.1. Habilitar Auto-Deploy**
+
+1. **No seu projeto Coolify**
+2. **Settings > Git**
+3. **Habilite "Auto Deploy"**
+4. **Configure:**
+   - **Branch**: `main`
+   - **Auto Deploy**: ✅
+   - **Deploy on PR**: ✅ (opcional)
+
+### **Script de Configuração**
+
+Execute o script para ver as instruções detalhadas:
+
+```bash
+./scripts/setup-auto-deploy.sh
+```
 
 ### Deploy Manual
 1. Acesse a aplicação no Coolify
