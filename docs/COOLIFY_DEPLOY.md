@@ -80,7 +80,7 @@ Ou você pode usar bancos externos.
    - **Events**: `Just the push event`
    - **Active**: ✅
 
-### **Opção 2: GitHub Actions (Mais Controle)**
+### **Opção 2: GitHub Actions (Integrado na Esteira Existente)**
 
 #### **2.1. Configurar Secrets no GitHub**
 
@@ -88,6 +88,8 @@ Ou você pode usar bancos externos.
 2. **Adicione os secrets:**
    - `COOLIFY_WEBHOOK_URL`: `https://SEU-COOLIFY.com/api/v1/applications/SEU_APP_ID/deploy`
    - `COOLIFY_TOKEN`: `seu_token_api_do_coolify`
+   - `COOLIFY_HEALTH_URL`: `https://SEU-COOLIFY.com/api/health`
+   - `COOLIFY_APP_URL`: `https://SEU-COOLIFY.com`
 
 #### **2.2. Obter Token do Coolify**
 
@@ -96,37 +98,15 @@ Ou você pode usar bancos externos.
 3. **Create New Token**
 4. **Copie o token gerado**
 
-#### **2.3. Workflow do GitHub Actions**
+#### **2.3. Esteira Integrada**
 
-O arquivo `.github/workflows/coolify-deploy.yml` já está configurado:
+O deploy do Coolify está integrado na esteira existente `.github/workflows/deploy.yml`:
 
-```yaml
-name: Deploy to Coolify
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Deploy to Coolify
-      run: |
-        curl --request GET "${COOLIFY_WEBHOOK_URL}" \
-             --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
-             --header "Content-Type: application/json"
-             
-    env:
-      COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
-      COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-```
+- **Trigger**: Push na branch `main` ou `develop`
+- **Dependências**: Validação, testes, security scan e build
+- **Deploy**: Automático após build bem-sucedido
+- **Health Check**: Verificação automática após deploy
+- **Relatórios**: Integrado no summary da esteira
 
 ### **Opção 3: Auto-Deploy no Coolify**
 

@@ -46,6 +46,8 @@ echo "   • Vá para: https://github.com/harrissondutra/fitOS/settings/secrets/
 echo "   • Adicione os secrets:"
 echo "     - COOLIFY_WEBHOOK_URL: https://SEU-COOLIFY.com/api/v1/applications/SEU_APP_ID/deploy"
 echo "     - COOLIFY_TOKEN: seu_token_api_do_coolify"
+echo "     - COOLIFY_HEALTH_URL: https://SEU-COOLIFY.com/api/health"
+echo "     - COOLIFY_APP_URL: https://SEU-COOLIFY.com"
 echo ""
 
 log "4️⃣  OBTER TOKEN DO COOLIFY:" "YELLOW"
