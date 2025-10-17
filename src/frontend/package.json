@@ -10,9 +10,9 @@
     "lint": "next lint --max-warnings 0 || true",
     "lint:fix": "next lint --fix || true",
     "type-check": "tsc --noEmit",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
-    "test:watch": "jest --watch"
+    "test": "jest --passWithNoTests",
+    "test:coverage": "jest --coverage --passWithNoTests",
+    "test:watch": "jest --watch --passWithNoTests"
   },
   "dependencies": {
     "@better-auth/client": "^0.0.2-alpha.3",

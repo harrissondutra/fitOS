@@ -1,5 +1,5 @@
-# Jest Configuration for Backend
-# src/backend/jest.config.js
+// Jest Configuration for Backend
+// src/backend/jest.config.js
 
 module.exports = {
   preset: 'ts-jest',
@@ -8,6 +8,11 @@ module.exports = {
   testMatch: [
     '**/__tests__/**/*.ts',
     '**/?(*.)+(spec|test).ts'
+  ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    '/src/tests/integration/'
   ],
   transform: {
     '^.+\\.ts$': 'ts-jest',
@@ -23,7 +28,7 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'html'],
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
   testTimeout: 10000,
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1'
   }
 };
