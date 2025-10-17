@@ -13,3 +13,5 @@ cmd = "npm start"
 [variables]
 NODE_ENV = "production"
 PORT = "3000"
+COOLIFY_URL = ""
+COOLIFY_FQDN = ""

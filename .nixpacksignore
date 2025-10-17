@@ -1,0 +1,13 @@
+# Ignore files that might cause nixpacks issues
+package.json.backup
+package.simple.json
+package.nixpacks.json
+*.log
+node_modules
+.git
+.github
+docs
+scripts
+docker
+*.md
+.env*

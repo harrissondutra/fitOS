@@ -1,0 +1,23 @@
+{
+  "providers": [],
+  "variables": {
+    "NODE_ENV": "production",
+    "PORT": "3000",
+    "COOLIFY_URL": "",
+    "COOLIFY_FQDN": ""
+  },
+  "phases": {
+    "setup": {
+      "nixPkgs": ["nodejs", "npm"]
+    },
+    "install": {
+      "cmds": ["npm ci"]
+    },
+    "build": {
+      "cmds": ["npm run build"]
+    }
+  },
+  "start": {
+    "cmd": "npm start"
+  }
+}
