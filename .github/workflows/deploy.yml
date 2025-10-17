@@ -197,7 +197,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: 📋 Extract Metadata
         id: meta
@@ -244,7 +244,7 @@ jobs:
 
     environment:
       name: staging
-      url: https://staging.fitOS.com
+      url: https://fitOS.com/staging
 
     steps:
       - name: 📥 Checkout Code
@@ -253,7 +253,7 @@ jobs:
       - name: 🔐 Setup SSH Key
         uses: webfactory/ssh-agent@v0.7.0
         with:
-          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
       - name: 🚀 Deploy to Staging
         run: |
@@ -264,8 +264,8 @@ jobs:
           #!/bin/bash
           set -e
           
-          echo "📁 Navigating to application directory..."
-          cd ${{ secrets.STAGING_PATH || '/opt/fitos' }}
+          echo "📁 Navigating to staging directory..."
+          cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/staging
           
           echo "📥 Pulling latest Docker image..."
           for i in {1..3}; do
@@ -298,7 +298,7 @@ jobs:
           
           # Execute deployment with retry
           for i in {1..3}; do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.STAGING_USERNAME }}@${{ secrets.STAGING_HOST }} 'bash -s' < deploy-staging.sh; then
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} 'bash -s' < deploy-staging.sh; then
               echo "✅ Deployment successful"
               break
             else
@@ -314,7 +314,7 @@ jobs:
           
           echo "🏥 Performing health check..."
           for i in {1..10}; do
-            if curl -f -s "http://${{ secrets.STAGING_HOST }}/api/health" > /dev/null; then
+            if curl -f -s "http://${{ secrets.VPS_HOST }}:3001/api/health" > /dev/null; then
               echo "✅ Health check passed!"
               break
             else
@@ -324,15 +324,15 @@ jobs:
           done
           
           # Final health check
-          if ! curl -f -s "http://${{ secrets.STAGING_HOST }}/api/health" > /dev/null; then
+          if ! curl -f -s "http://${{ secrets.VPS_HOST }}:3001/api/health" > /dev/null; then
             echo "❌ Health check failed!"
             exit 1
           fi
 
       - name: 🗄️ Run Database Migrations
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_USERNAME }}@${{ secrets.STAGING_HOST }} << 'EOF'
-          cd ${{ secrets.STAGING_PATH || '/opt/fitos' }}
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
+          cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/staging
           docker-compose exec -T backend npm run migrate:prod
           EOF
 
@@ -346,7 +346,7 @@ jobs:
           echo "Branch: ${{ github.ref_name }}" >> deployment-logs/staging-deployment.log
           
           # Try to get container logs
-          ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_USERNAME }}@${{ secrets.STAGING_HOST }} 'cd ${{ secrets.STAGING_PATH || '/opt/fitos' }} && docker-compose logs --tail=100' >> deployment-logs/staging-deployment.log 2>&1 || echo "Could not retrieve container logs" >> deployment-logs/staging-deployment.log
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} 'cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/staging && docker-compose logs --tail=100' >> deployment-logs/staging-deployment.log 2>&1 || echo "Could not retrieve container logs" >> deployment-logs/staging-deployment.log
 
       - name: 📤 Upload Deployment Artifacts
         if: failure()
@@ -364,8 +364,8 @@ jobs:
           echo "**Version:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** ${{ needs.build-and-push.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** https://${{ secrets.STAGING_HOST }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Health Check:** https://${{ secrets.STAGING_HOST }}/api/health" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** http://${{ secrets.VPS_HOST }}:3000" >> $GITHUB_STEP_SUMMARY
+          echo "**Health Check:** http://${{ secrets.VPS_HOST }}:3001/api/health" >> $GITHUB_STEP_SUMMARY
 
   # ===========================================
   # JOB 5: DEPLOY TO PRODUCTION
@@ -391,17 +391,17 @@ jobs:
       - name: 🔐 Setup SSH Key
         uses: webfactory/ssh-agent@v0.7.0
         with:
-          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
       - name: 💾 Create Backup
         run: |
           echo "💾 Creating backup of current production..."
           
-          ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
           set -e
           
-          echo "📁 Navigating to application directory..."
-          cd ${{ secrets.PROD_PATH || '/opt/fitos' }}
+          echo "📁 Navigating to production directory..."
+          cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/production
           
           echo "💾 Creating backup..."
           BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
@@ -425,8 +425,8 @@ jobs:
           #!/bin/bash
           set -e
           
-          echo "📁 Navigating to application directory..."
-          cd ${{ secrets.PROD_PATH || '/opt/fitos' }}
+          echo "📁 Navigating to production directory..."
+          cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/production
           
           echo "📥 Pulling latest Docker image..."
           docker-compose pull
@@ -450,7 +450,7 @@ jobs:
           chmod +x deploy-production.sh
           
           # Execute deployment
-          ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' < deploy-production.sh
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} 'bash -s' < deploy-production.sh
 
       - name: 🏥 Health Check
         run: |
@@ -459,7 +459,7 @@ jobs:
           
           echo "🏥 Performing health check..."
           for i in {1..15}; do
-            if curl -f -s "https://${{ secrets.PROD_HOST }}/api/health" > /dev/null; then
+            if curl -f -s "http://${{ secrets.VPS_HOST }}:3001/api/health" > /dev/null; then
               echo "✅ Health check passed!"
               break
             else
@@ -469,12 +469,12 @@ jobs:
           done
           
           # Final health check
-          if ! curl -f -s "https://${{ secrets.PROD_HOST }}/api/health" > /dev/null; then
+          if ! curl -f -s "http://${{ secrets.VPS_HOST }}:3001/api/health" > /dev/null; then
             echo "❌ Health check failed! Attempting rollback..."
             
             # Rollback
-            ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} << 'EOF'
-            cd ${{ secrets.PROD_PATH || '/opt/fitos' }}
+            ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
+            cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/production
             docker-compose down
             docker-compose up -d
             EOF
@@ -484,16 +484,16 @@ jobs:
 
       - name: 🗄️ Run Database Migrations
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} << 'EOF'
-          cd ${{ secrets.PROD_PATH || '/opt/fitos' }}
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
+          cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/production
           docker-compose exec -T backend npm run migrate:prod
           EOF
 
       - name: 🔥 Warm Up Application
         run: |
           echo "🔥 Warming up application..."
-          curl -s "https://${{ secrets.PROD_HOST }}/api/health" > /dev/null
-          curl -s "https://${{ secrets.PROD_HOST }}/api/tenants" > /dev/null
+          curl -s "http://${{ secrets.VPS_HOST }}:3001/api/health" > /dev/null
+          curl -s "http://${{ secrets.VPS_HOST }}:3001/api/tenants" > /dev/null
           echo "✅ Application warmed up successfully"
 
       - name: 📊 Generate Deployment Report
@@ -504,8 +504,8 @@ jobs:
           echo "**Version:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** ${{ needs.build-and-push.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** https://${{ secrets.PROD_HOST }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Health Check:** https://${{ secrets.PROD_HOST }}/api/health" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** http://${{ secrets.VPS_HOST }}:3000" >> $GITHUB_STEP_SUMMARY
+          echo "**Health Check:** http://${{ secrets.VPS_HOST }}:3001/api/health" >> $GITHUB_STEP_SUMMARY
           echo "**Backup:** Created before deployment" >> $GITHUB_STEP_SUMMARY
 
   # ===========================================

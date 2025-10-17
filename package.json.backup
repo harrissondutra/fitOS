@@ -1,0 +1,85 @@
+{
+  "name": "fitos",
+  "version": "1.0.0",
+  "description": "FitOS - Fitness Operating System",
+  "private": true,
+  "workspaces": [
+    "src/frontend",
+    "src/backend"
+  ],
+  "scripts": {
+    "setup": "bash scripts/setup-dev.sh",
+    "dev": "bash scripts/dev-start.sh",
+    "dev:concurrent": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd src/backend && npm run dev",
+    "dev:frontend": "cd src/frontend && npm run dev",
+    "dev:db": "cd src/backend && npm run db:studio",
+    "dev:logs": "tail -f src/backend/logs/combined.log",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd src/backend && npm run build",
+    "build:frontend": "cd src/frontend && npm run build",
+    "start": "node scripts/start-app.js",
+    "start:quick": "node scripts/start-app.js --quick",
+    "start:dev": "npm run dev",
+    "start:build": "node scripts/start-app.js --build-only",
+    "start:prod": "npm run build && concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd src/backend && npm run start",
+    "start:frontend": "cd src/frontend && npm run start",
+    "start:bash": "bash scripts/quick-start.sh",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd src/backend && npm run test",
+    "test:frontend": "cd src/frontend && npm run test",
+    "test:coverage": "npm run test:backend:coverage && npm run test:frontend:coverage",
+    "test:backend:coverage": "cd src/backend && npm run test:coverage",
+    "test:frontend:coverage": "cd src/frontend && npm run test:coverage",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd src/backend && npm run lint",
+    "lint:frontend": "cd src/frontend && npm run lint",
+    "lint:fix": "npm run lint:backend:fix && npm run lint:frontend:fix",
+    "lint:backend:fix": "cd src/backend && npm run lint:fix",
+    "lint:frontend:fix": "cd src/frontend && npm run lint:fix",
+    "type-check": "npm run type-check:backend && npm run type-check:frontend",
+    "type-check:backend": "cd src/backend && npm run type-check",
+    "type-check:frontend": "cd src/frontend && npm run type-check",
+    "docker:build": "docker build -f docker/Dockerfile -t fitos:latest .",
+    "docker:run": "docker run -p 3000:3000 -p 3001:3001 fitos:latest",
+    "docker:dev": "docker-compose -f docker/docker-compose.yml up --build",
+    "docker:prod": "docker-compose -f docker/docker-compose.prod.yml up -d",
+    "deploy:staging": "bash scripts/deploy-staging.sh",
+    "deploy:production": "bash scripts/auto-deploy.sh",
+    "deploy:vps": "bash scripts/deploy.sh",
+    "migrate:dev": "cd src/backend && npm run migrate:dev",
+    "migrate:prod": "cd src/backend && npm run migrate:prod",
+    "migrate:reset": "cd src/backend && npm run migrate:reset",
+    "seed:dev": "cd src/backend && npm run seed:dev",
+    "seed:prod": "cd src/backend && npm run seed:prod"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/nodemailer": "^7.0.2",
+    "concurrently": "^8.2.2",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "typescript": "^5.3.0"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "pre-push": "npm run test && npm run type-check"
+    }
+  },
+  "lint-staged": {
+    "src/backend/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "src/frontend/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

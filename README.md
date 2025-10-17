@@ -43,8 +43,8 @@
 
 ### 1. Clone o repositório
 ```bash
-git clone https://github.com/seu-usuario/fitos.git
-cd fitos
+git clone https://github.com/harrissondutra/fitOS.git
+cd fitOS
 ```
 
 ### 2. Setup automático (recomendado)
@@ -89,6 +89,7 @@ npm run seed:dev
 
 ## 📚 Documentação
 
+- **[Deploy no Coolify](docs/COOLIFY_DEPLOY.md)** - Guia completo de deploy no Coolify
 - **[Desenvolvimento Local](docs/DESENVOLVIMENTO_LOCAL.md)** - Guia completo de setup
 - **[Pipeline CI/CD](docs/CI_CD_PIPELINE.md)** - Esteira de deploy automatizada
 - **[Configurações Técnicas](docs/CONFIGURACOES_TECNICAS_FITOS.md)** - Detalhes técnicos
@@ -223,7 +224,19 @@ FitOS suporta múltiplas academias através de subdomínios:
 
 ## 🚀 Deploy
 
-### VPS (Recomendado)
+### Coolify (Recomendado)
+```bash
+# Deploy automático no Coolify
+# 1. Acesse seu painel do Coolify
+# 2. Crie nova aplicação Docker Compose
+# 3. Use: https://github.com/harrissondutra/fitOS.git
+# 4. Configure: docker-compose.coolify.yml
+
+# Ou use o script automático
+./deploy-coolify.sh
+```
+
+### VPS
 ```bash
 # Deploy automático para VPS
 npm run deploy:vps
@@ -258,7 +271,7 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para de
 - 📧 Email: suporte@fitos.com
 - 💬 Discord: [FitOS Community](https://discord.gg/fitos)
 - 📖 Docs: [docs.fitos.com](https://docs.fitos.com)
-- 🐛 Issues: [GitHub Issues](https://github.com/seu-usuario/fitos/issues)
+- 🐛 Issues: [GitHub Issues](https://github.com/harrissondutra/fitOS/issues)
 
 ## 🎯 Roadmap
 

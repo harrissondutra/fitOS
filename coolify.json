@@ -1,0 +1,56 @@
+{
+  "name": "FitOS - Fitness Operating System",
+  "description": "Sistema completo de gestão de academias com IA integrada e arquitetura multi-tenant",
+  "version": "1.0.0",
+  "gitRepository": "https://github.com/harrissondutra/fitOS.git",
+  "type": "docker-compose",
+  "dockerfile": "Dockerfile.coolify",
+  "dockerComposeFile": "docker-compose.coolify.yml",
+  "ports": {
+    "frontend": 3000,
+    "backend": 3001
+  },
+  "environment": {
+    "NODE_ENV": "production",
+    "PORT_BACKEND": "3001",
+    "PORT_FRONTEND": "3000"
+  },
+  "requiredEnvVars": [
+    "DATABASE_URL",
+    "REDIS_URL", 
+    "JWT_SECRET"
+  ],
+  "optionalEnvVars": [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "APPLE_HEALTH_API_URL",
+    "GOOGLE_FIT_API_URL",
+    "DEFAULT_DOMAIN"
+  ],
+  "healthCheck": {
+    "endpoint": "/api/health",
+    "port": 3001,
+    "timeout": 10
+  },
+  "build": {
+    "context": ".",
+    "dockerfile": "Dockerfile.coolify"
+  },
+  "volumes": [
+    {
+      "name": "fitos_uploads",
+      "mountPath": "/app/uploads"
+    },
+    {
+      "name": "fitos_logs", 
+      "mountPath": "/app/logs"
+    }
+  ],
+  "restartPolicy": "unless-stopped",
+  "resources": {
+    "memory": "2Gi",
+    "cpu": "1000m"
+  }
+}
