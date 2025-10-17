@@ -1,0 +1,102 @@
+# FitOS - Coolify Optimized Dockerfile
+# Multi-stage build para Frontend + Backend
+
+# ===========================================
+# Stage 1: Build Frontend (Next.js)
+# ===========================================
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app
+
+# Copiar package.json do frontend
+COPY package*.json ./
+COPY src/frontend/package*.json ./src/frontend/
+
+# Instalar dependências
+RUN npm ci --only=production
+
+# Copiar código do frontend
+COPY src/frontend ./src/frontend
+COPY src/shared ./src/shared
+
+# Build do frontend
+WORKDIR /app/src/frontend
+RUN npm run build
+
+# ===========================================
+# Stage 2: Build Backend (Node.js + Express)
+# ===========================================
+FROM node:20-alpine AS backend-builder
+
+WORKDIR /app
+
+# Copiar package.json do backend
+COPY package*.json ./
+COPY src/backend/package*.json ./src/backend/
+
+# Instalar dependências
+RUN npm ci --only=production
+
+# Copiar código do backend
+COPY src/backend ./src/backend
+COPY src/shared ./src/shared
+
+# Build do backend (TypeScript)
+WORKDIR /app/src/backend
+RUN npm run build
+
+# ===========================================
+# Stage 3: Production Image
+# ===========================================
+FROM node:20-alpine AS production
+
+# Instalar dependências do sistema
+RUN apk add --no-cache \
+    dumb-init \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# Criar usuário não-root
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S fitos -u 1001
+
+WORKDIR /app
+
+# Copiar package.json root
+COPY package*.json ./
+
+# Instalar dependências de produção
+RUN npm ci --only=production && npm cache clean --force
+
+# Copiar builds do frontend e backend
+COPY --from=frontend-builder /app/src/frontend/.next ./src/frontend/.next
+COPY --from=frontend-builder /app/src/frontend/public ./src/frontend/public
+COPY --from=frontend-builder /app/src/frontend/package*.json ./src/frontend/
+
+COPY --from=backend-builder /app/src/backend/dist ./src/backend/dist
+COPY --from=backend-builder /app/src/backend/package*.json ./src/backend/
+
+# Copiar código compartilhado
+COPY src/shared ./src/shared
+
+# Copiar scripts de inicialização
+COPY scripts/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
+# Criar diretórios necessários
+RUN mkdir -p /app/uploads /app/logs
+
+# Configurar permissões
+RUN chown -R fitos:nodejs /app
+USER fitos
+
+# Expor portas
+EXPOSE 3000 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3001/api/health || exit 1
+
+# Comando de inicialização
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["./start.sh"]

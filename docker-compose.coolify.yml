@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # Aplicação FitOS para Coolify
+  fitos-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: fitos-app
+    environment:
+      # Database - Coolify irá fornecer via variáveis de ambiente
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      
+      # API Keys - Configurar no Coolify
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      
+      # App Config
+      NODE_ENV: production
+      PORT_BACKEND: 3001
+      PORT_FRONTEND: 3000
+      
+      # External APIs
+      APPLE_HEALTH_API_URL: ${APPLE_HEALTH_API_URL}
+      GOOGLE_FIT_API_URL: ${GOOGLE_FIT_API_URL}
+      
+      # Payment Gateways
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      
+      # Multi-tenant
+      DEFAULT_DOMAIN: ${DEFAULT_DOMAIN:-fitos.com}
+      
+    ports:
+      - "3000:3000"  # Frontend
+      - "3001:3001"  # Backend API
+    volumes:
+      - fitos_uploads:/app/uploads
+      - fitos_logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  fitos_uploads:
+  fitos_logs:
