@@ -19,8 +19,8 @@ COPY package*.json ./
 COPY src/frontend/package*.json ./src/frontend/
 COPY src/backend/package*.json ./src/backend/
 
-# Instalar dependências root
-RUN npm ci
+# Instalar dependências root (incluindo devDependencies para build)
+RUN npm ci --include=dev
 
 # Copiar código fonte
 COPY src/ ./src/
