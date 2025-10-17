@@ -20,12 +20,13 @@ Este guia te mostra como configurar o Coolify para funcionar **exatamente como o
 - **Port**: `3000` (frontend)
 - **Auto Deploy**: ✅ **HABILITADO**
 
-### **✅ Nixpacks Configurado Corretamente**
-- **Arquivo**: `nixpacks.toml` e `nixpacks.json`
+### **✅ Nixpacks Automático (Zero Config)**
+- **Detecção**: Automática pelo Coolify
 - **Node.js**: Instalado automaticamente
-- **NPM**: Instalado via `nodePackages.npm`
-- **Build**: `npm run build`
-- **Start**: `npm start`
+- **NPM**: Instalado automaticamente
+- **Build**: Detecta `npm run build` do package.json
+- **Start**: Detecta `npm start` do package.json
+- **Arquivos**: Nenhum arquivo de configuração necessário!
 
 ## 🔧 **Passo 2: Configurar Variáveis de Ambiente**
 
