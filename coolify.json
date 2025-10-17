@@ -4,7 +4,6 @@
   "version": "1.0.0",
   "gitRepository": "https://github.com/harrissondutra/fitOS.git",
   "type": "nixpacks",
-  "buildPack": "nixpacks",
   "ports": {
     "frontend": 3000,
     "backend": 3001
