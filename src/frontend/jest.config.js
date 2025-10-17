@@ -1,5 +1,5 @@
-# Jest Configuration for Frontend
-# src/frontend/jest.config.js
+// Jest Configuration for Frontend
+// src/frontend/jest.config.js
 
 const nextJest = require('next/jest')
 
@@ -9,8 +9,8 @@ const createJestConfig = nextJest({
 
 const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  moduleNameMapping: {
-    '^@/(.*)$': '<rootDir>/$1',
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
   testEnvironment: 'jest-environment-jsdom',
   collectCoverageFrom: [
