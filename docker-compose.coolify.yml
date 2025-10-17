@@ -5,7 +5,7 @@ services:
   fitos-app:
     build:
       context: .
-      dockerfile: Dockerfile.debug
+      dockerfile: Dockerfile.fixed
     container_name: fitos-app
     environment:
       # Database - Coolify irá fornecer via variáveis de ambiente

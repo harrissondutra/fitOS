@@ -3,6 +3,9 @@ const nextConfig = {
   // Configuração para desenvolvimento local
   reactStrictMode: true,
   
+  // Desabilitar pre-rendering estático durante o build para evitar problemas com hooks
+  output: 'standalone',
+  
   // Desabilitar ESLint durante o build
   eslint: {
     ignoreDuringBuilds: true,
