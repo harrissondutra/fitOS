@@ -1,0 +1,47 @@
+# FitOS - Simple Dockerfile for Coolify
+FROM node:20-alpine
+
+# Instalar dependências do sistema
+RUN apk add --no-cache \
+    dumb-init \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# Criar usuário não-root
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S fitos -u 1001
+
+WORKDIR /app
+
+# Copiar package.json files
+COPY package*.json ./
+COPY src/frontend/package*.json ./src/frontend/
+COPY src/backend/package*.json ./src/backend/
+
+# Instalar dependências
+RUN npm ci --only=production
+
+# Copiar código fonte
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+
+# Build da aplicação
+RUN npm run build
+
+# Criar diretórios necessários
+RUN mkdir -p /app/uploads /app/logs
+
+# Configurar permissões
+RUN chown -R fitos:nodejs /app
+USER fitos
+
+# Expor portas
+EXPOSE 3000 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3001/api/health || exit 1
+
+# Comando de inicialização
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["npm", "start"]
