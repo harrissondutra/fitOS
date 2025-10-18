@@ -243,3 +243,12 @@ docker-compose.override.yml
 # Local development
 .local/
 nul
+update-password.js
+better-auth-schema.sql
+check-better-auth-tables.js
+check-users.js
+create-better-auth-tables.js
+create-test-user.js
+test-better-auth-signup.js
+update-harrisson-password.js
+update-password-admin.js
