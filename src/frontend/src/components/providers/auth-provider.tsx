@@ -38,10 +38,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
+    setMounted(true);
     // Check for existing session
     checkSession();
   }, []);
@@ -294,6 +296,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     socialLogin,
   };
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return (
+      <AuthContext.Provider value={value}>
+        {children}
+      </AuthContext.Provider>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>
