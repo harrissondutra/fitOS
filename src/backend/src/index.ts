@@ -20,6 +20,7 @@ import { tenantMiddleware } from './middleware/tenant';
 
 // Import routes
 import { authRoutes } from './routes/auth';
+import { tenantExampleRoutes } from './routes/tenant-example';
 import { userRoutes } from './routes/users';
 import { workoutRoutes } from './routes/workouts';
 import { chatRoutes } from './routes/chat';
@@ -89,6 +90,9 @@ class FitOSServer {
 
     // Auth routes (Better Auth implementation)
     this.app.use('/', authRoutes);
+
+    // Tenant example routes (demonstrates multitenancy)
+    this.app.use('/', tenantExampleRoutes);
 
     // API routes
     this.app.use('/api/users', userRoutes);

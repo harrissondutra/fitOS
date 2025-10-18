@@ -24,7 +24,7 @@ const requireAdmin = (req: RequestWithTenant, res: Response, next: any) => {
 
 // Get tenant statistics
 router.get('/stats', requireAdmin, asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
 
   if (!tenantId) {
     return res.status(401).json({
@@ -114,7 +114,7 @@ router.get('/stats', requireAdmin, asyncHandler(async (req: RequestWithTenant, r
 
 // Get all users with pagination
 router.get('/users', requireAdmin, asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
   const { page = 1, limit = 20, search = '', role = '' } = req.query;
 
   if (!tenantId) {
@@ -185,7 +185,7 @@ router.get('/users', requireAdmin, asyncHandler(async (req: RequestWithTenant, r
 router.put('/users/:id/role', requireAdmin, asyncHandler(async (req: RequestWithTenant, res: Response) => {
   const { id } = req.params;
   const { role } = req.body;
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
 
   if (!tenantId) {
     return res.status(401).json({
@@ -239,7 +239,7 @@ router.put('/users/:id/role', requireAdmin, asyncHandler(async (req: RequestWith
 router.put('/users/:id/status', requireAdmin, asyncHandler(async (req: RequestWithTenant, res: Response) => {
   const { id } = req.params;
   const { status } = req.body;
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
 
   if (!tenantId) {
     return res.status(401).json({

@@ -88,6 +88,9 @@ export function LoginForm({
                     disabled={isLoading}
                     className="h-11"
                   />
+                  <div className="text-xs text-muted-foreground">
+                    💡 <strong>Dica:</strong> Use a senha: <code className="bg-gray-100 px-1 rounded">Admin@1234</code>
+                  </div>
                 </div>
               </div>
               

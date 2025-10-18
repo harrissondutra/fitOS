@@ -1,9 +1,6 @@
 import Link from 'next/link'
 import { Button } from '../components/ui/button'
 
-// Desabilitar pre-rendering estático para esta página
-export const dynamic = 'force-dynamic';
-
 export default function NotFound() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

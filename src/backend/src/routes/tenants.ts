@@ -217,9 +217,9 @@ router.get('/', authRateLimiter, asyncHandler(async (req: Request, res: Response
 
 // Get current tenant info (for authenticated requests)
 router.get('/me/info', authRateLimiter, asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenant = req.tenant;
+  const tenantId = req.tenantId;
 
-  if (!tenant) {
+  if (!tenantId) {
     return res.status(404).json({
       success: false,
       error: {
@@ -230,16 +230,16 @@ router.get('/me/info', authRateLimiter, asyncHandler(async (req: RequestWithTena
 
   return res.json({
     success: true,
-    data: { tenant },
+    data: { tenantId },
   });
 }));
 
 // Update current tenant settings
 router.put('/me/settings', authRateLimiter, asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenant = req.tenant;
+  const tenantId = req.tenantId;
   const { settings } = req.body;
 
-  if (!tenant) {
+  if (!tenantId) {
     return res.status(404).json({
       success: false,
       error: {
@@ -258,10 +258,10 @@ router.put('/me/settings', authRateLimiter, asyncHandler(async (req: RequestWith
   }
 
   try {
-    const updatedTenant = await tenantService.updateTenant(tenant.id, { settings });
+    const updatedTenant = await tenantService.updateTenant(tenantId, { settings });
 
     logger.info('Tenant settings updated via API', {
-      tenantId: tenant.id,
+      tenantId: tenantId,
       settings,
     });
 

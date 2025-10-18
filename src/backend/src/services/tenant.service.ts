@@ -1,6 +1,14 @@
 import { getPrismaClient } from '../config/database';
 import { logger } from '../utils/logger';
-import { Tenant } from '../middleware/tenant';
+// Tenant interface moved to middleware/tenant.ts
+interface Tenant {
+  id: string;
+  name: string;
+  subdomain: string;
+  customDomain?: string;
+  status: 'active' | 'inactive' | 'suspended';
+  settings: Record<string, any>;
+}
 
 export class TenantService {
   private static instance: TenantService;

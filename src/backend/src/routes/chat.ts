@@ -9,7 +9,7 @@ const router = Router();
 
 // Get chat history
 router.get('/', asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
   const userId = req.headers['x-user-id'] as string;
   const { limit = 50, offset = 0 } = req.query;
 
@@ -51,7 +51,7 @@ router.get('/', asyncHandler(async (req: RequestWithTenant, res: Response) => {
 
 // Send message to AI
 router.post('/message', chatRateLimiter, asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
   const userId = req.headers['x-user-id'] as string;
   const { message, context } = req.body;
 
@@ -137,7 +137,7 @@ router.post('/message', chatRateLimiter, asyncHandler(async (req: RequestWithTen
 
 // Get chat statistics
 router.get('/stats', asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
   const userId = req.headers['x-user-id'] as string;
 
   if (!tenantId || !userId) {
@@ -185,7 +185,7 @@ router.get('/stats', asyncHandler(async (req: RequestWithTenant, res: Response) 
 
 // Clear chat history
 router.delete('/', asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
   const userId = req.headers['x-user-id'] as string;
 
   if (!tenantId || !userId) {

@@ -1,7 +1,6 @@
 import React from 'react';
 
 // Forçar renderização dinâmica para todas as páginas do dashboard
-export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default function DashboardLayout({
