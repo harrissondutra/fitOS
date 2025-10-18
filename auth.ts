@@ -8,6 +8,7 @@ const authPool = new Pool({
 
 const auth = betterAuth({
   database: authPool,
+  secret: process.env.BETTER_AUTH_SECRET || "super-secret-better-auth-key-for-production-fitos-2025",
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,

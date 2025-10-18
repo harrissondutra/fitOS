@@ -29,8 +29,10 @@ class EmailService {
 
   private initializeTransporter(): void {
     try {
-      if (!config.email.host || !config.email.auth?.user || !config.email.auth?.pass) {
-        logger.warn('Email configuration incomplete. Email service will not be available.');
+      // Desabilitar verificação de email temporariamente para desenvolvimento
+      if (!config.email.host || !config.email.auth?.user || !config.email.auth?.pass || 
+          config.email.auth.pass === 'sua-app-password-do-gmail') {
+        logger.warn('Email configuration incomplete or using default values. Email service will not be available.');
         return;
       }
 

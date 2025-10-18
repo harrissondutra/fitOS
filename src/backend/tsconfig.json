@@ -4,6 +4,8 @@
     "module": "commonjs",
     "lib": ["ES2022"],
     "outDir": "./dist",
+    "rootDir": "..",
+    "composite": true,
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -25,9 +27,9 @@
     "noUncheckedIndexedAccess": false,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "baseUrl": "./src",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
+      "@/*": ["./src/*"],
       "@/shared/*": ["../shared/*"]
     },
     "moduleResolution": "node",

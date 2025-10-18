@@ -6,12 +6,12 @@ const nextConfig = {
   // Configuração para desenvolvimento local
   reactStrictMode: true,
   
-  // Configuração de output para desenvolvimento
-  output: 'export',
-  
   // Forçar renderização dinâmica para todas as páginas
   trailingSlash: false,
   generateEtags: false,
+  
+  // Configuração de output tracing
+  outputFileTracingRoot: path.join(__dirname, '../..'),
   
   // Desabilitar ESLint durante o build
   eslint: {
@@ -26,25 +26,28 @@ const nextConfig = {
   
   // Variáveis de ambiente
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'FitOS',
     NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
   },
   
-  // Rewrites para API
+  // Rewrites para API (apenas em desenvolvimento)
   async rewrites() {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${apiUrl}/api/:path*`,
-      },
-      // Better Auth routes
-      {
-        source: '/api/auth/:path*',
-        destination: `${apiUrl}/api/auth/:path*`,
-      },
-    ];
+    if (process.env.NODE_ENV === 'development') {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      return [
+        {
+          source: '/api/:path*',
+          destination: `${apiUrl}/api/:path*`,
+        },
+        // Better Auth routes
+        {
+          source: '/api/auth/:path*',
+          destination: `${apiUrl}/api/auth/:path*`,
+        },
+      ];
+    }
+    return [];
   },
   
   // Configuração de webpack
@@ -61,28 +64,28 @@ const nextConfig = {
     return config;
   },
   
-  // Desabilitar pre-rendering estático completamente
-  experimental: {
-    esmExternals: false,
-  },
+  // Configurações experimentais removidas para evitar warnings
   
-  // Configuração de headers para desenvolvimento
+  // Configuração de headers (apenas em desenvolvimento)
   async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-        ],
-      },
-    ];
+    if (process.env.NODE_ENV === 'development') {
+      return [
+        {
+          source: '/(.*)',
+          headers: [
+            {
+              key: 'X-Frame-Options',
+              value: 'DENY',
+            },
+            {
+              key: 'X-Content-Type-Options',
+              value: 'nosniff',
+            },
+          ],
+        },
+      ];
+    }
+    return [];
   },
 };
 

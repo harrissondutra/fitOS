@@ -1,4 +1,4 @@
-name: FitOS - Complete CI/CD Pipeline
+name: FitOS - Dokploy CI/CD Pipeline
 
 on:
   push:
@@ -10,10 +10,10 @@ on:
       environment:
         description: 'Environment to deploy to'
         required: true
-        default: 'staging'
+        default: 'dokploy'
         type: choice
         options:
-          - staging
+          - dokploy
           - production
       force_deploy:
         description: 'Force deployment even if tests fail'
@@ -25,6 +25,7 @@ env:
   NODE_VERSION: '20'
   DOCKER_REGISTRY: 'docker.io'
   APP_NAME: 'fitos'
+  DOKPLOY_APP_NAME: 'fitos'
 
 jobs:
   # ===========================================
@@ -230,349 +231,70 @@ jobs:
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
 
   # ===========================================
-  # JOB 4: DEPLOY TO STAGING
+  # JOB 4: NOTIFY DOKPLOY AUTO-DEPLOY
   # ===========================================
-  deploy-staging:
-    name: 🚀 Deploy to Staging
+  notify-dokploy:
+    name: 📢 Notify Dokploy Auto-Deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     needs: [build-and-push]
     if: |
       always() && 
       (needs.build-and-push.result == 'success' || github.event.inputs.force_deploy == 'true') &&
-      (github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'staging')
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'dokploy')
 
     environment:
-      name: staging
-      url: https://fitOS.com/staging
+      name: dokploy
 
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      - name: 🔐 Setup SSH Key
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
-
-      - name: 🚀 Deploy to Staging
+      - name: 📢 Notify Dokploy Auto-Deploy
         run: |
-          echo "🚀 Deploying to staging environment..."
-          
-          # Create deployment script with retry logic
-          cat > deploy-staging.sh << 'EOF'
-          #!/bin/bash
-          set -e
-          
-          echo "📁 Navigating to staging directory..."
-          cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/staging
-          
-          echo "📥 Pulling latest Docker image..."
-          for i in {1..3}; do
-            if docker-compose pull; then
-              echo "✅ Docker image pulled successfully"
-              break
-            else
-              echo "⚠️ Attempt $i/3 failed, retrying..."
-              sleep 10
-            fi
-          done
-          
-          echo "🔄 Stopping existing containers..."
-          docker-compose down --remove-orphans || echo "⚠️ No containers to stop"
-          
-          echo "🚀 Starting new containers..."
-          docker-compose up -d
-          
-          echo "🧹 Cleaning up unused Docker resources..."
-          docker system prune -f || echo "⚠️ Cleanup failed, continuing..."
-          
-          echo "📊 Checking container status..."
-          docker-compose ps
-          
-          echo "📝 Checking application logs..."
-          docker-compose logs --tail=50
-          EOF
-          
-          chmod +x deploy-staging.sh
-          
-          # Execute deployment with retry
-          for i in {1..3}; do
-            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} 'bash -s' < deploy-staging.sh; then
-              echo "✅ Deployment successful"
-              break
-            else
-              echo "⚠️ Deployment attempt $i/3 failed, retrying..."
-              sleep 30
-            fi
-          done
-
-      - name: 🏥 Health Check
-        run: |
-          echo "⏳ Waiting for application to start..."
-          sleep 30
-          
-          echo "🏥 Performing health check..."
-          for i in {1..10}; do
-            if curl -f -s "http://${{ secrets.VPS_HOST }}:3001/api/health" > /dev/null; then
-              echo "✅ Health check passed!"
-              break
-            else
-              echo "⏳ Attempt $i/10 - Application not ready yet..."
-              sleep 10
-            fi
-          done
-          
-          # Final health check
-          if ! curl -f -s "http://${{ secrets.VPS_HOST }}:3001/api/health" > /dev/null; then
-            echo "❌ Health check failed!"
-            exit 1
-          fi
-
-      - name: 🗄️ Run Database Migrations
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
-          cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/staging
-          docker-compose exec -T backend npm run migrate:prod
-          EOF
-
-      - name: 📦 Upload Deployment Logs
-        if: failure()
-        run: |
-          echo "📦 Collecting deployment logs for debugging..."
-          mkdir -p deployment-logs
-          echo "Deployment failed at $(date)" > deployment-logs/staging-deployment.log
-          echo "Git SHA: ${{ github.sha }}" >> deployment-logs/staging-deployment.log
-          echo "Branch: ${{ github.ref_name }}" >> deployment-logs/staging-deployment.log
-          
-          # Try to get container logs
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} 'cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/staging && docker-compose logs --tail=100' >> deployment-logs/staging-deployment.log 2>&1 || echo "Could not retrieve container logs" >> deployment-logs/staging-deployment.log
-
-      - name: 📤 Upload Deployment Artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: staging-deployment-logs-${{ github.sha }}
-          path: deployment-logs/
-          retention-days: 7
-
-      - name: 📊 Generate Deployment Report
-        run: |
-          echo "## 🚀 Staging Deployment Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** Staging" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** ${{ needs.build-and-push.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** http://${{ secrets.VPS_HOST }}:3000" >> $GITHUB_STEP_SUMMARY
-          echo "**Health Check:** http://${{ secrets.VPS_HOST }}:3001/api/health" >> $GITHUB_STEP_SUMMARY
-
-  # ===========================================
-  # JOB 5: DEPLOY TO PRODUCTION
-  # ===========================================
-  deploy-production:
-    name: 🌟 Deploy to Production
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: [build-and-push, deploy-staging]
-    if: |
-      always() && 
-      (needs.build-and-push.result == 'success' || github.event.inputs.force_deploy == 'true') &&
-      (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production')
-
-    environment:
-      name: production
-      url: https://fitOS.com
-
-    steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v4
-
-      - name: 🔐 Setup SSH Key
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
-
-      - name: 💾 Create Backup
-        run: |
-          echo "💾 Creating backup of current production..."
-          
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
-          set -e
-          
-          echo "📁 Navigating to production directory..."
-          cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/production
-          
-          echo "💾 Creating backup..."
-          BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
-          mkdir -p "$BACKUP_DIR"
-          
-          # Backup database
-          docker-compose exec -T postgres pg_dump -U postgres fitos_prod > "$BACKUP_DIR/database.sql"
-          
-          # Backup application files
-          cp -r . "$BACKUP_DIR/app/"
-          
-          echo "✅ Backup created in $BACKUP_DIR"
-          EOF
-
-      - name: 🚀 Deploy to Production
-        run: |
-          echo "🚀 Deploying to production environment..."
-          
-          # Create deployment script
-          cat > deploy-production.sh << 'EOF'
-          #!/bin/bash
-          set -e
-          
-          echo "📁 Navigating to production directory..."
-          cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/production
-          
-          echo "📥 Pulling latest Docker image..."
-          docker-compose pull
-          
-          echo "🔄 Gracefully stopping existing containers..."
-          docker-compose down --timeout 30
-          
-          echo "🚀 Starting new containers..."
-          docker-compose up -d
-          
-          echo "🧹 Cleaning up unused Docker resources..."
-          docker system prune -f
-          
-          echo "📊 Checking container status..."
-          docker-compose ps
-          
-          echo "📝 Checking application logs..."
-          docker-compose logs --tail=50
-          EOF
-          
-          chmod +x deploy-production.sh
-          
-          # Execute deployment
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} 'bash -s' < deploy-production.sh
-
-      - name: 🏥 Health Check
-        run: |
-          echo "⏳ Waiting for application to start..."
-          sleep 60
-          
-          echo "🏥 Performing health check..."
-          for i in {1..15}; do
-            if curl -f -s "http://${{ secrets.VPS_HOST }}:3001/api/health" > /dev/null; then
-              echo "✅ Health check passed!"
-              break
-            else
-              echo "⏳ Attempt $i/15 - Application not ready yet..."
-              sleep 10
-            fi
-          done
-          
-          # Final health check
-          if ! curl -f -s "http://${{ secrets.VPS_HOST }}:3001/api/health" > /dev/null; then
-            echo "❌ Health check failed! Attempting rollback..."
-            
-            # Rollback
-            ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
-            cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/production
-            docker-compose down
-            docker-compose up -d
-            EOF
-            
-            exit 1
-          fi
-
-      - name: 🗄️ Run Database Migrations
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
-          cd ${{ secrets.VPS_PATH || '/opt/fitos' }}/production
-          docker-compose exec -T backend npm run migrate:prod
-          EOF
-
-      - name: 🔥 Warm Up Application
-        run: |
-          echo "🔥 Warming up application..."
-          curl -s "http://${{ secrets.VPS_HOST }}:3001/api/health" > /dev/null
-          curl -s "http://${{ secrets.VPS_HOST }}:3001/api/tenants" > /dev/null
-          echo "✅ Application warmed up successfully"
-
-      - name: 📊 Generate Deployment Report
-        run: |
-          echo "## 🌟 Production Deployment Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** ${{ needs.build-and-push.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** http://${{ secrets.VPS_HOST }}:3000" >> $GITHUB_STEP_SUMMARY
-          echo "**Health Check:** http://${{ secrets.VPS_HOST }}:3001/api/health" >> $GITHUB_STEP_SUMMARY
-          echo "**Backup:** Created before deployment" >> $GITHUB_STEP_SUMMARY
-
-  # ===========================================
-  # JOB 6: NOTIFY COOLIFY (Auto-Deploy)
-  # ===========================================
-  notify-coolify:
-    name: 📢 Notify Coolify (Auto-Deploy)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [validate-and-test, security-scan, build-and-push]
-    if: |
-      always() && 
-      (needs.validate-and-test.result == 'success' || github.event.inputs.force_deploy == 'true') &&
-      (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production')
-
-    environment:
-      name: coolify
-      url: https://fitOS.com
-
-    steps:
-      - name: 📥 Checkout Code
-        uses: actions/checkout@v4
-
-      - name: 📢 Notify Coolify (Optional)
-        run: |
-          echo "📢 Coolify has auto-deploy enabled!"
+          echo "📢 Dokploy has auto-deploy enabled!"
           echo "🚀 Your push will trigger automatic deployment"
           echo "✅ No manual intervention needed"
-          
-          # Optional: Send notification to Coolify
-          if [[ -n "${COOLIFY_WEBHOOK_URL}" && -n "${COOLIFY_TOKEN}" ]]; then
-            echo "📤 Sending notification to Coolify..."
-            curl --request GET "${COOLIFY_WEBHOOK_URL}" \
-                 --header "Authorization: Bearer ${COOLIFY_TOKEN}" \
-                 --header "Content-Type: application/json" \
-                 --fail-with-body || echo "⚠️ Coolify notification failed, but auto-deploy will still work"
-          fi
-          
-        env:
-          COOLIFY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          echo ""
+          echo "📦 Docker Image: ${{ env.DOCKER_REGISTRY }}/${{ env.APP_NAME }}:${{ github.sha }}"
+          echo "🌐 App URL: https://fitnessos.sistudo.com.br"
+          echo ""
+          echo "⏳ Dokploy will automatically:"
+          echo "  - Pull the new Docker image"
+          echo "  - Deploy the application"
+          echo "  - Update the running containers"
 
-      - name: 📊 Generate Coolify Status Report
+      - name: 📊 Generate Dokploy Status Report
         run: |
-          echo "## 🚀 Coolify Auto-Deploy Status" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Dokploy Auto-Deploy Status" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** Coolify (Auto-Deploy)" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Dokploy (Auto-Deploy)" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ env.DOCKER_REGISTRY }}/${{ env.APP_NAME }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Status:** ✅ Auto-Deploy Enabled" >> $GITHUB_STEP_SUMMARY
-          echo "**URL:** ${{ secrets.COOLIFY_APP_URL || 'Configure COOLIFY_APP_URL secret' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Note:** Coolify will automatically deploy this push" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://fitnessos.sistudo.com.br" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** Dokploy will automatically deploy this push" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Dokploy Resources:" >> $GITHUB_STEP_SUMMARY
+          echo "- [Dokploy Documentation](https://docs.dokploy.com/docs/core)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Docker Compose Guide](https://docs.dokploy.com/docs/core/docker-compose)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Environment Variables](https://docs.dokploy.com/docs/core/environment-variables)" >> $GITHUB_STEP_SUMMARY
 
   # ===========================================
-  # JOB 7: NOTIFICATION
+  # JOB 5: NOTIFICATION
   # ===========================================
   notify:
     name: 📢 Send Notifications
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [validate-and-test, security-scan, build-and-push, deploy-staging, deploy-production, notify-coolify]
+    needs: [validate-and-test, security-scan, build-and-push, notify-dokploy]
     if: always()
     continue-on-error: true
 
     steps:
       - name: 📊 Generate Summary
         run: |
-          echo "## 🎯 FitOS Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 FitOS Dokploy Auto-Deploy Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
@@ -584,15 +306,27 @@ jobs:
           echo "- **Validate & Test:** ${{ needs.validate-and-test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Security Scan:** ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Build & Push:** ${{ needs.build-and-push.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Deploy Staging:** ${{ needs.deploy-staging.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Deploy Production:** ${{ needs.deploy-production.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Coolify Auto-Deploy:** ${{ needs.notify-coolify.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Notify Dokploy:** ${{ needs.notify-dokploy.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Determine overall status
           if [[ "${{ needs.validate-and-test.result }}" == "success" && 
                 "${{ needs.build-and-push.result }}" == "success" ]]; then
             echo "### 🎉 Overall Status: ✅ SUCCESS" >> $GITHUB_STEP_SUMMARY
+            echo "### 🚀 Deployment: Dokploy will auto-deploy" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ❌ Overall Status: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔧 Check failed jobs above" >> $GITHUB_STEP_SUMMARY
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Dokploy Auto-Deploy:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Image:** ${{ env.DOCKER_REGISTRY }}/${{ env.APP_NAME }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **App URL:** https://fitnessos.sistudo.com.br" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Auto-deploy enabled in Dokploy" >> $GITHUB_STEP_SUMMARY
+          echo "- **Note:** No manual intervention needed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Dokploy Resources:" >> $GITHUB_STEP_SUMMARY
+          echo "- [Dokploy Documentation](https://docs.dokploy.com/docs/core)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Docker Compose Guide](https://docs.dokploy.com/docs/core/docker-compose)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Environment Variables](https://docs.dokploy.com/docs/core/environment-variables)" >> $GITHUB_STEP_SUMMARY
