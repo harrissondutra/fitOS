@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Better Auth retorna os dados em data.data.user
-      const userData = data?.data?.user || data?.user;
+      const userData = (data as any)?.data?.user || data?.user;
       
       if (userData) {
         setUser({
@@ -166,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Better Auth retorna os dados em result.data.user
-      const userData = result?.data?.user || result?.user;
+      const userData = (result as any)?.data?.user || result?.user;
       
       if (userData) {
         setUser({
@@ -241,7 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Better Auth retorna os dados em data.data.user
-      const userData = data?.data?.user || (data && 'user' in data ? data.user : null);
+      const userData = (data as any)?.data?.user || (data && 'user' in data ? data.user : null);
       
       if (userData) {
         setUser({
