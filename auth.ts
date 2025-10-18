@@ -16,8 +16,8 @@ const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // 1 day
   },
-  trustedOrigins: ["http://localhost:3000", "http://localhost:3001"],
-  baseURL: "http://localhost:3001",
+  trustedOrigins: process.env.TRUSTED_ORIGINS?.split(',') || ["http://localhost:3000", "http://localhost:3001"],
+  baseURL: process.env.BETTER_AUTH_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
 });
 
 export default auth;

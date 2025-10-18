@@ -35,7 +35,7 @@ export const sharedConfig = {
 
   // CORS
   cors: {
-    origins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+    origins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000', 'http://localhost:3001'],
   },
 
   // Server
@@ -90,3 +90,4 @@ export const sharedConfig = {
 };
 
 export default sharedConfig;
+

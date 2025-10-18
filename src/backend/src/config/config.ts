@@ -28,7 +28,7 @@ export const config = {
 
   // CORS
   cors: {
-    origins: ["http://localhost:3000", "http://localhost:3001"],
+    origins: process.env.CORS_ORIGINS?.split(',') || ["http://localhost:3000", "http://localhost:3001"],
   },
 
   // AI Services
