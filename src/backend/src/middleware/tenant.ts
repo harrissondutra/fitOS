@@ -1,27 +1,33 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
-import { TenantService } from '../services/tenant.service';
-
-export interface Tenant {
-  id: string;
-  name: string;
-  subdomain: string;
-  customDomain?: string;
-  status: 'active' | 'inactive' | 'suspended';
-  settings: Record<string, any>;
-}
 
 export interface RequestWithTenant extends Request {
-  tenant?: Tenant;
+  tenantId?: string;
 }
 
-const tenantService = TenantService.getInstance();
+/**
+ * Resolve tenant ID baseado no host ou header
+ */
+function resolveTenantFromHost(host: string): string {
+  // Exemplo: acme.fitos.com => "acme"
+  // Para desenvolvimento local: localhost:3000 => "default"
+  if (host.includes('localhost')) {
+    return 'default';
+  }
+  
+  const parts = host.split('.');
+  if (parts.length > 2) {
+    return parts[0]; // subdomain
+  }
+  
+  return 'default';
+}
 
-export const tenantMiddleware = async (
+export const tenantMiddleware = (
   req: RequestWithTenant,
   res: Response,
   next: NextFunction
-): Promise<void> => {
+): void => {
   try {
     // Skip tenant resolution for health check endpoints and Better Auth
     if (req.path.startsWith('/api/health') || req.path.startsWith('/api/auth/')) {
@@ -30,46 +36,30 @@ export const tenantMiddleware = async (
     }
 
     const host = req.get('host') || '';
-    const tenantId = req.headers['x-tenant-id'] as string;
+    const tenantIdFromHeader = req.headers['x-tenant-id'] as string;
     
-    let tenant: Tenant | null = null;
-
-    // Try to resolve tenant by ID first (for API calls)
-    if (tenantId) {
-      tenant = await tenantService.resolveTenantById(tenantId);
-    } else {
-      // Try to resolve tenant by hostname
-      tenant = await tenantService.resolveTenantByHost(host);
-    }
-
-    if (!tenant) {
-      logger.warn('Tenant not found', { host, tenantId });
-      res.status(404).json({
+    // Resolve tenant ID (prioriza header, depois host)
+    const tenantId = tenantIdFromHeader || resolveTenantFromHost(host);
+    
+    // Validação básica do tenant ID
+    if (!tenantId || tenantId.length < 1) {
+      logger.warn('Invalid tenant ID', { host, tenantIdFromHeader });
+      res.status(400).json({
         success: false,
         error: {
-          message: 'Tenant not found',
+          message: 'Invalid tenant ID',
         },
       });
       return;
     }
 
-    if (tenant.status !== 'active') {
-      logger.warn('Tenant not active', { tenantId: tenant.id, status: tenant.status });
-      res.status(403).json({
-        success: false,
-        error: {
-          message: 'Tenant is not active',
-        },
-      });
-      return;
-    }
-
-    // Attach tenant to request
-    req.tenant = tenant;
+    // Attach tenant ID to request
+    req.tenantId = tenantId;
     
     // Add tenant ID to response headers
-    res.set('X-Tenant-ID', tenant.id);
+    res.set('X-Tenant-ID', tenantId);
     
+    logger.debug('Tenant resolved', { tenantId, host });
     next();
   } catch (error) {
     logger.error('Tenant middleware error:', error);

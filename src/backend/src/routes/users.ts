@@ -16,7 +16,7 @@ interface RequestWithTenantAndAuth extends RequestWithTenant {
 
 // Get current user profile - será implementado com Better Auth
 router.get('/profile', asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
 
   if (!tenantId) {
     res.status(401).json({
@@ -39,7 +39,7 @@ router.get('/profile', asyncHandler(async (req: RequestWithTenantAndAuth, res: R
 
 // Update user profile - será implementado com Better Auth
 router.put('/profile', asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
 
   if (!tenantId) {
     res.status(401).json({
@@ -62,7 +62,7 @@ router.put('/profile', asyncHandler(async (req: RequestWithTenantAndAuth, res: R
 
 // Get all users (admin only) - será implementado com Better Auth
 router.get('/', asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
 
   if (!tenantId) {
     res.status(401).json({
@@ -85,7 +85,7 @@ router.get('/', asyncHandler(async (req: RequestWithTenantAndAuth, res: Response
 
 // Update user (admin only) - será implementado com Better Auth
 router.put('/:id', asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
 
   if (!tenantId) {
     res.status(401).json({

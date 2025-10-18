@@ -24,6 +24,25 @@ export function SignupForm({
     confirmPassword: "",
   })
 
+  const validatePassword = (password: string) => {
+    const minLength = password.length >= 8
+    const hasUpperCase = /[A-Z]/.test(password)
+    const hasLowerCase = /[a-z]/.test(password)
+    const hasNumbers = /\d/.test(password)
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password)
+    
+    return {
+      isValid: minLength && hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar,
+      errors: {
+        minLength: !minLength,
+        hasUpperCase: !hasUpperCase,
+        hasLowerCase: !hasLowerCase,
+        hasNumbers: !hasNumbers,
+        hasSpecialChar: !hasSpecialChar,
+      }
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -36,10 +55,11 @@ export function SignupForm({
       return
     }
 
-    if (formData.password.length < 8) {
+    const passwordValidation = validatePassword(formData.password)
+    if (!passwordValidation.isValid) {
       toast({
-        title: "Erro de validação",
-        description: "A senha deve ter pelo menos 8 caracteres",
+        title: "Senha inválida",
+        description: "A senha deve ter pelo menos 8 caracteres, incluindo maiúsculas, minúsculas, números e caracteres especiais",
         variant: "destructive",
       })
       return
@@ -136,6 +156,33 @@ export function SignupForm({
                     disabled={isLoading}
                     className="h-11"
                   />
+                  {formData.password && (
+                    <div className="space-y-1 text-xs">
+                      <div className="text-muted-foreground font-medium">Critérios da senha:</div>
+                      <div className="grid grid-cols-2 gap-1">
+                        <div className={`flex items-center gap-1 ${formData.password.length >= 8 ? 'text-green-600' : 'text-red-500'}`}>
+                          <span>{formData.password.length >= 8 ? '✓' : '✗'}</span>
+                          <span>Mínimo 8 caracteres</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${/[A-Z]/.test(formData.password) ? 'text-green-600' : 'text-red-500'}`}>
+                          <span>{/[A-Z]/.test(formData.password) ? '✓' : '✗'}</span>
+                          <span>Maiúscula</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${/[a-z]/.test(formData.password) ? 'text-green-600' : 'text-red-500'}`}>
+                          <span>{/[a-z]/.test(formData.password) ? '✓' : '✗'}</span>
+                          <span>Minúscula</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${/\d/.test(formData.password) ? 'text-green-600' : 'text-red-500'}`}>
+                          <span>{/\d/.test(formData.password) ? '✓' : '✗'}</span>
+                          <span>Número</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? 'text-green-600' : 'text-red-500'}`}>
+                          <span>{/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? '✓' : '✗'}</span>
+                          <span>Especial</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="space-y-2">

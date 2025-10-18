@@ -8,7 +8,7 @@ const router = Router();
 
 // Get all workouts
 router.get('/', asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
   const userId = req.headers['x-user-id'] as string;
   const userRole = req.headers['x-user-role'] as string;
 
@@ -58,7 +58,7 @@ router.get('/', asyncHandler(async (req: RequestWithTenant, res: Response) => {
 // Get workout by ID
 router.get('/:id', asyncHandler(async (req: RequestWithTenant, res: Response) => {
   const { id } = req.params;
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
   const userId = req.headers['x-user-id'] as string;
   const userRole = req.headers['x-user-role'] as string;
 
@@ -108,7 +108,7 @@ router.get('/:id', asyncHandler(async (req: RequestWithTenant, res: Response) =>
 
 // Create new workout
 router.post('/', asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
   const userId = req.headers['x-user-id'] as string;
   const { name, description, exercises } = req.body;
 
@@ -158,7 +158,7 @@ router.post('/', asyncHandler(async (req: RequestWithTenant, res: Response) => {
 // Update workout
 router.put('/:id', asyncHandler(async (req: RequestWithTenant, res: Response) => {
   const { id } = req.params;
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
   const userId = req.headers['x-user-id'] as string;
   const userRole = req.headers['x-user-role'] as string;
   const { name, description, exercises } = req.body;
@@ -230,7 +230,7 @@ router.put('/:id', asyncHandler(async (req: RequestWithTenant, res: Response) =>
 // Delete workout
 router.delete('/:id', asyncHandler(async (req: RequestWithTenant, res: Response) => {
   const { id } = req.params;
-  const tenantId = req.tenant?.id;
+  const tenantId = req.tenantId;
   const userId = req.headers['x-user-id'] as string;
   const userRole = req.headers['x-user-role'] as string;
 

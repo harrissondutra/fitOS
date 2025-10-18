@@ -1,7 +1,6 @@
 'use client';
 
 // Desabilitar pre-rendering estático para esta página
-export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';

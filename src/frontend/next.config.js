@@ -6,8 +6,8 @@ const nextConfig = {
   // Configuração para desenvolvimento local
   reactStrictMode: true,
   
-  // Desabilitar pre-rendering estático durante o build para evitar problemas com hooks
-  output: 'standalone',
+  // Configuração de output para desenvolvimento
+  output: 'export',
   
   // Forçar renderização dinâmica para todas as páginas
   trailingSlash: false,

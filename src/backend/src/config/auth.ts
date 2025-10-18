@@ -1,16 +1,27 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcrypt";
 
+// PrismaClient global para Better Auth (não troca schema por tenant)
 const prisma = new PrismaClient();
 
-export const auth = betterAuth({
+const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    password: {
+      // Usar bcrypt para compatibilidade com dados existentes
+      hash: async (password: string) => {
+        return await bcrypt.hash(password, 10);
+      },
+      verify: async (data: { password: string; hash: string }) => {
+        return await bcrypt.compare(data.password, data.hash);
+      },
+    },
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
@@ -20,4 +31,5 @@ export const auth = betterAuth({
   baseURL: "http://localhost:3001",
 });
 
+export default auth;
 export type Session = typeof auth.$Infer.Session;

@@ -61,8 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const result = await response.json();
         console.log('📥 Resposta da sessão:', result);
         
-        if (result.success && result.data?.user) {
-          const userData = result.data.user;
+        // Better Auth retorna os dados em result.user
+        const userData = result?.user;
+        if (userData) {
           setUser({
             id: userData.id,
             email: userData.email,
@@ -98,18 +99,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
 
+      console.log('📊 Status da resposta:', response.status);
+      console.log('📊 Headers da resposta:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Erro do backend (status:', response.status, '):', errorText);
+        throw new Error(`Erro do servidor: ${response.status} - ${errorText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const textResponse = await response.text();
+        console.error('❌ Resposta não é JSON:', textResponse);
+        throw new Error('Resposta inválida do servidor');
+      }
+
       const result = await response.json();
       console.log('📥 Resposta do backend:', result);
 
-      if (!response.ok || !result.success) {
-        console.error('❌ Erro do backend:', result);
-        throw new Error(result.error?.message || 'Falha no login');
-      }
-
-      const { data } = result;
-
-      // O backend retorna os dados diretamente em data.user
-      const userData = data?.user;
+      // Better Auth retorna os dados diretamente no resultado
+      const userData = result?.user;
       
       if (userData) {
         setUser({
@@ -151,7 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         console.warn('⚠️ Login retornou sem dados de usuário');
-        console.log('Estrutura da resposta:', data);
+        console.log('Estrutura da resposta:', result);
         throw new Error('Dados de usuário não encontrados');
       }
     } catch (error: any) {
