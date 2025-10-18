@@ -23,8 +23,8 @@ export const tenantMiddleware = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Skip tenant resolution for health check endpoints
-    if (req.path.startsWith('/api/health')) {
+    // Skip tenant resolution for health check endpoints and Better Auth
+    if (req.path.startsWith('/api/health') || req.path.startsWith('/api/auth/')) {
       next();
       return;
     }

@@ -21,7 +21,7 @@
     "db:generate": "prisma generate"
   },
   "dependencies": {
-    "@prisma/client": "^5.7.0",
+    "@prisma/client": "^5.22.0",
     "@stripe/stripe-js": "^8.0.0",
     "@types/pg": "^8.15.5",
     "axios": "^1.6.2",

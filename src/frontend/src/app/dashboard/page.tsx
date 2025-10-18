@@ -41,7 +41,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Dumbbell className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">FitOS Dashboard</span>
+              <span className="text-2xl font-bold">Member Dashboard</span>
             </div>
             
             <div className="flex items-center space-x-4">

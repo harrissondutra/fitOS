@@ -20,7 +20,6 @@ import { tenantMiddleware } from './middleware/tenant';
 
 // Import routes
 import { authRoutes } from './routes/auth';
-// import betterAuthRoutes from './routes/better-auth';
 import { userRoutes } from './routes/users';
 import { workoutRoutes } from './routes/workouts';
 import { chatRoutes } from './routes/chat';
@@ -88,8 +87,8 @@ class FitOSServer {
     // Health check
     this.app.use('/api/health', healthRoutes);
 
-    // Auth routes
-    this.app.use('/api/auth', authRoutes);
+    // Auth routes (Better Auth implementation)
+    this.app.use('/', authRoutes);
 
     // API routes
     this.app.use('/api/users', userRoutes);
@@ -114,25 +113,33 @@ class FitOSServer {
   }
 
   private setupSocketIO(): void {
-    this.io = new SocketIOServer(this.server, {
-      cors: {
-        origin: config.cors.origins,
-        methods: ['GET', 'POST']
-      }
-    });
-
-    this.io.on('connection', (socket) => {
-      logger.info(`Client connected: ${socket.id}`);
-
-      socket.on('join-tenant', (tenantId: string) => {
-        socket.join(`tenant-${tenantId}`);
-        logger.info(`Client ${socket.id} joined tenant ${tenantId}`);
+    try {
+      logger.info('🔌 Setting up Socket.IO...');
+      this.io = new SocketIOServer(this.server, {
+        cors: {
+          origin: "*",
+          methods: ["GET", "POST"]
+        }
       });
 
-      socket.on('disconnect', () => {
-        logger.info(`Client disconnected: ${socket.id}`);
+      this.io.on('connection', (socket) => {
+        logger.info(`Client connected: ${socket.id}`);
+
+        socket.on('join-tenant', (tenantId: string) => {
+          socket.join(`tenant-${tenantId}`);
+          logger.info(`Client ${socket.id} joined tenant ${tenantId}`);
+        });
+
+        socket.on('disconnect', () => {
+          logger.info(`Client disconnected: ${socket.id}`);
+        });
       });
-    });
+      
+      logger.info('✅ Socket.IO setup complete');
+    } catch (error) {
+      logger.error('❌ Socket.IO setup failed:', error);
+      throw error;
+    }
   }
 
   public async start(): Promise<void> {
@@ -150,21 +157,36 @@ class FitOSServer {
       }
 
       // Create HTTP server
+      logger.info('🌐 Creating HTTP server...');
       this.server = createServer(this.app);
 
-      // Setup Socket.IO
-      this.setupSocketIO();
+      // Setup Socket.IO (temporarily disabled)
+      // this.setupSocketIO();
 
       // Start server
+      logger.info(`🚀 Starting server on port ${config.port}...`);
       this.server.listen(config.port, () => {
         logger.info(`🚀 FitOS Backend running on port ${config.port}`);
         logger.info(`📱 Environment: ${config.nodeEnv}`);
         logger.info(`🔗 Health check: http://localhost:${config.port}/api/health`);
       });
 
+      logger.info('✅ Server started successfully!');
+
       // Graceful shutdown
       process.on('SIGTERM', this.gracefulShutdown.bind(this));
       process.on('SIGINT', this.gracefulShutdown.bind(this));
+      
+      // Handle uncaught exceptions
+      process.on('uncaughtException', (error) => {
+        logger.error('❌ Uncaught Exception:', error);
+        process.exit(1);
+      });
+      
+      process.on('unhandledRejection', (reason, promise) => {
+        logger.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+        process.exit(1);
+      });
 
     } catch (error) {
       logger.error('Failed to start server:', error);

@@ -2,8 +2,9 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
-import { API_BASE_URL } from '@/lib/auth-client';
+import { useToast } from '@/hooks/use-toast';
+import { authClient } from '@/lib/auth-client';
+import { getDashboardUrl, getRoleDisplayName, type UserRole } from '@/lib/role-redirect';
 
 interface AuthUser {
   id: string;
@@ -12,7 +13,7 @@ interface AuthUser {
   firstName?: string;
   lastName?: string;
   phone?: string;
-  role: string;
+  role: UserRole;
   status: string;
   createdAt: Date;
 }
@@ -38,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     // Check for existing session
@@ -46,24 +48,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkSession = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        // Verify token and get user info
-        const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Tenant-ID': localStorage.getItem('tenantId') || '',
-          },
+      const { data } = await authClient.getSession();
+      if (data?.session && data?.user) {
+        setUser({
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name || data.user.email,
+          firstName: (data.user as any).firstName || '',
+          lastName: (data.user as any).lastName || '',
+          phone: (data.user as any).phone || '',
+          role: (data.user as any).role || 'member',
+          status: (data.user as any).status || 'ACTIVE',
+          createdAt: new Date(data.user.createdAt),
         });
-        
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData.data.user);
-        } else {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('tenantId');
-        }
       }
     } catch (error) {
       console.error('Session check failed:', error);
@@ -73,58 +70,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    console.log('Iniciando login...', { email });
+    console.log('🔐 Iniciando login...', { email });
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Tenant-ID': 'cmgtv73ht0006u8so2hmw7qmw', // Default tenant for now
-        },
-        body: JSON.stringify({ email, password }),
+      console.log('📡 Chamando authClient.signIn.email...');
+      const { data, error } = await authClient.signIn.email({
+        email,
+        password,
       });
 
-      const data = await response.json();
+      console.log('📥 Resposta do authClient:', { data, error });
 
-      if (response.ok && data.success) {
-        const { user: userData, tokens } = data.data;
-        
-        // Store tokens and tenant ID
-        localStorage.setItem('accessToken', tokens.accessToken);
-        localStorage.setItem('refreshToken', tokens.refreshToken);
-        localStorage.setItem('tenantId', 'cmgtv73ht0006u8so2hmw7qmw');
-        
+      if (error) {
+        console.error('❌ Erro do authClient:', error);
+        throw new Error(error.message || 'Falha no login');
+      }
+
+      // Better Auth retorna os dados em data.data.user
+      const userData = data?.data?.user || data?.user;
+      
+      if (userData) {
         setUser({
           id: userData.id,
           email: userData.email,
-          name: `${userData.firstName} ${userData.lastName}`,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          phone: userData.phone,
-          role: userData.role,
-          status: userData.status,
-          createdAt: new Date(),
+          name: userData.name || userData.email,
+          firstName: (userData as any).firstName || '',
+          lastName: (userData as any).lastName || '',
+          phone: (userData as any).phone || '',
+          role: (userData as any).role || 'member',
+          status: (userData as any).status || 'ACTIVE',
+          createdAt: new Date(userData.createdAt),
         });
         
-        toast.success('Login realizado com sucesso!');
-        console.log('Redirecionando para /dashboard...');
+        const dashboardUrl = getDashboardUrl({
+          id: userData.id,
+          email: userData.email,
+          name: userData.name || userData.email,
+          role: (userData as any).role || 'member',
+          status: (userData as any).status || 'ACTIVE'
+        });
+        
+        const roleDisplayName = getRoleDisplayName((userData as any).role || 'member');
+        
+        console.log('✅ Login bem-sucedido!', { user: userData, dashboardUrl });
+        
+        toast({
+          title: "Login realizado com sucesso!",
+          description: `Bem-vindo ao FitOS como ${roleDisplayName}!`,
+        });
+        console.log(`🔄 Redirecionando para ${dashboardUrl}...`);
         
         // Try router.push first, fallback to window.location
         try {
-          router.push('/dashboard');
+          router.push(dashboardUrl);
         } catch (error) {
           console.warn('Router.push failed, using window.location:', error);
-          window.location.href = '/dashboard';
+          window.location.href = dashboardUrl;
         }
       } else {
-        throw new Error(data.error?.message || 'Falha no login');
+        console.warn('⚠️ Login retornou sem dados de usuário');
+        console.log('Estrutura da resposta:', data);
+        throw new Error('Dados de usuário não encontrados');
       }
     } catch (error: any) {
-      console.error('Login error:', error);
-      toast.error(error.message || 'Falha no login');
+      console.error('❌ Login error:', error);
+      toast({
+        title: "Erro no login",
+        description: error.message || 'Falha no login',
+        variant: "destructive",
+      });
       throw error;
     } finally {
+      console.log('🏁 Finalizando processo de login');
       setIsLoading(false);
     }
   };
@@ -138,53 +155,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Tenant-ID': 'cmgtv73ht0006u8so2hmw7qmw', // Default tenant for now
-        },
-        body: JSON.stringify(data),
+      const { data: result, error } = await authClient.signUp.email({
+        email: data.email,
+        password: data.password,
+        name: `${data.firstName} ${data.lastName}`,
       });
 
-      const result = await response.json();
+      if (error) {
+        throw new Error(error.message || 'Falha no cadastro');
+      }
 
-      if (response.ok && result.success) {
-        const { user: userData, tokens } = result.data;
-        
-        // Store tokens and tenant ID
-        localStorage.setItem('accessToken', tokens.accessToken);
-        localStorage.setItem('refreshToken', tokens.refreshToken);
-        localStorage.setItem('tenantId', 'cmgtv73ht0006u8so2hmw7qmw');
-        
+      // Better Auth retorna os dados em result.data.user
+      const userData = result?.data?.user || result?.user;
+      
+      if (userData) {
         setUser({
           id: userData.id,
           email: userData.email,
-          name: `${userData.firstName} ${userData.lastName}`,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          phone: userData.phone,
-          role: userData.role,
-          status: userData.status,
+          name: userData.name || `${data.firstName} ${data.lastName}`,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone || '',
+          role: (userData as any).role || 'member',
+          status: (userData as any).status || 'ACTIVE',
           createdAt: new Date(userData.createdAt),
         });
         
-        toast.success('Cadastro realizado com sucesso!');
-        console.log('Redirecionando para /dashboard...');
+        const dashboardUrl = getDashboardUrl({
+          id: userData.id,
+          email: userData.email,
+          name: userData.name || `${data.firstName} ${data.lastName}`,
+          role: (userData as any).role || 'member',
+          status: (userData as any).status || 'ACTIVE'
+        });
+        
+        const roleDisplayName = getRoleDisplayName((userData as any).role || 'member');
+        
+        toast({
+          title: "Cadastro realizado com sucesso!",
+          description: `Bem-vindo ao FitOS como ${roleDisplayName}!`,
+        });
+        console.log(`Redirecionando para ${dashboardUrl}...`);
         
         // Try router.push first, fallback to window.location
         try {
-          router.push('/dashboard');
+          router.push(dashboardUrl);
         } catch (error) {
           console.warn('Router.push failed, using window.location:', error);
-          window.location.href = '/dashboard';
+          window.location.href = dashboardUrl;
         }
-      } else {
-        throw new Error(result.error?.message || 'Falha no cadastro');
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      toast.error(error.message || 'Falha no cadastro');
+      toast({
+        title: "Erro no cadastro",
+        description: error.message || 'Falha no cadastro',
+        variant: "destructive",
+      });
       throw error;
     } finally {
       setIsLoading(false);
@@ -193,20 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (refreshToken) {
-        await fetch(`${API_BASE_URL}/api/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ refreshToken }),
-        });
-      }
-      
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('tenantId');
+      await authClient.signOut();
       setUser(null);
       router.push('/');
     } catch (error) {
@@ -215,8 +229,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const socialLogin = async (provider: 'google' | 'microsoft' | 'facebook') => {
-    // Social login not implemented yet
-    throw new Error('Social login not implemented yet');
+    setIsLoading(true);
+    try {
+      const { data, error } = await authClient.signIn.social({
+        provider,
+        callbackURL: "/dashboard",
+      });
+
+      if (error) {
+        throw new Error(error.message || `Falha no login com ${provider}`);
+      }
+
+      // Better Auth retorna os dados em data.data.user
+      const userData = data?.data?.user || (data && 'user' in data ? data.user : null);
+      
+      if (userData) {
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          name: userData.name || userData.email,
+          firstName: (userData as any).firstName || '',
+          lastName: (userData as any).lastName || '',
+          phone: (userData as any).phone || '',
+          role: (userData as any).role || 'member',
+          status: (userData as any).status || 'ACTIVE',
+          createdAt: new Date(userData.createdAt),
+        });
+        
+        const dashboardUrl = getDashboardUrl({
+          id: userData.id,
+          email: userData.email,
+          name: userData.name || userData.email,
+          role: (userData as any).role || 'member',
+          status: (userData as any).status || 'ACTIVE'
+        });
+        
+        const roleDisplayName = getRoleDisplayName((userData as any).role || 'member');
+        
+        toast({
+          title: "Login realizado com sucesso!",
+          description: `Bem-vindo ao FitOS como ${roleDisplayName} via ${provider}!`,
+        });
+        
+        router.push(dashboardUrl);
+      }
+    } catch (error: any) {
+      console.error(`Social login error with ${provider}:`, error);
+      toast({
+        title: "Erro no login social",
+        description: error.message || `Falha no login com ${provider}`,
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const value = {
