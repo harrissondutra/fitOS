@@ -50,19 +50,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkSession = async () => {
     try {
-      const { data } = await authClient.getSession();
-      if (data?.session && data?.user) {
-        setUser({
-          id: data.user.id,
-          email: data.user.email,
-          name: data.user.name || data.user.email,
-          firstName: (data.user as any).firstName || '',
-          lastName: (data.user as any).lastName || '',
-          phone: (data.user as any).phone || '',
-          role: (data.user as any).role || 'member',
-          status: (data.user as any).status || 'ACTIVE',
-          createdAt: new Date(data.user.createdAt),
-        });
+      console.log('🔍 Verificando sessão...');
+      
+      const response = await fetch('http://localhost:3001/api/auth/session', {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('📥 Resposta da sessão:', result);
+        
+        if (result.success && result.data?.user) {
+          const userData = result.data.user;
+          setUser({
+            id: userData.id,
+            email: userData.email,
+            name: userData.name || userData.email,
+            firstName: (userData as any).firstName || '',
+            lastName: (userData as any).lastName || '',
+            phone: (userData as any).phone || '',
+            role: (userData as any).role || 'member',
+            status: (userData as any).status || 'ACTIVE',
+            createdAt: new Date(userData.createdAt),
+          });
+        }
       }
     } catch (error) {
       console.error('Session check failed:', error);
