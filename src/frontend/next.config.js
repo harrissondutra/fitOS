@@ -1,4 +1,7 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+
 const nextConfig = {
   // Configuração para desenvolvimento local
   reactStrictMode: true,
@@ -35,6 +38,11 @@ const nextConfig = {
       {
         source: '/api/:path*',
         destination: `${apiUrl}/api/:path*`,
+      },
+      // Better Auth routes
+      {
+        source: '/api/auth/:path*',
+        destination: `${apiUrl}/api/auth/:path*`,
       },
     ];
   },

@@ -37,8 +37,8 @@ export const rateLimiter = rateLimit({
 
 // Stricter rate limiting for auth endpoints
 export const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
+  windowMs: 2 * 60 * 1000, // 2 minutes
+  max: 20, // 20 attempts per window
   message: {
     success: false,
     error: {

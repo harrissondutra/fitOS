@@ -1,49 +1,38 @@
-import dotenv from 'dotenv';
-
-dotenv.config();
+import { sharedConfig } from '../../../shared/config/env';
 
 export const config = {
   // Server
-  port: parseInt(process.env.PORT_BACKEND || '3001', 10),
-  nodeEnv: process.env.NODE_ENV || 'development',
+  port: sharedConfig.server.port,
+  nodeEnv: sharedConfig.server.nodeEnv,
   
   // Database
   database: {
-    url: process.env.DATABASE_URL || 'postgres://postgres:odzOGPnbD3O9f6QYus605EKMKiIewNLzL4wh4T9W90Jyo1NTAoUTC7dCRZ3rZ81o@150.136.182.94:5432/postgres',
+    url: sharedConfig.database.url,
     maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '10', 10),
     connectionTimeout: parseInt(process.env.DB_CONNECTION_TIMEOUT || '30000', 10),
   },
 
   // Redis
   redis: {
-    url: process.env.REDIS_URL || 'redis://localhost:6379',
-    password: process.env.REDIS_PASSWORD,
-    db: parseInt(process.env.REDIS_DB || '0', 10),
+    url: sharedConfig.redis.url,
+    password: sharedConfig.redis.password,
+    db: sharedConfig.redis.db,
   },
 
   // JWT
   jwt: {
-    secret: process.env.JWT_SECRET || 'fitos-super-secret-key',
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
+    secret: sharedConfig.jwt.secret,
+    expiresIn: sharedConfig.jwt.expiresIn,
+    refreshExpiresIn: sharedConfig.jwt.refreshExpiresIn,
   },
 
   // CORS
   cors: {
-    origins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+    origins: ["http://localhost:3000", "http://localhost:3001"],
   },
 
   // AI Services
-  ai: {
-    ollama: {
-      baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-      model: process.env.OLLAMA_MODEL || 'llama2',
-    },
-    chroma: {
-      baseUrl: process.env.CHROMA_BASE_URL || 'http://localhost:8000',
-      collection: process.env.CHROMA_COLLECTION || 'fitos-knowledge',
-    },
-  },
+  ai: sharedConfig.ai,
 
   // External APIs
   external: {

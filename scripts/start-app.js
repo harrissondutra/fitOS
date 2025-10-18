@@ -154,13 +154,13 @@ async function startDev() {
     });
   } else {
     // Em desenvolvimento, usar dotenv-cli
-    backend = spawn('npx', ['dotenv-cli', '-e', '../../.env', '--', 'npm', 'run', 'dev'], {
+    backend = spawn('npx', ['dotenv-cli', '-e', '.env', '--', 'npm', 'run', 'dev'], {
       cwd: backendPath,
       stdio: 'pipe',
       shell: true
     });
     
-    frontend = spawn('npm', ['run', 'dev'], {
+    frontend = spawn('npx', ['dotenv-cli', '-e', '.env', '--', 'npm', 'run', 'dev'], {
       cwd: frontendPath,
       stdio: 'pipe',
       shell: true

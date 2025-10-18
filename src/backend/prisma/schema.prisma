@@ -11,48 +11,50 @@ datasource db {
 }
 
 // Tabela de Tenants (Organizações)
+
 model Tenant {
-  id                    String   @id @default(cuid())
-  name                  String
-  subdomain             String   @unique
-  customDomain          String?  @unique @map("custom_domain")
-  plan                  String   @default("starter")
-  status                String   @default("active")
-  billingEmail          String   @map("billing_email")
-  stripeCustomerId      String?  @map("stripe_customer_id")
-  stripeSubscriptionId  String?  @map("stripe_subscription_id")
-  settings              Json     @default("{}")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                   String   @id @default(cuid())
+  name                 String
+  subdomain            String   @unique
+  customDomain         String?  @unique @map("custom_domain")
+  plan                 String   @default("starter")
+  status               String   @default("active")
+  billingEmail         String   @map("billing_email")
+  stripeCustomerId     String?  @map("stripe_customer_id")
+  stripeSubscriptionId String?  @map("stripe_subscription_id")
+  settings             Json     @default("{}")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  users                 User[]
-  members               Member[]
-  workouts              Workout[]
-  aiSessions            AiSession[]
-  biometricData         BiometricData[]
-  churnPredictions      ChurnPrediction[]
-  chatMessages          ChatMessage[]
-  subscriptions         Subscription[]
+  users            FitOSUser[]
+  members          Member[]
+  workouts         Workout[]
+  aiSessions       AiSession[]
+  biometricData    BiometricData[]
+  churnPredictions ChurnPrediction[]
+  chatMessages     ChatMessage[]
+  subscriptions    Subscription[]
 
   @@map("tenants")
 }
 
 // Tabela de Usuários
-model User {
-  id        String   @id @default(cuid())
-  tenantId  String   @map("tenant_id")
+
+model FitOSUser {
+  id        String    @id @default(cuid())
+  tenantId  String    @map("tenant_id")
   email     String
-  password  String   @map("password_hash")
-  firstName String   @map("first_name")
-  lastName  String   @map("last_name")
+  password  String    @map("password_hash")
+  firstName String    @map("first_name")
+  lastName  String    @map("last_name")
   phone     String?
-  role      String   // owner, admin, trainer, member
-  status    String   @default("ACTIVE")
-  profile   Json     @default("{}")
+  role      String // owner, admin, trainer, member
+  status    String    @default("ACTIVE")
+  profile   Json      @default("{}")
   lastLogin DateTime? @map("last_login")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   // Relacionamentos
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -62,11 +64,16 @@ model User {
   chatMessages  ChatMessage[]
   workouts      Workout[]
 
+  name          String?
+  emailVerified Boolean   @default(false)
+  image         String?
+
   @@unique([tenantId, email])
   @@map("users")
 }
 
 // Tabela de Membros
+
 model Member {
   id             String   @id @default(cuid())
   tenantId       String   @map("tenant_id")
@@ -82,9 +89,9 @@ model Member {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workouts        Workout[]
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user             FitOSUser?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workouts         Workout[]
   biometricRecords BiometricData[]
   churnPredictions ChurnPrediction[]
 
@@ -92,30 +99,32 @@ model Member {
 }
 
 // Tabela de Treinos
+
 model Workout {
-  id           String   @id @default(cuid())
-  tenantId     String   @map("tenant_id")
-  memberId     String   @map("member_id")
-  userId       String   @map("user_id")
-  name         String
-  description  String?
-  exercises    Json     @default("[]")
-  aiGenerated  Boolean  @default(false) @map("ai_generated")
-  completed    Boolean  @default(false)
-  completedAt  DateTime? @map("completed_at")
-  feedback     Json     @default("{}")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  memberId    String    @map("member_id")
+  userId      String    @map("user_id")
+  name        String
+  description String?
+  exercises   Json      @default("[]")
+  aiGenerated Boolean   @default(false) @map("ai_generated")
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at")
+  feedback    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relacionamentos
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   FitOSUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("workouts")
 }
 
 // Tabela de Sessões de Chat IA
+
 model AiSession {
   id        String   @id @default(cuid())
   tenantId  String   @map("tenant_id")
@@ -128,12 +137,13 @@ model AiSession {
 
   // Relacionamentos
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   FitOSUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("ai_sessions")
 }
 
 // Tabela de Dados Biométricos
+
 model BiometricData {
   id         String   @id @default(cuid())
   tenantId   String   @map("tenant_id")
@@ -142,7 +152,7 @@ model BiometricData {
   value      Float
   unit       String
   recordedAt DateTime @map("recorded_at")
-  source     String   // apple_health, google_fit, manual
+  source     String // apple_health, google_fit, manual
   createdAt  DateTime @default(now()) @map("created_at")
 
   // Relacionamentos
@@ -153,11 +163,12 @@ model BiometricData {
 }
 
 // Tabela de Predições de Churn
+
 model ChurnPrediction {
   id               String   @id @default(cuid())
   tenantId         String   @map("tenant_id")
   memberId         String   @map("member_id")
-  churnProbability Float  @map("churn_probability")
+  churnProbability Float    @map("churn_probability")
   riskFactors      Json     @default("[]") @map("risk_factors")
   suggestedActions Json     @default("[]") @map("suggested_actions")
   predictedAt      DateTime @default(now()) @map("predicted_at")
@@ -171,6 +182,7 @@ model ChurnPrediction {
 }
 
 // Tabela de Refresh Tokens
+
 model RefreshToken {
   id        String   @id @default(cuid())
   token     String   @unique
@@ -179,111 +191,190 @@ model RefreshToken {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relacionamentos
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user FitOSUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
 }
 
 // Tabela de Mensagens de Chat
+
 model ChatMessage {
   id        String   @id @default(cuid())
   tenantId  String   @map("tenant_id")
   userId    String   @map("user_id")
   sessionId String   @map("session_id")
   content   String
-  role      String   // user, assistant, system
+  role      String // user, assistant, system
   metadata  Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relacionamentos
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   FitOSUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("chat_messages")
 }
 
 // Tabela de Planos de Assinatura
+
 model SubscriptionPlan {
-  id              String   @id @default(cuid())
-  name            String   // starter, professional, enterprise
-  displayName     String   @map("display_name")
-  description     String?
-  price           Float
-  currency        String   @default("BRL")
-  interval        String   // month, year
-  stripePriceId   String?  @map("stripe_price_id")
-  mercadoPagoId  String?  @map("mercado_pago_id")
-  features        Json     @default("[]")
-  limits          Json     @default("{}")
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  name          String // starter, professional, enterprise
+  displayName   String   @map("display_name")
+  description   String?
+  price         Float
+  currency      String   @default("BRL")
+  interval      String // month, year
+  stripePriceId String?  @map("stripe_price_id")
+  mercadoPagoId String?  @map("mercado_pago_id")
+  features      Json     @default("[]")
+  limits        Json     @default("{}")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  subscriptions   Subscription[]
+  subscriptions Subscription[]
 
   @@map("subscription_plans")
 }
 
 // Tabela de Assinaturas
+
 model Subscription {
-  id                    String   @id @default(cuid())
-  tenantId              String   @map("tenant_id")
-  planId                String   @map("plan_id")
-  status                String   // active, cancelled, past_due, unpaid
-  currentPeriodStart    DateTime @map("current_period_start")
-  currentPeriodEnd      DateTime @map("current_period_end")
-  cancelAtPeriodEnd     Boolean  @default(false) @map("cancel_at_period_end")
-  cancelledAt           DateTime? @map("cancelled_at")
-  stripeSubscriptionId  String?  @map("stripe_subscription_id")
-  mercadoPagoId        String?  @map("mercado_pago_id")
-  paymentMethod         String?  @map("payment_method") // stripe, mercadopago
-  metadata              Json     @default("{}")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                   String    @id @default(cuid())
+  tenantId             String    @map("tenant_id")
+  planId               String    @map("plan_id")
+  status               String // active, cancelled, past_due, unpaid
+  currentPeriodStart   DateTime  @map("current_period_start")
+  currentPeriodEnd     DateTime  @map("current_period_end")
+  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+  cancelledAt          DateTime? @map("cancelled_at")
+  stripeSubscriptionId String?   @map("stripe_subscription_id")
+  mercadoPagoId        String?   @map("mercado_pago_id")
+  paymentMethod        String?   @map("payment_method") // stripe, mercadopago
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   // Relacionamentos
-  tenant                Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  plan                  SubscriptionPlan  @relation(fields: [planId], references: [id])
-  invoices              Invoice[]
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan @relation(fields: [planId], references: [id])
+  invoices Invoice[]
 
   @@map("subscriptions")
 }
 
 // Tabela de Faturas
+
 model Invoice {
-  id                    String   @id @default(cuid())
-  subscriptionId        String   @map("subscription_id")
-  amount                Float
-  currency              String   @default("BRL")
-  status                String   // paid, pending, failed, refunded
-  stripeInvoiceId       String?  @map("stripe_invoice_id")
-  mercadoPagoId        String?  @map("mercado_pago_id")
-  paymentIntentId       String?  @map("payment_intent_id")
-  paidAt                DateTime? @map("paid_at")
-  dueDate               DateTime @map("due_date")
-  metadata              Json     @default("{}")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id              String    @id @default(cuid())
+  subscriptionId  String    @map("subscription_id")
+  amount          Float
+  currency        String    @default("BRL")
+  status          String // paid, pending, failed, refunded
+  stripeInvoiceId String?   @map("stripe_invoice_id")
+  mercadoPagoId   String?   @map("mercado_pago_id")
+  paymentIntentId String?   @map("payment_intent_id")
+  paidAt          DateTime? @map("paid_at")
+  dueDate         DateTime  @map("due_date")
+  metadata        Json      @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   // Relacionamentos
-  subscription          Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@map("invoices")
 }
 
 // Tabela de Webhooks de Pagamento
+
 model PaymentWebhook {
-  id            String   @id @default(cuid())
-  provider      String   // stripe, mercadopago
-  eventType     String   @map("event_type")
-  eventId       String   @map("event_id")
-  payload       Json
-  processed     Boolean  @default(false)
-  processedAt   DateTime? @map("processed_at")
-  error         String?
-  createdAt     DateTime @default(now()) @map("created_at")
+  id          String    @id @default(cuid())
+  provider    String // stripe, mercadopago
+  eventType   String    @map("event_type")
+  eventId     String    @map("event_id")
+  payload     Json
+  processed   Boolean   @default(false)
+  processedAt DateTime? @map("processed_at")
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   @@unique([provider, eventId])
   @@map("payment_webhooks")
 }
+
+// ===== TABELAS DO BETTER AUTH =====
+
+// Tabela de Usuários do Better Auth
+
+model User {
+  id            String   @id
+  email         String   @unique
+  emailVerified Boolean  @default(false) @map("email_verified")
+  name          String?
+  image         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  sessions Session[]
+  accounts Account[]
+
+  @@map("user")
+}
+
+// Tabela de Sessões do Better Auth
+
+model Session {
+  id        String   @id
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  token     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+// Tabela de Contas do Better Auth
+
+model Account {
+  id                    String    @id
+  userId                String    @map("user_id")
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("account")
+}
+
+// Tabela de Verificação do Better Auth
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("verification")
+}
+

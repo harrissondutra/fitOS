@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { config } from './config';
 import { logger } from '../utils/logger';
+import dotenv from 'dotenv';
+
+// Carregar .env da raiz do projeto
+dotenv.config({ path: '../../.env' });
 
 let prisma: PrismaClient;
 
@@ -9,7 +13,7 @@ export const connectDatabase = async (): Promise<void> => {
     prisma = new PrismaClient({
       datasources: {
         db: {
-          url: config.database.url,
+          url: process.env.DATABASE_URL || config.database.url,
         },
       },
       log: [

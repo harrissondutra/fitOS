@@ -33,7 +33,7 @@ router.post('/users',
     }
 
     // Verificar se o usuário já existe no schema do tenant
-    const existingUser = await prisma.user.findFirst({
+    const existingUser = await prisma.fitOSUser.findFirst({
       where: { email },
     });
 
@@ -48,7 +48,7 @@ router.post('/users',
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const user = await prisma.user.create({
+    const user = await prisma.fitOSUser.create({
       data: {
         email,
         password: hashedPassword,
@@ -93,7 +93,7 @@ router.get('/users', asyncHandler(async (req: RequestWithSchemaTenant, res: Resp
     return res.status(500).json({ success: false, error: { message: 'Prisma client not available for tenant.' } });
   }
 
-  const users = await prisma.user.findMany({
+  const users = await prisma.fitOSUser.findMany({
     select: {
       id: true,
       email: true,

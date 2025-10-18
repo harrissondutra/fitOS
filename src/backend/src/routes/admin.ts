@@ -46,7 +46,7 @@ router.get('/stats', requireAdmin, asyncHandler(async (req: RequestWithTenant, r
     recentWorkouts,
   ] = await Promise.all([
     // User statistics
-    prisma.user.aggregate({
+    prisma.fitOSUser.aggregate({
       where: { tenantId },
       _count: { id: true },
     }),
@@ -64,7 +64,7 @@ router.get('/stats', requireAdmin, asyncHandler(async (req: RequestWithTenant, r
     }),
     
     // Recent users
-    prisma.user.findMany({
+    prisma.fitOSUser.findMany({
       where: { tenantId },
       select: {
         id: true,
@@ -147,7 +147,7 @@ router.get('/users', requireAdmin, asyncHandler(async (req: RequestWithTenant, r
   }
 
   const [users, total] = await Promise.all([
-    prisma.user.findMany({
+    prisma.fitOSUser.findMany({
       where: whereClause,
       select: {
         id: true,
@@ -164,7 +164,7 @@ router.get('/users', requireAdmin, asyncHandler(async (req: RequestWithTenant, r
       skip,
       take: parseInt(limit as string, 10),
     }),
-    prisma.user.count({ where: whereClause }),
+    prisma.fitOSUser.count({ where: whereClause }),
   ]);
 
   return res.json({
@@ -207,7 +207,7 @@ router.put('/users/:id/role', requireAdmin, asyncHandler(async (req: RequestWith
 
   const prisma = getPrismaClient();
 
-  const user = await prisma.user.update({
+  const user = await prisma.fitOSUser.update({
     where: {
       id,
       tenantId,
@@ -261,7 +261,7 @@ router.put('/users/:id/status', requireAdmin, asyncHandler(async (req: RequestWi
 
   const prisma = getPrismaClient();
 
-  const user = await prisma.user.update({
+  const user = await prisma.fitOSUser.update({
     where: {
       id,
       tenantId,
