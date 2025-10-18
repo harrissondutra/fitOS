@@ -14,6 +14,7 @@ pids
 
 # Coverage directory used by tools like istanbul
 coverage/
+**/coverage/
 *.lcov
 
 # nyc test coverage
@@ -91,7 +92,8 @@ tmp/
 temp/
 
 # Logs
-logs
+logs/
+**/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -232,9 +234,27 @@ temp/
 dist/
 build/
 out/
+**/dist/
+**/build/
+**/out/
 
 # Prisma
 prisma/migrations/
+**/prisma/migrations/
+
+# Backend specific
+src/backend/coverage/
+src/backend/dist/
+src/backend/logs/
+
+# Frontend specific
+src/frontend/coverage/
+src/frontend/out/
+src/frontend/.next/
+
+# Scripts and backups
+scripts/
+docs/
 
 # Docker
 .dockerignore
@@ -243,12 +263,48 @@ docker-compose.override.yml
 # Local development
 .local/
 nul
+
+# Cache and temporary files
+.cache/
+.parcel-cache/
+.turbo/
+.next/
+.nuxt/
+.vuepress/dist/
+
+# Test files
+**/*.test.js
+**/*.test.ts
+**/*.spec.js
+**/*.spec.ts
+test-*.html
+
+# Backup files
+*.backup
+*.bak
+*.old
+*.orig
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+# Specific files to ignore
 update-password.js
 better-auth-schema.sql
-check-better-auth-tables.js
-check-users.js
-create-better-auth-tables.js
-create-test-user.js
-test-better-auth-signup.js
-update-harrisson-password.js
-update-password-admin.js
+CONFIGURACAO_PRODUCAO.md
+.env.backup
+env.fitnessos.sistudo.com.br
+scripts/start-app.js

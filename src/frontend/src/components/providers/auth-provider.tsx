@@ -52,7 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('🔍 Verificando sessão...');
       
-      const response = await fetch('http://localhost:3001/api/auth/session', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/auth/session`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -90,7 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('📡 Fazendo requisição direta para o backend...');
       
-      const response = await fetch('http://localhost:3001/api/auth/sign-in/email', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/auth/sign-in/email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
