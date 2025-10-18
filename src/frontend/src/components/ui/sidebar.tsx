@@ -198,7 +198,7 @@ const Sidebar = React.forwardRef<
       )
     }
 
-    if (isMobile) {
+    if (mounted && isMobile) {
       return (
         <div suppressHydrationWarning>
           <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
@@ -595,7 +595,7 @@ const SidebarMenuButton = React.forwardRef<
         <TooltipContent
           side="right"
           align="center"
-          hidden={state !== "collapsed"}
+          hidden={mounted ? state !== "collapsed" : true}
           {...tooltip}
         />
       </Tooltip>
