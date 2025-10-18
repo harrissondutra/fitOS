@@ -5,6 +5,11 @@ console.log('🔧 AuthClient configurado com baseURL:', baseURL);
 
 export const authClient = createAuthClient({
   baseURL,
+  fetchOptions: {
+    onError: (ctx) => {
+      console.error('❌ AuthClient fetch error:', ctx.error);
+    },
+  },
 });
 
 export const {

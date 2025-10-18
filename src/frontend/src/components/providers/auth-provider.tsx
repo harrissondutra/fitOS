@@ -75,21 +75,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('🔐 Iniciando login...', { email });
     setIsLoading(true);
     try {
-      console.log('📡 Chamando authClient.signIn.email...');
-      const { data, error } = await authClient.signIn.email({
-        email,
-        password,
+      console.log('📡 Fazendo requisição direta para o backend...');
+      
+      const response = await fetch('http://localhost:3001/api/auth/sign-in/email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
       });
 
-      console.log('📥 Resposta do authClient:', { data, error });
+      const result = await response.json();
+      console.log('📥 Resposta do backend:', result);
 
-      if (error) {
-        console.error('❌ Erro do authClient:', error);
-        throw new Error(error.message || 'Falha no login');
+      if (!response.ok || !result.success) {
+        console.error('❌ Erro do backend:', result);
+        throw new Error(result.error?.message || 'Falha no login');
       }
 
-      // Better Auth retorna os dados em data.data.user
-      const userData = (data as any)?.data?.user || data?.user;
+      const { data } = result;
+
+      // O backend retorna os dados diretamente em data.user
+      const userData = data?.user;
       
       if (userData) {
         setUser({
