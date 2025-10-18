@@ -46,20 +46,7 @@ export default function ForgotPasswordPage() {
   if (emailSent) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-orange-50 to-red-100">
-        {/* Header */}
-        <div className="absolute top-0 left-0 right-0 z-10 p-4 lg:p-8">
-          <Button
-            variant="ghost"
-            onClick={() => router.back()}
-            className="text-gray-600 hover:text-gray-900 hover:bg-white/50"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
-          </Button>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex min-h-screen items-center justify-center p-4 pt-20 lg:pt-8">
+        <div className="flex min-h-screen items-center justify-center p-4">
           <div className="w-full max-w-6xl">
             <div className="flex flex-col gap-6">
               <Card className="overflow-hidden shadow-2xl border-0">
@@ -67,6 +54,7 @@ export default function ForgotPasswordPage() {
                   <div className="p-6 md:p-8 lg:p-12">
                     <div className="flex flex-col gap-6 max-w-md mx-auto lg:mx-0">
                       <div className="flex flex-col items-center text-center">
+                        <CheckCircle className="h-16 w-16 text-green-500 mb-4" />
                         <h1 className="text-3xl font-bold text-gray-900">Email enviado!</h1>
                         <p className="text-balance text-muted-foreground mt-2">
                           Verifique sua caixa de entrada
@@ -74,7 +62,6 @@ export default function ForgotPasswordPage() {
                       </div>
 
                       <div className="text-center space-y-6">
-                        <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
                         <div>
                           <h3 className="text-xl font-semibold mb-2">Email enviado com sucesso!</h3>
                           <p className="text-gray-600">
@@ -89,7 +76,7 @@ export default function ForgotPasswordPage() {
                           <Button
                             variant="outline"
                             onClick={() => setEmailSent(false)}
-                            className="w-full"
+                            className="w-full h-11"
                           >
                             Tentar novamente
                           </Button>
@@ -115,7 +102,6 @@ export default function ForgotPasswordPage() {
                       className="object-cover"
                       priority
                     />
-                    {/* Overlay com gradiente usando cores do tema */}
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary/70 to-primary/90" />
                     <div className="absolute inset-0 flex items-center justify-center p-12">
                       <div className="text-center text-white relative z-10">
@@ -147,20 +133,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-orange-50 to-red-100">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 p-4 lg:p-8">
-        <Button
-          variant="ghost"
-          onClick={() => router.back()}
-          className="text-gray-600 hover:text-gray-900 hover:bg-white/50"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Voltar
-        </Button>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex min-h-screen items-center justify-center p-4 pt-20 lg:pt-8">
+      <div className="flex min-h-screen items-center justify-center p-4">
         <div className="w-full max-w-6xl">
           <div className="flex flex-col gap-6">
             <Card className="overflow-hidden shadow-2xl border-0">
@@ -214,7 +187,6 @@ export default function ForgotPasswordPage() {
                     className="object-cover"
                     priority
                   />
-                  {/* Overlay com gradiente usando cores do tema */}
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-primary/70 to-primary/90" />
                   <div className="absolute inset-0 flex items-center justify-center p-12">
                     <div className="text-center text-white relative z-10">

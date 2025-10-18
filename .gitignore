@@ -308,3 +308,28 @@ CONFIGURACAO_PRODUCAO.md
 .env.backup
 env.fitnessos.sistudo.com.br
 scripts/start-app.js
+
+# Environment files
+.env.development
+.env.production
+
+# Generated TypeScript declaration files
+*.d.ts
+*.d.ts.map
+*.js.map
+
+# Generated JavaScript files from TypeScript
+auth.js
+src/frontend/src/app/auth/forgot-password/page.jsx
+src/frontend/src/components/providers/auth-provider.jsx
+src/frontend/src/hooks/use-auth.js
+src/frontend/src/hooks/use-toast.js
+src/frontend/src/lib/api.js
+src/frontend/src/lib/auth-client.js
+src/shared/config/env.js
+src/shared/config/env.js.map
+src/shared/types/index.js
+src/shared/types/index.js.map
+
+# Deleted files
+start-production.js

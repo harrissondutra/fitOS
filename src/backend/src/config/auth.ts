@@ -10,6 +10,7 @@ const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  secret: process.env.BETTER_AUTH_SECRET || "super-secret-better-auth-key-for-production-fitos-2025",
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
