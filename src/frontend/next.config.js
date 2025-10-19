@@ -31,23 +31,25 @@ const nextConfig = {
     NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
   },
   
-  // Rewrites para API (apenas em desenvolvimento)
+  // Rewrites para API (desenvolvimento e produção)
   async rewrites() {
-    if (process.env.NODE_ENV === 'development') {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      return [
-        {
-          source: '/api/:path*',
-          destination: `${apiUrl}/api/:path*`,
-        },
-        // Better Auth routes
-        {
-          source: '/api/auth/:path*',
-          destination: `${apiUrl}/api/auth/:path*`,
-        },
-      ];
+    // Só aplicar rewrites se NEXT_PUBLIC_API_URL estiver definida
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+      return [];
     }
-    return [];
+    
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${apiUrl}/api/:path*`,
+      },
+      // Better Auth routes
+      {
+        source: '/api/auth/:path*',
+        destination: `${apiUrl}/api/auth/:path*`,
+      },
+    ];
   },
   
   // Configuração de webpack

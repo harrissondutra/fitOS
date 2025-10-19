@@ -151,7 +151,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast({
           title: "Login realizado com sucesso!",
           description: `Bem-vindo ao FitOS como ${roleDisplayName}!`,
-        });
+          type: "success",
+        } as any);
         console.log(`🔄 Redirecionando para ${dashboardUrl}...`);
         
         // Try router.push first, fallback to window.location
@@ -171,8 +172,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast({
         title: "Erro no login",
         description: error.message || 'Falha no login',
-        variant: "destructive",
-      });
+        type: "error",
+      } as any);
       throw error;
     } finally {
       console.log('🏁 Finalizando processo de login');
@@ -228,7 +229,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast({
           title: "Cadastro realizado com sucesso!",
           description: `Bem-vindo ao FitOS como ${roleDisplayName}!`,
-        });
+          type: "success",
+        } as any);
         console.log(`Redirecionando para ${dashboardUrl}...`);
         
         // Try router.push first, fallback to window.location
@@ -244,8 +246,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast({
         title: "Erro no cadastro",
         description: error.message || 'Falha no cadastro',
-        variant: "destructive",
-      });
+        type: "error",
+      } as any);
       throw error;
     } finally {
       setIsLoading(false);
@@ -303,7 +305,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast({
           title: "Login realizado com sucesso!",
           description: `Bem-vindo ao FitOS como ${roleDisplayName} via ${provider}!`,
-        });
+          type: "success",
+        } as any);
         
         router.push(dashboardUrl);
       }
@@ -312,8 +315,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast({
         title: "Erro no login social",
         description: error.message || `Falha no login com ${provider}`,
-        variant: "destructive",
-      });
+        type: "error",
+      } as any);
       throw error;
     } finally {
       setIsLoading(false);

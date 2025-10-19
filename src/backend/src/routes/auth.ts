@@ -30,6 +30,7 @@ router.get('/api/auth/session', async (req: Request, res: Response) => {
 });
 
 // Handlers oficiais do Better Auth usando toNodeHandler
-router.all('/api/auth/*', toNodeHandler(auth));
+// Better Auth precisa ser registrado na raiz para funcionar corretamente
+router.all('*', toNodeHandler(auth));
 
 export { router as authRoutes };
