@@ -56,7 +56,7 @@ export class TenantService {
       const tenantData: Tenant = {
         id: tenant.id,
         name: tenant.name,
-        subdomain: tenant.subdomain,
+        subdomain: tenant.subdomain || '',
         customDomain: tenant.customDomain || undefined,
         status: tenant.status as 'active' | 'inactive' | 'suspended',
         settings: tenant.settings as Record<string, any>,
@@ -134,7 +134,7 @@ export class TenantService {
       const tenantData: Tenant = {
         id: tenant.id,
         name: tenant.name,
-        subdomain: tenant.subdomain,
+        subdomain: tenant.subdomain || '',
         customDomain: tenant.customDomain || undefined,
         status: tenant.status as 'active' | 'inactive' | 'suspended',
         settings: tenant.settings as Record<string, any>,
@@ -208,7 +208,7 @@ export class TenantService {
       const result: Tenant = {
         id: tenant.id,
         name: tenant.name,
-        subdomain: tenant.subdomain,
+        subdomain: tenant.subdomain || '',
         customDomain: tenant.customDomain || undefined,
         status: tenant.status as 'active' | 'inactive' | 'suspended',
         settings: tenant.settings as Record<string, any>,
@@ -216,14 +216,14 @@ export class TenantService {
 
       // Cache the result
       this.setCachedTenant(tenant.id, result);
-      this.setCachedTenant(tenant.subdomain, result);
+      this.setCachedTenant(tenant.subdomain || '', result);
       if (tenant.customDomain) {
         this.setCachedTenant(tenant.customDomain, result);
       }
 
       logger.info('Tenant created successfully', {
         tenantId: tenant.id,
-        subdomain: tenant.subdomain,
+        subdomain: tenant.subdomain || '',
         customDomain: tenant.customDomain,
       });
 
@@ -293,7 +293,7 @@ export class TenantService {
       const result: Tenant = {
         id: tenant.id,
         name: tenant.name,
-        subdomain: tenant.subdomain,
+        subdomain: tenant.subdomain || '',
         customDomain: tenant.customDomain || undefined,
         status: tenant.status as 'active' | 'inactive' | 'suspended',
         settings: tenant.settings as Record<string, any>,
@@ -301,7 +301,7 @@ export class TenantService {
 
       // Update cache
       this.setCachedTenant(tenant.id, result);
-      this.setCachedTenant(tenant.subdomain, result);
+      this.setCachedTenant(tenant.subdomain || '', result);
       if (tenant.customDomain) {
         this.setCachedTenant(tenant.customDomain, result);
       }
@@ -378,7 +378,7 @@ export class TenantService {
       const result: Tenant[] = tenants.map((tenant: any) => ({
         id: tenant.id,
         name: tenant.name,
-        subdomain: tenant.subdomain,
+        subdomain: tenant.subdomain || '',
         customDomain: tenant.customDomain || undefined,
         status: tenant.status as 'active' | 'inactive' | 'suspended',
         settings: tenant.settings as Record<string, any>,

@@ -15,9 +15,18 @@ datasource db {
 model Tenant {
   id                   String   @id @default(cuid())
   name                 String
-  subdomain            String   @unique
+  subdomain            String?  @unique
   customDomain         String?  @unique @map("custom_domain")
   plan                 String   @default("starter")
+  tenantType           String   @default("business") @map("tenant_type")
+  // tenantType: "individual" (pessoa física) ou "business" (profissional/academia/clínica)
+  customPlanId         String?  @map("custom_plan_id")
+  // Se customPlanId existe, usa plano customizado ao invés do plano base
+  planLimits           Json     @default("{}") @map("plan_limits")
+  extraSlots           Json     @default("{}") @map("extra_slots")
+  // extraSlots: { "trainer": 2, "admin": 1 }
+  enabledFeatures      Json     @default("{}") @map("enabled_features")
+  // enabledFeatures: { "aiAgents": true, "wearables": false, "computerVision": false }
   status               String   @default("active")
   billingEmail         String   @map("billing_email")
   stripeCustomerId     String?  @map("stripe_customer_id")
@@ -27,7 +36,7 @@ model Tenant {
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   // Relacionamentos
-  users            FitOSUser[]
+  users            User[]
   members          Member[]
   workouts         Workout[]
   aiSessions       AiSession[]
@@ -35,40 +44,43 @@ model Tenant {
   churnPredictions ChurnPrediction[]
   chatMessages     ChatMessage[]
   subscriptions    Subscription[]
+  customPlan       PlanConfig?       @relation(fields: [customPlanId], references: [id])
 
   @@map("tenants")
 }
 
-// Tabela de Usuários
+// Tabela de Usuários (compatível com Better Auth)
 
-model FitOSUser {
+model User {
   id        String    @id @default(cuid())
-  tenantId  String    @map("tenant_id")
-  email     String
-  password  String    @map("password_hash")
-  firstName String    @map("first_name")
-  lastName  String    @map("last_name")
+  tenantId  String?   @map("tenant_id") @default("default-tenant")
+  email     String    @unique
+  firstName String?   @map("first_name") @default("Usuário")
+  lastName  String?   @map("last_name") @default("Sistema")
   phone     String?
-  role      String // owner, admin, trainer, member
+  role      String?   @default("MEMBER") // owner, admin, trainer, member
   status    String    @default("ACTIVE")
   profile   Json      @default("{}")
   lastLogin DateTime? @map("last_login")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
 
+  // Campos do Better Auth
+  name          String?
+  emailVerified Boolean @default(false) @map("email_verified")
+  image         String?
+
   // Relacionamentos
-  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   member        Member?
   aiSessions    AiSession[]
   refreshTokens RefreshToken[]
   chatMessages  ChatMessage[]
   workouts      Workout[]
+  // Relacionamentos do Better Auth
+  sessions      Session[]
+  accounts      Account[]
 
-  name          String?
-  emailVerified Boolean   @default(false)
-  image         String?
-
-  @@unique([tenantId, email])
   @@map("users")
 }
 
@@ -90,7 +102,7 @@ model Member {
 
   // Relacionamentos
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user             FitOSUser?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   workouts         Workout[]
   biometricRecords BiometricData[]
   churnPredictions ChurnPrediction[]
@@ -118,7 +130,7 @@ model Workout {
   // Relacionamentos
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  user   FitOSUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("workouts")
 }
@@ -137,7 +149,7 @@ model AiSession {
 
   // Relacionamentos
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   FitOSUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("ai_sessions")
 }
@@ -191,7 +203,7 @@ model RefreshToken {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relacionamentos
-  user FitOSUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
 }
@@ -210,7 +222,7 @@ model ChatMessage {
 
   // Relacionamentos
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   FitOSUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("chat_messages")
 }
@@ -288,6 +300,38 @@ model Invoice {
   @@map("invoices")
 }
 
+// Tabela de Configurações de Planos (Base e Customizados)
+
+model PlanConfig {
+  id             String   @id @default(cuid())
+  plan           String // starter, professional, enterprise, ou slug customizado
+  displayName    String   @map("display_name")
+  tenantType     String   @map("tenant_type") // "individual" ou "business"
+  tenantId       String?  @map("tenant_id")
+  // Se tenantId existe, é plano customizado exclusivo para esse tenant
+  isCustom       Boolean  @default(false) @map("is_custom")
+  // Planos custom não aparecem no signup público
+  limits         Json     @default("{}")
+  // limits: { "owner": 1, "admin": 2, "trainer": 2, "member": 50 }
+  price          Float
+  extraSlotPrice Json     @default("{}") @map("extra_slot_price")
+  // extraSlotPrice: { "trainer": 50, "admin": 30 }
+  features       Json     @default("{}")
+  // features: { "aiAgents": true, "wearables": true, "computerVision": false, "marketplace": true, "whiteLabel": false }
+  contractTerms  String?  @map("contract_terms")
+  // Condições especiais do contrato para planos customizados
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdBy      String?  @map("created_by")
+  // ID do super admin que criou o plano
+  // Relacionamento
+  tenants        Tenant[]
+
+  @@unique([plan, tenantId])
+  @@map("plan_configs")
+}
+
 // Tabela de Webhooks de Pagamento
 
 model PaymentWebhook {
@@ -307,24 +351,6 @@ model PaymentWebhook {
 
 // ===== TABELAS DO BETTER AUTH =====
 
-// Tabela de Usuários do Better Auth
-
-model User {
-  id            String   @id
-  email         String   @unique
-  emailVerified Boolean  @default(false) @map("email_verified")
-  name          String?
-  image         String?
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  // Relacionamentos
-  sessions Session[]
-  accounts Account[]
-
-  @@map("user")
-}
-
 // Tabela de Sessões do Better Auth
 
 model Session {
@@ -340,7 +366,7 @@ model Session {
   // Relacionamentos
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("session")
+  @@map("sessions")
 }
 
 // Tabela de Contas do Better Auth
@@ -364,7 +390,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, accountId])
-  @@map("account")
+  @@map("accounts")
 }
 
 // Tabela de Verificação do Better Auth
@@ -379,4 +405,5 @@ model Verification {
 
   @@map("verification")
 }
+
 

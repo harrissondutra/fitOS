@@ -26,7 +26,7 @@ router.get('/api/tenant-example/users', async (req: RequestWithTenant, res: Resp
     const db = getTenantPrisma(tenantId);
 
     // 3. Buscar dados no schema do tenant
-    const users = await db.fitOSUser.findMany({
+    const users = await db.user.findMany({
       where: {
         tenantId: tenantId
       },
@@ -90,7 +90,7 @@ router.post('/api/tenant-example/users', async (req: RequestWithTenant, res: Res
     }
 
     // 3. Criar usuário no schema do tenant
-    const user = await db.fitOSUser.create({
+    const user = await db.user.create({
       data: {
         tenantId,
         email,
@@ -98,7 +98,7 @@ router.post('/api/tenant-example/users', async (req: RequestWithTenant, res: Res
         lastName,
         role,
         status: 'ACTIVE',
-        password: 'temp-password' // Em produção, gerar senha segura
+        // password removido - agora é gerenciado via Account
       }
     });
 

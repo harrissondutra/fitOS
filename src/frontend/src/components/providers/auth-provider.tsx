@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { authClient } from '@/lib/auth-client';
 import { getDashboardUrl, getRoleDisplayName, type UserRole } from '@/lib/role-redirect';
+import { Tenant, PlanLimits, PlanConfig } from '../../../../shared/types';
 
 interface AuthUser {
   id: string;
@@ -20,6 +21,12 @@ interface AuthUser {
 
 interface AuthContextType {
   user: AuthUser | null;
+  tenant: Tenant | null;
+  tenantType: 'individual' | 'business';
+  planLimits: PlanLimits | null;
+  enabledFeatures: Record<string, boolean>;
+  isCustomPlan: boolean;
+  canHaveSubdomain: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: {
@@ -31,12 +38,19 @@ interface AuthContextType {
   }) => Promise<void>;
   logout: () => void;
   socialLogin: (provider: 'google' | 'microsoft' | 'facebook') => Promise<void>;
+  refreshTenantData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [tenantType, setTenantType] = useState<'individual' | 'business'>('individual');
+  const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
+  const [enabledFeatures, setEnabledFeatures] = useState<Record<string, boolean>>({});
+  const [isCustomPlan, setIsCustomPlan] = useState(false);
+  const [canHaveSubdomain, setCanHaveSubdomain] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
@@ -72,16 +86,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             firstName: (userData as any).firstName || '',
             lastName: (userData as any).lastName || '',
             phone: (userData as any).phone || '',
-            role: (userData as any).role || 'member',
+            role: (userData as any).role || 'MEMBER',
             status: (userData as any).status || 'ACTIVE',
             createdAt: new Date(userData.createdAt),
           });
+
+          // Buscar dados do tenant se o usuário estiver logado
+          await refreshTenantData();
         }
       }
     } catch (error) {
       console.error('Session check failed:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const refreshTenantData = async () => {
+    if (!user) return;
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      
+      console.log('🔍 Iniciando refreshTenantData...');
+      console.log('🔍 User:', user);
+      console.log('🔍 API URL:', apiUrl);
+      
+      // Buscar informações do plano do tenant
+      console.log('🔍 Fazendo requisição para /api/admin/plan-info...');
+      const planResponse = await fetch(`${apiUrl}/api/admin/plan-info`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'X-User-Role': user.role,
+        },
+      });
+      
+      console.log('🔍 Resposta do plan-info:', planResponse.status, planResponse.statusText);
+
+      if (planResponse.ok) {
+        console.log('✅ Plan-info response OK');
+        const planData = await planResponse.json();
+        console.log('🔍 Plan data:', planData);
+        
+        const { tenant, limits, features, canHaveSubdomain: canHave } = planData.data;
+
+        setTenant(tenant);
+        setTenantType(tenant.tenantType);
+        setPlanLimits(limits);
+        setEnabledFeatures(features);
+        setIsCustomPlan(tenant.isCustomPlan);
+        setCanHaveSubdomain(canHave);
+        
+        console.log('✅ Tenant data atualizado com sucesso');
+      } else {
+        console.warn('❌ Failed to fetch tenant data:', planResponse.status, planResponse.statusText);
+        const errorText = await planResponse.text();
+        console.warn('❌ Error response:', errorText);
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch tenant data:', error);
     }
   };
 
@@ -124,29 +188,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = result?.user;
       
       if (userData) {
+        // Buscar dados completos do usuário via rota /api/users/me
+        console.log('🔍 Buscando dados completos do usuário via /api/users/me...');
+        const userResponse = await fetch(`${apiUrl}/api/users/me`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // Incluir cookies para autenticação
+        });
+        
+        let fullUserData = null;
+        if (userResponse.ok) {
+          fullUserData = await userResponse.json();
+          console.log('🔍 Dados completos do usuário:', JSON.stringify(fullUserData, null, 2));
+          console.log('🔍 fullUserData.data:', fullUserData.data);
+          console.log('🔍 fullUserData.data.role:', fullUserData.data?.role);
+          console.log('🔍 fullUserData.data.status:', fullUserData.data?.status);
+          console.log('🔍 fullUserData.data.firstName:', fullUserData.data?.firstName);
+          console.log('🔍 fullUserData.data.lastName:', fullUserData.data?.lastName);
+          console.log('🔍 fullUserData.data.phone:', fullUserData.data?.phone);
+        } else {
+          console.warn('⚠️ Não foi possível buscar dados completos do usuário');
+          const errorText = await userResponse.text();
+          console.warn('⚠️ Error response:', errorText);
+        }
+        
+        const userRole = fullUserData?.data?.role || 'MEMBER';
+        
+        const userStatus = fullUserData?.data?.status || 'ACTIVE';
+        const firstName = fullUserData?.data?.firstName || '';
+        const lastName = fullUserData?.data?.lastName || '';
+        const phone = fullUserData?.data?.phone || '';
+        
+        console.log('🔍 userRole extraído:', userRole);
+        console.log('🔍 userStatus extraído:', userStatus);
+        console.log('🔍 firstName extraído:', firstName);
+        console.log('🔍 lastName extraído:', lastName);
+        console.log('🔍 phone extraído:', phone);
+        
         setUser({
           id: userData.id,
           email: userData.email,
           name: userData.name || userData.email,
-          firstName: (userData as any).firstName || '',
-          lastName: (userData as any).lastName || '',
-          phone: (userData as any).phone || '',
-          role: (userData as any).role || 'member',
-          status: (userData as any).status || 'ACTIVE',
+          firstName,
+          lastName,
+          phone,
+          role: userRole,
+          status: userStatus,
           createdAt: new Date(userData.createdAt),
         });
+        
+        console.log('🔍 Role do usuário:', userRole);
         
         const dashboardUrl = getDashboardUrl({
           id: userData.id,
           email: userData.email,
           name: userData.name || userData.email,
-          role: (userData as any).role || 'member',
-          status: (userData as any).status || 'ACTIVE'
+          role: userRole,
+          status: userStatus
         });
         
-        const roleDisplayName = getRoleDisplayName((userData as any).role || 'member');
+        console.log('🔍 Dashboard URL calculada:', dashboardUrl);
+        
+        const roleDisplayName = getRoleDisplayName(userRole);
         
         console.log('✅ Login bem-sucedido!', { user: userData, dashboardUrl });
+        
+        // Buscar dados do tenant após login
+        console.log('🔍 Chamando refreshTenantData...');
+        await refreshTenantData();
+        console.log('🔍 refreshTenantData concluído');
         
         toast({
           title: "Login realizado com sucesso!",
@@ -211,7 +323,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firstName: data.firstName,
           lastName: data.lastName,
           phone: data.phone || '',
-          role: (userData as any).role || 'member',
+          role: (userData as any).role || 'MEMBER',
           status: (userData as any).status || 'ACTIVE',
           createdAt: new Date(userData.createdAt),
         });
@@ -220,11 +332,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: userData.id,
           email: userData.email,
           name: userData.name || `${data.firstName} ${data.lastName}`,
-          role: (userData as any).role || 'member',
+          role: (userData as any).role || 'MEMBER',
           status: (userData as any).status || 'ACTIVE'
         });
         
-        const roleDisplayName = getRoleDisplayName((userData as any).role || 'member');
+        const roleDisplayName = getRoleDisplayName((userData as any).role || 'MEMBER');
         
         toast({
           title: "Cadastro realizado com sucesso!",
@@ -287,20 +399,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firstName: (userData as any).firstName || '',
           lastName: (userData as any).lastName || '',
           phone: (userData as any).phone || '',
-          role: (userData as any).role || 'member',
+          role: (userData as any).role || 'MEMBER',
           status: (userData as any).status || 'ACTIVE',
           createdAt: new Date(userData.createdAt),
         });
+        
+        const userRole = (userData as any).role || 'MEMBER';
+        console.log('🔍 Role do usuário:', userRole);
         
         const dashboardUrl = getDashboardUrl({
           id: userData.id,
           email: userData.email,
           name: userData.name || userData.email,
-          role: (userData as any).role || 'member',
+          role: userRole,
           status: (userData as any).status || 'ACTIVE'
         });
         
-        const roleDisplayName = getRoleDisplayName((userData as any).role || 'member');
+        console.log('🔍 Dashboard URL calculada:', dashboardUrl);
+        
+        const roleDisplayName = getRoleDisplayName((userData as any).role || 'MEMBER');
         
         toast({
           title: "Login realizado com sucesso!",
@@ -325,11 +442,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     user,
+    tenant,
+    tenantType,
+    planLimits,
+    enabledFeatures,
+    isCustomPlan,
+    canHaveSubdomain,
     isLoading,
     login,
     register,
     logout,
     socialLogin,
+    refreshTenantData,
   };
 
   // Prevent hydration mismatch by not rendering until mounted

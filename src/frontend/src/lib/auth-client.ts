@@ -5,7 +5,9 @@ console.log('🔧 AuthClient configurado com baseURL:', baseURL);
 
 export const authClient: any = createAuthClient({
   baseURL,
+  basePath: '/api/auth',  // Definir explicitamente o caminho de auth
   fetchOptions: {
+    credentials: 'include',  // Habilitar cookies
     onError: (ctx: any) => {
       console.error('❌ AuthClient fetch error:', ctx.error);
     },

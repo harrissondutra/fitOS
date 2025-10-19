@@ -6,13 +6,13 @@ import { logger } from '../utils/logger';
 
 const router = Router();
 
-// Rota de teste
-router.get('/api/auth/test', (req: Request, res: Response) => {
+// Rota de teste (sem prefixo /api/auth)
+router.get('/test', (req: Request, res: Response) => {
   res.json({ message: 'Auth route working!', timestamp: new Date().toISOString() });
 });
 
-// Rota personalizada para sessão
-router.get('/api/auth/session', async (req: Request, res: Response) => {
+// Rota personalizada para sessão (sem prefixo /api/auth)
+router.get('/session', async (req: Request, res: Response) => {
   try {
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),

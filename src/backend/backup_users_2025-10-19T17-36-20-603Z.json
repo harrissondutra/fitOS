@@ -1,0 +1,53 @@
+{
+  "timestamp": "2025-10-19T17:36:20.602Z",
+  "users": [
+    {
+      "id": "cmgxchxng0001131d8besicpe",
+      "email": "admin@fitos.com",
+      "password": "$2a$10$mXI0EiEpxj5P.5DNFV5TPOjXgYwM9h9yKbyCpWaIzKkjJlD.K4suO",
+      "name": "Admin FitOS",
+      "firstName": "Admin",
+      "lastName": "FitOS",
+      "role": "ADMIN",
+      "tenantId": "default-tenant",
+      "status": "ACTIVE",
+      "createdAt": "2025-10-19T06:48:23.452Z"
+    },
+    {
+      "id": "cmgxcqb6z000111vo38rfqllt",
+      "email": "test@fitos.com",
+      "password": "$2a$10$5LvGwpJ69BDqGDCdfr3YQ.Dm0h.K6K8H3ueeVnOITlNILFSId.TU.",
+      "name": "Teste Frontend",
+      "firstName": "Teste",
+      "lastName": "Frontend",
+      "role": "ADMIN",
+      "tenantId": "default-tenant",
+      "status": "ACTIVE",
+      "createdAt": "2025-10-19T06:54:54.251Z"
+    },
+    {
+      "id": "cmgxzaxno00017a33frl9igvb",
+      "email": "teste@exemplo.com",
+      "password": "hashed_password_here",
+      "name": "Usuário Teste",
+      "firstName": "Usuário",
+      "lastName": "Teste",
+      "role": "MEMBER",
+      "tenantId": "default-tenant",
+      "status": "ACTIVE",
+      "createdAt": "2025-10-19T17:26:48.037Z"
+    },
+    {
+      "id": "admin-user-id",
+      "email": "harrissondutra@gmail.com",
+      "password": "$2b$10$wI4C1omBvU8AR2GnJ.uafuEgfh0PasLpGHtb5B2gHULjFog5/gKY6",
+      "name": "Harrisson Dutra",
+      "firstName": "Harrisson",
+      "lastName": "Dutra",
+      "role": "SUPER_ADMIN",
+      "tenantId": "default-tenant",
+      "status": "ACTIVE",
+      "createdAt": "2025-10-18T00:14:19.960Z"
+    }
+  ]
+}

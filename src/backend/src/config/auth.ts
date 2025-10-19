@@ -26,6 +26,7 @@ const auth = betterAuth({
     provider: "postgresql",
   }),
   secret: process.env.BETTER_AUTH_SECRET,
+  basePath: '/api/auth',
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
@@ -52,6 +53,48 @@ const auth = betterAuth({
   advanced: {
     generateId: () => crypto.randomUUID(),
   },
+  // Campos customizados do FitOS
+  user: {
+    additionalFields: {
+      tenantId: {
+        type: "string",
+        required: false,
+        defaultValue: "default-tenant",
+        input: false
+      },
+      firstName: {
+        type: "string",
+        required: false,
+        defaultValue: "Usuário"
+      },
+      lastName: {
+        type: "string", 
+        required: false,
+        defaultValue: "Sistema"
+      },
+      role: {
+        type: "string",
+        required: false,
+        defaultValue: "MEMBER",
+        input: false
+      },
+      status: {
+        type: "string",
+        required: false,
+        defaultValue: "ACTIVE",
+        input: false
+      },
+      phone: {
+        type: "string",
+        required: false
+      },
+      lastLogin: {
+        type: "date",
+        required: false,
+        input: false
+      }
+    }
+  }
 });
 
 export default auth;
