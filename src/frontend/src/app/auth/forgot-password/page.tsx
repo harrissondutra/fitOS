@@ -31,13 +31,14 @@ export default function ForgotPasswordPage() {
       toast({
         title: "Email de recuperação enviado!",
         description: "Verifique sua caixa de entrada",
-      });
+        type: "success",
+      } as any);
     } catch (error: any) {
       toast({
         title: "Erro ao enviar email",
         description: "Erro ao enviar email de recuperação",
-        variant: "destructive",
-      });
+        type: "error",
+      } as any);
     } finally {
       setIsLoading(false);
     }

@@ -5,6 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+env.example
 
 # Runtime data
 pids
@@ -333,3 +334,6 @@ src/shared/types/index.js.map
 
 # Deleted files
 start-production.js
+src/backend/debug-auth.js
+env.example
+env.example

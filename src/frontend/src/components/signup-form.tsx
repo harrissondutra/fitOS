@@ -50,8 +50,8 @@ export function SignupForm({
       toast({
         title: "Erro de validação",
         description: "As senhas não coincidem",
-        variant: "destructive",
-      })
+        type: "error",
+      } as any)
       return
     }
 
@@ -60,8 +60,8 @@ export function SignupForm({
       toast({
         title: "Senha inválida",
         description: "A senha deve ter pelo menos 8 caracteres, incluindo maiúsculas, minúsculas, números e caracteres especiais",
-        variant: "destructive",
-      })
+        type: "error",
+      } as any)
       return
     }
 

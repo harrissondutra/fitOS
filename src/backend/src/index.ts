@@ -88,19 +88,19 @@ class FitOSServer {
     // Health check
     this.app.use('/api/health', healthRoutes);
 
-    // Auth routes (Better Auth implementation)
-    this.app.use('/', authRoutes);
-
-    // Tenant example routes (demonstrates multitenancy)
-    this.app.use('/', tenantExampleRoutes);
-
-    // API routes
+    // API routes (registrar antes das rotas de auth para evitar conflitos)
     this.app.use('/api/users', userRoutes);
     this.app.use('/api/workouts', workoutRoutes);
     this.app.use('/api/chat', chatRoutes);
     this.app.use('/api/admin', adminRoutes);
     this.app.use('/api/email', emailRoutes);
     this.app.use('/api/tenants', tenantRoutes);
+
+    // Tenant example routes (demonstrates multitenancy)
+    this.app.use('/', tenantExampleRoutes);
+
+    // Auth routes (Better Auth implementation) - registrar por último
+    this.app.use('/', authRoutes);
 
     // 404 handler
     this.app.use('*', (req, res) => {
