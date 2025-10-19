@@ -4,6 +4,7 @@ import { RequestWithSchemaTenant } from '../middleware/schema-tenant';
 import { body, validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
 import { logger } from '../utils/logger';
+import { validateUserLimit } from '../middleware/validateUserLimit';
 
 const router = Router();
 
@@ -13,6 +14,8 @@ router.post('/users',
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   body('firstName').trim().isLength({ min: 1 }).withMessage('First name is required'),
   body('lastName').trim().isLength({ min: 1 }).withMessage('Last name is required'),
+  body('role').isIn(['MEMBER', 'TRAINER', 'ADMIN', 'OWNER']).withMessage('Invalid role'),
+  validateUserLimit, // NOVO: Validar limite de usuários
   asyncHandler(async (req: RequestWithSchemaTenant, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -33,7 +36,7 @@ router.post('/users',
     }
 
     // Verificar se o usuário já existe no schema do tenant
-    const existingUser = await prisma.fitOSUser.findFirst({
+    const existingUser = await prisma.user.findFirst({
       where: { email },
     });
 
@@ -48,10 +51,10 @@ router.post('/users',
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const user = await prisma.fitOSUser.create({
+    const user = await prisma.user.create({
       data: {
         email,
-        password: hashedPassword,
+        // password removido - agora é gerenciado via Account
         firstName,
         lastName,
         phone,
@@ -76,6 +79,19 @@ router.post('/users',
       },
     });
 
+    // Criar Account para credenciais
+    await prisma.account.create({
+      data: {
+        id: `credential-${user.id}`,
+        userId: user.id,
+        accountId: user.email,
+        providerId: 'credential',
+        password: hashedPassword,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
+
     logger.info(`User created in schema tenant ${req.tenant?.id}: ${user.email}`);
 
     return res.status(201).json({
@@ -93,7 +109,7 @@ router.get('/users', asyncHandler(async (req: RequestWithSchemaTenant, res: Resp
     return res.status(500).json({ success: false, error: { message: 'Prisma client not available for tenant.' } });
   }
 
-  const users = await prisma.fitOSUser.findMany({
+  const users = await prisma.user.findMany({
     select: {
       id: true,
       email: true,

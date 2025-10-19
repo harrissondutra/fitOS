@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { toastUtils } from '@/lib/toast-utils';
 import { 
   Users, 
   Dumbbell, 
@@ -39,6 +41,7 @@ export default function TrainerDashboardPage() {
             </div>
             
             <div className="flex items-center space-x-4">
+              <ThemeToggle />
               <Button variant="ghost" onClick={() => router.push('/auth/login')}>
                 Sair
               </Button>
@@ -121,15 +124,15 @@ export default function TrainerDashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+              <Button className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
                 <Users className="mr-2 h-4 w-4" />
                 Ver Clientes
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
                 <UserCheck className="mr-2 h-4 w-4" />
                 Adicionar Cliente
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
                 <Activity className="mr-2 h-4 w-4" />
                 Progresso dos Clientes
               </Button>
@@ -144,15 +147,15 @@ export default function TrainerDashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+              <Button className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
                 <Dumbbell className="mr-2 h-4 w-4" />
                 Criar Treino
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
                 <Calendar className="mr-2 h-4 w-4" />
                 Agendar Sessão
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
                 <Clock className="mr-2 h-4 w-4" />
                 Histórico de Treinos
               </Button>

@@ -7,10 +7,15 @@ export interface RequestWithSchemaTenant extends Request {
   tenant?: {
     id: string;
     name: string;
-    subdomain: string;
-    customDomain: string | null;
+    subdomain?: string;
+    customDomain?: string;
     plan: string;
-    status: string;
+    tenantType: any;
+    customPlanId?: string;
+    planLimits: any;
+    extraSlots: any;
+    enabledFeatures: any;
+    status: any;
     billingEmail: string;
     stripeCustomerId: string | null;
     stripeSubscriptionId: string | null;

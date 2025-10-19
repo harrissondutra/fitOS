@@ -2,7 +2,7 @@
  * Função para determinar o dashboard correto baseado na role do usuário
  */
 
-export type UserRole = 'owner' | 'admin' | 'trainer' | 'member';
+export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'MEMBER';
 
 export interface User {
   id: string;
@@ -16,19 +16,26 @@ export interface User {
  * Retorna a URL do dashboard baseado na role do usuário
  */
 export function getDashboardUrl(user: User): string {
-  // Normalizar a role para lowercase
-  const normalizedRole = user.role.toLowerCase() as UserRole;
+  console.log('🔍 getDashboardUrl chamada com user:', user);
+  console.log('🔍 user.role:', user.role);
   
-  switch (normalizedRole) {
-    case 'owner':
-    case 'admin':
+  switch (user.role) {
+    case 'SUPER_ADMIN':
+      console.log('🔍 Retornando /super-admin/dashboard');
+      return '/super-admin/dashboard';
+    
+    case 'OWNER':
+    case 'ADMIN':
+      console.log('🔍 Retornando /admin/dashboard');
       return '/admin/dashboard';
     
-    case 'trainer':
+    case 'TRAINER':
+      console.log('🔍 Retornando /trainer/dashboard');
       return '/trainer/dashboard';
     
-    case 'member':
+    case 'MEMBER':
     default:
+      console.log('🔍 Retornando /dashboard (default)');
       return '/dashboard';
   }
 }
@@ -37,14 +44,16 @@ export function getDashboardUrl(user: User): string {
  * Retorna o nome amigável da role
  */
 export function getRoleDisplayName(role: UserRole): string {
-  switch (role.toLowerCase() as UserRole) {
-    case 'owner':
+  switch (role) {
+    case 'SUPER_ADMIN':
+      return 'Super Administrador';
+    case 'OWNER':
       return 'Proprietário';
-    case 'admin':
+    case 'ADMIN':
       return 'Administrador';
-    case 'trainer':
+    case 'TRAINER':
       return 'Personal Trainer';
-    case 'member':
+    case 'MEMBER':
       return 'Membro';
     default:
       return 'Usuário';
@@ -55,21 +64,24 @@ export function getRoleDisplayName(role: UserRole): string {
  * Verifica se o usuário tem permissão para acessar uma rota específica
  */
 export function hasPermission(user: User, route: string): boolean {
-  const normalizedRole = user.role.toLowerCase() as UserRole;
-  
-  // Admin e Owner podem acessar tudo
-  if (normalizedRole === 'admin' || normalizedRole === 'owner') {
+  // Super Admin pode acessar tudo
+  if (user.role === 'SUPER_ADMIN') {
     return true;
   }
   
+  // Admin e Owner podem acessar tudo exceto super-admin
+  if (user.role === 'ADMIN' || user.role === 'OWNER') {
+    return !route.startsWith('/super-admin');
+  }
+  
   // Trainer pode acessar rotas de trainer e member
-  if (normalizedRole === 'trainer') {
+  if (user.role === 'TRAINER') {
     return route.startsWith('/trainer') || route.startsWith('/dashboard');
   }
   
   // Member só pode acessar rotas de member
-  if (normalizedRole === 'member') {
-    return route.startsWith('/dashboard') && !route.startsWith('/admin') && !route.startsWith('/trainer');
+  if (user.role === 'MEMBER') {
+    return route.startsWith('/dashboard') && !route.startsWith('/admin') && !route.startsWith('/trainer') && !route.startsWith('/super-admin');
   }
   
   return false;
@@ -79,9 +91,20 @@ export function hasPermission(user: User, route: string): boolean {
  * Retorna as rotas permitidas para uma role específica
  */
 export function getAllowedRoutes(role: UserRole): string[] {
-  switch (role.toLowerCase() as UserRole) {
-    case 'owner':
-    case 'admin':
+  switch (role) {
+    case 'SUPER_ADMIN':
+      return [
+        '/super-admin/dashboard',
+        '/super-admin/tenants',
+        '/super-admin/plans',
+        '/super-admin/custom-plans',
+        '/admin/dashboard',
+        '/trainer/dashboard',
+        '/dashboard'
+      ];
+    
+    case 'OWNER':
+    case 'ADMIN':
       return [
         '/admin/dashboard',
         '/trainer/dashboard',
@@ -91,7 +114,7 @@ export function getAllowedRoutes(role: UserRole): string[] {
         '/admin/reports'
       ];
     
-    case 'trainer':
+    case 'TRAINER':
       return [
         '/trainer/dashboard',
         '/dashboard',
@@ -100,7 +123,7 @@ export function getAllowedRoutes(role: UserRole): string[] {
         '/trainer/schedule'
       ];
     
-    case 'member':
+    case 'MEMBER':
     default:
       return [
         '/dashboard',

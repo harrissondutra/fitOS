@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 // import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { toastUtils } from '@/lib/toast-utils';
 import { 
   Dumbbell, 
   Brain, 
@@ -33,33 +35,25 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted">
+    <div className="space-y-6">
       {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Dumbbell className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">Member Dashboard</span>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={() => router.push('/auth/login')}>
-                Sair
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Bem-vindo ao FitOS!</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">
-            Seu painel de controle para uma jornada fitness completa.
+            Bem-vindo ao seu painel de controle FitOS
           </p>
         </div>
+        <div className="flex items-center space-x-4">
+          <ThemeToggle />
+          <Button variant="ghost" onClick={() => router.push('/auth/login')}>
+            Sair
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="space-y-6">
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -126,15 +120,15 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+              <Button className="w-full" onClick={() => toastUtils.comingSoon('Treinos personalizados')}>
                 <Play className="mr-2 h-4 w-4" />
                 Iniciar Treino
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
                 <Brain className="mr-2 h-4 w-4" />
                 Recomendações IA
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => alert('Funcionalidade em desenvolvimento')}>
+              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Ver Estatísticas
               </Button>
@@ -209,7 +203,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import compression from 'compression';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import { toNodeHandler } from 'better-auth/node';
+import auth from './config/auth';
 
 // Import configurations
 import { config } from './config/config';
@@ -19,15 +21,16 @@ import { rateLimiter } from './middleware/rateLimiter';
 import { tenantMiddleware } from './middleware/tenant';
 
 // Import routes
-import { authRoutes } from './routes/auth';
 import { tenantExampleRoutes } from './routes/tenant-example';
 import { userRoutes } from './routes/users';
 import { workoutRoutes } from './routes/workouts';
 import { chatRoutes } from './routes/chat';
-import { adminRoutes } from './routes/admin';
+import adminRoutes from './routes/admin';
 import { healthRoutes } from './routes/health';
 import { emailRoutes } from './routes/email';
 import { tenantRoutes } from './routes/tenants';
+import superAdminRoutes from './routes/super-admin';
+import schemaUserRoutes from './routes/schema-users';
 
 // Load environment variables
 dotenv.config();
@@ -62,7 +65,7 @@ class FitOSServer {
       origin: config.cors.origins,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'x-user-role'],
     }));
 
     // Compression
@@ -76,17 +79,39 @@ class FitOSServer {
     // Rate limiting
     this.app.use(rateLimiter);
 
-    // Body parsing
-    this.app.use(express.json({ limit: '10mb' }));
-    this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    // Body parsing (aplicar apenas em rotas não-auth para evitar conflito com Better Auth)
+    this.app.use((req, res, next) => {
+      if (!req.path.startsWith('/api/auth')) {
+        express.json({ limit: '10mb' })(req, res, next);
+      } else {
+        next();
+      }
+    });
+    
+    this.app.use((req, res, next) => {
+      if (!req.path.startsWith('/api/auth')) {
+        express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
+      } else {
+        next();
+      }
+    });
 
     // Tenant resolution
     this.app.use(tenantMiddleware);
   }
 
   private setupRoutes(): void {
+    // Montar Better Auth PRIMEIRO (antes do body parser)
+    // Isso é crítico para evitar travamento das requisições
+    // Usar diretamente o handler Better Auth conforme documentação
+    this.app.all('/api/auth/*', toNodeHandler(auth));
+
     // Health check
     this.app.use('/api/health', healthRoutes);
+
+
+    // Super admin routes (protegidas por middleware)
+    this.app.use('/api/super-admin', superAdminRoutes);
 
     // API routes (registrar antes das rotas de auth para evitar conflitos)
     this.app.use('/api/users', userRoutes);
@@ -96,11 +121,11 @@ class FitOSServer {
     this.app.use('/api/email', emailRoutes);
     this.app.use('/api/tenants', tenantRoutes);
 
+    // Schema-based tenant routes (com validação de limites)
+    this.app.use('/', schemaUserRoutes);
+
     // Tenant example routes (demonstrates multitenancy)
     this.app.use('/', tenantExampleRoutes);
-
-    // Auth routes (Better Auth implementation) - registrar por último
-    this.app.use('/', authRoutes);
 
     // 404 handler
     this.app.use('*', (req, res) => {

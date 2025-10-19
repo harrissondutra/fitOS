@@ -12,24 +12,59 @@ export interface User {
   tenantId: string;
   createdAt: Date;
   updatedAt: Date;
+  lastLogin?: Date;
 }
 
-export type UserRole = 'MEMBER' | 'TRAINER' | 'ADMIN';
-export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'MEMBER';
+export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DELETED';
 
 // Tenant types
 export interface Tenant {
   id: string;
   name: string;
-  subdomain: string;
+  subdomain?: string;
   customDomain?: string;
+  plan: string;
+  tenantType: TenantType;
+  customPlanId?: string;
+  planLimits: Record<string, number>;
+  extraSlots: Record<string, number>;
+  enabledFeatures: Record<string, boolean>;
   status: TenantStatus;
   settings: Record<string, any>;
   createdAt: Date;
   updatedAt: Date;
 }
 
+export type TenantType = 'individual' | 'business';
 export type TenantStatus = 'active' | 'inactive' | 'suspended';
+
+// Plan types
+export interface PlanConfig {
+  id: string;
+  plan: string;
+  displayName: string;
+  tenantType: TenantType;
+  tenantId?: string;
+  isCustom: boolean;
+  limits: Record<string, number>;
+  price: number;
+  extraSlotPrice: Record<string, number>;
+  features: Record<string, boolean>;
+  contractTerms?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy?: string;
+}
+
+export interface PlanLimits {
+  super_admin: number;
+  owner: number;
+  admin: number;
+  trainer: number;
+  member: number;
+}
 
 // Workout types
 export interface Workout {
@@ -240,6 +275,101 @@ export interface AppError {
   code?: string;
   statusCode?: number;
   details?: any;
+}
+
+// User Management types
+export interface UserFilters {
+  search?: string;
+  role?: UserRole;
+  status?: UserStatus;
+  createdFrom?: string;
+  createdTo?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: 'firstName' | 'lastName' | 'email' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface UserBulkAction {
+  action: 'activate' | 'deactivate' | 'delete' | 'export';
+  userIds: string[];
+  reason?: string;
+}
+
+export interface CSVImportResult {
+  success: boolean;
+  totalRows: number;
+  successCount: number;
+  errorCount: number;
+  errors: Array<{
+    row: number;
+    field: string;
+    message: string;
+  }>;
+  importedUsers: User[];
+}
+
+export interface UserFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  role: UserRole;
+  password?: string;
+  status?: UserStatus;
+}
+
+export interface UserTableColumn {
+  key: keyof User | 'actions';
+  label: string;
+  sortable?: boolean;
+  width?: string;
+}
+
+export interface UserTableProps {
+  users: User[];
+  loading: boolean;
+  selectedUsers: string[];
+  onSelectUser: (userId: string, selected: boolean) => void;
+  onSelectAll: (selected: boolean) => void;
+  onEdit: (user: User) => void;
+  onDelete: (user: User) => void;
+  onToggleStatus: (user: User) => void;
+  onResetPassword: (user: User) => void;
+}
+
+export interface UserFiltersProps {
+  filters: UserFilters;
+  onFiltersChange: (filters: UserFilters) => void;
+  onClearFilters: () => void;
+  loading?: boolean;
+}
+
+export interface BulkActionsBarProps {
+  selectedCount: number;
+  onBulkAction: (action: UserBulkAction['action']) => void;
+  onExport: () => void;
+  onClearSelection: () => void;
+}
+
+export interface CSVImportModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onImport: (file: File) => Promise<CSVImportResult>;
+}
+
+// Sidebar types
+export interface SidebarMenuItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string | number;
+  children?: SidebarMenuItem[];
+}
+
+export interface SidebarProps {
+  userRole: UserRole;
+  tenantType?: TenantType;
 }
 
 // Configuration types

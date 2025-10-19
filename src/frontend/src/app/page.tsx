@@ -86,17 +86,17 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Dumbbell className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold">FitOS</span>
+              <span className="text-2xl font-bold text-foreground">FitOS</span>
             </div>
             
             <nav className="hidden md:flex items-center space-x-6">
-              <a href="#features" className="text-sm font-medium hover:text-primary transition-colors">
+              <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
                 Recursos
               </a>
-              <a href="#about" className="text-sm font-medium hover:text-primary transition-colors">
+              <a href="#about" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
                 Sobre
               </a>
-              <a href="#contact" className="text-sm font-medium hover:text-primary transition-colors">
+              <a href="#contact" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
                 Contato
               </a>
             </nav>
@@ -169,7 +169,7 @@ export default function HomePage() {
       <section id="features" className="py-20 px-4 bg-muted/50">
         <div className="container mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
               Tudo que você precisa para fitness moderno
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
@@ -204,7 +204,7 @@ export default function HomePage() {
       <section className="py-20 px-4">
         <div className="container mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
               Transforme sua vida fitness
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
@@ -254,7 +254,7 @@ export default function HomePage() {
         </div>
         
         <div className="container mx-auto text-center relative z-10">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
             Pronto para transformar sua jornada fitness?
           </h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
@@ -273,7 +273,7 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
               <Dumbbell className="h-6 w-6 text-primary" />
-              <span className="text-lg font-semibold">FitOS</span>
+              <span className="text-lg font-semibold text-foreground">FitOS</span>
             </div>
             <p className="text-sm text-muted-foreground">
               © 2024 FitOS. Todos os direitos reservados. Construído com ❤️ para a comunidade fitness.

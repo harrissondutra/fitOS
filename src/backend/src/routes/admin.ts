@@ -1,292 +1,259 @@
-import { Router, Request, Response } from 'express';
-import { getPrismaClient } from '../config/database';
-import { logger } from '../utils/logger';
-import { asyncHandler } from '../middleware/errorHandler';
-import { RequestWithTenant } from '../middleware/tenant';
+import { Router, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { requireAdmin } from '../middleware/auth';
+import { asyncHandler } from '../utils/asyncHandler';
+import { PlanLimitsService } from '../services/plan-limits.service';
 
 const router = Router();
+const prisma = new PrismaClient();
+const planLimitsService = new PlanLimitsService(prisma);
 
-// Middleware to check admin role
-const requireAdmin = (req: RequestWithTenant, res: Response, next: any) => {
-  const userRole = req.headers['x-user-role'] as string;
-  
-  if (userRole !== 'ADMIN') {
-    return res.status(403).json({
-      success: false,
-      error: {
-        message: 'Admin access required',
-      },
-    });
+// Extend Request interface to include tenantId
+declare global {
+  namespace Express {
+    interface Request {
+      tenantId?: string;
+    }
   }
-  
-  return next();
-};
+}
 
-// Get tenant statistics
-router.get('/stats', requireAdmin, asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const tenantId = req.tenantId;
+// === Novas rotas para gestão de planos e limites ===
 
-  if (!tenantId) {
-    return res.status(401).json({
+/**
+ * GET /api/admin/plan-info
+ * Ver plano atual (base ou custom), limites e uso
+ */
+router.get('/plan-info', asyncHandler(async (req: any, res: Response): Promise<void> => {
+  // Usar tenant padrão temporariamente
+  const tenantId = req.tenantId === 'default' ? 'default-tenant' : (req.tenantId || 'default-tenant');
+
+  console.log('🔍 Plan-info request - tenantId original:', req.tenantId);
+  console.log('🔍 Plan-info request - tenantId final:', tenantId);
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    include: { customPlan: true }
+  });
+
+  if (!tenant) {
+    res.status(404).json({
       success: false,
-      error: {
-        message: 'Tenant not found',
-      },
+      error: { message: 'Tenant not found' }
     });
+    return;
   }
 
-  const prisma = getPrismaClient();
+  const userCounts = await planLimitsService.getUserCountByRole(tenantId);
+  const limits = await planLimitsService.getPlanLimits(tenantId);
+  const features = await planLimitsService.getEnabledFeatures(tenantId);
 
-  // Get various statistics
-  const [
-    userStats,
-    workoutStats,
-    chatStats,
-    recentUsers,
-    recentWorkouts,
-  ] = await Promise.all([
-    // User statistics
-    prisma.fitOSUser.aggregate({
-      where: { tenantId },
-      _count: { id: true },
-    }),
-    
-    // Workout statistics
-    prisma.workout.aggregate({
-      where: { tenantId },
-      _count: { id: true },
-    }),
-    
-    // Chat statistics
-    prisma.chatMessage.aggregate({
-      where: { tenantId },
-      _count: { id: true },
-    }),
-    
-    // Recent users
-    prisma.fitOSUser.findMany({
-      where: { tenantId },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-        status: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    }),
-    
-    // Recent workouts
-    prisma.workout.findMany({
-      where: { tenantId },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-        user: {
-          select: {
-            firstName: true,
-            lastName: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    }),
-  ]);
-
-  return res.json({
+  res.json({
     success: true,
     data: {
-      stats: {
-        totalUsers: userStats._count.id,
-        totalWorkouts: workoutStats._count.id,
-        totalMessages: chatStats._count.id,
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        tenantType: tenant.tenantType,
+        plan: tenant.plan,
+        subdomain: tenant.subdomain,
+        customDomain: tenant.customDomain,
+        isCustomPlan: !!tenant.customPlanId,
+        customPlan: tenant.customPlan
       },
-      recentUsers,
-      recentWorkouts,
-    },
+      limits,
+      usage: userCounts,
+      features,
+      canHaveSubdomain: await planLimitsService.canHaveSubdomain(tenant.tenantType)
+    }
   });
 }));
 
-// Get all users with pagination
-router.get('/users', requireAdmin, asyncHandler(async (req: RequestWithTenant, res: Response) => {
+/**
+ * GET /api/admin/users/by-role
+ * Contagem de usuários por role
+ */
+router.get('/users/by-role', requireAdmin, asyncHandler(async (req: any, res: Response): Promise<void> => {
   const tenantId = req.tenantId;
-  const { page = 1, limit = 20, search = '', role = '' } = req.query;
 
   if (!tenantId) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
-      error: {
-        message: 'Tenant not found',
-      },
+      error: { message: 'Tenant not found' }
     });
+    return;
   }
 
-  const prisma = getPrismaClient();
-  const skip = (parseInt(page as string, 10) - 1) * parseInt(limit as string, 10);
+  const userCounts = await planLimitsService.getUserCountByRole(tenantId);
+  const limits = await planLimitsService.getPlanLimits(tenantId);
 
-  // Build where clause
-  const whereClause: any = {
-    tenantId,
-  };
+  // Calcular disponibilidade por role
+  const availability = Object.keys(limits).reduce((acc, role) => {
+    const current = userCounts[role] || 0;
+    const limit = limits[role as keyof typeof limits];
+    const isUnlimited = limit === -1;
+    
+    acc[role] = {
+      current,
+      limit: isUnlimited ? -1 : limit,
+      available: isUnlimited ? -1 : Math.max(0, limit - current),
+      isUnlimited
+    };
+    
+    return acc;
+  }, {} as Record<string, any>);
 
-  if (search) {
-    whereClause.OR = [
-      { firstName: { contains: search as string, mode: 'insensitive' } },
-      { lastName: { contains: search as string, mode: 'insensitive' } },
-      { email: { contains: search as string, mode: 'insensitive' } },
-    ];
-  }
-
-  if (role) {
-    whereClause.role = role;
-  }
-
-  const [users, total] = await Promise.all([
-    prisma.fitOSUser.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: parseInt(limit as string, 10),
-    }),
-    prisma.fitOSUser.count({ where: whereClause }),
-  ]);
-
-  return res.json({
+  res.json({
     success: true,
     data: {
-      users,
-      pagination: {
-        page: parseInt(page as string, 10),
-        limit: parseInt(limit as string, 10),
-        total,
-        pages: Math.ceil(total / parseInt(limit as string, 10)),
-      },
-    },
+      usage: userCounts,
+      limits,
+      availability
+    }
   });
 }));
 
-// Update user role
-router.put('/users/:id/role', requireAdmin, asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const { id } = req.params;
-  const { role } = req.body;
+/**
+ * POST /api/admin/request-extra-slots
+ * Solicitar slots extras (gera pedido para super admin aprovar)
+ */
+router.post('/request-extra-slots', requireAdmin, asyncHandler(async (req: any, res: Response): Promise<void> => {
   const tenantId = req.tenantId;
+  const { role, quantity, reason } = req.body;
 
   if (!tenantId) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
-      error: {
-        message: 'Tenant not found',
-      },
+      error: { message: 'Tenant not found' }
     });
+    return;
   }
 
-  if (!['MEMBER', 'TRAINER', 'ADMIN'].includes(role)) {
-    return res.status(400).json({
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId }
+  });
+
+  if (!tenant) {
+    res.status(404).json({
       success: false,
-      error: {
-        message: 'Invalid role',
-      },
+      error: { message: 'Tenant not found' }
     });
+    return;
   }
 
-  const prisma = getPrismaClient();
+  // Validar que tenant é business
+  if (tenant.tenantType === 'individual') {
+    res.status(400).json({
+      success: false,
+      error: { 
+        message: 'Pessoas físicas não podem solicitar slots extras',
+        details: { tenantType: tenant.tenantType }
+      }
+    });
+    return;
+  }
 
-  const user = await prisma.fitOSUser.update({
-    where: {
-      id,
-      tenantId,
-    },
-    data: { role },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      role: true,
-      status: true,
-    },
-  });
-
-  logger.info('User role updated', {
-    userId: id,
-    newRole: role,
-    tenantId,
-  });
-
-  return res.json({
+  // TODO: Implementar sistema de solicitações para super admin
+  // Por enquanto, apenas retorna sucesso
+  res.json({
     success: true,
-    data: { user },
+    message: 'Solicitação de slots extras enviada para aprovação',
+    data: {
+      role,
+      quantity,
+      reason,
+      status: 'pending'
+    }
   });
 }));
 
-// Update user status
-router.put('/users/:id/status', requireAdmin, asyncHandler(async (req: RequestWithTenant, res: Response) => {
-  const { id } = req.params;
-  const { status } = req.body;
+/**
+ * POST /api/admin/request-upgrade-to-business
+ * Pessoa física solicitar upgrade para business (criar subdomain)
+ */
+router.post('/request-upgrade-to-business', requireAdmin, asyncHandler(async (req: any, res: Response): Promise<void> => {
   const tenantId = req.tenantId;
+  const { subdomain } = req.body;
 
   if (!tenantId) {
-    return res.status(401).json({
+    res.status(401).json({
       success: false,
-      error: {
-        message: 'Tenant not found',
-      },
+      error: { message: 'Tenant not found' }
     });
+    return;
   }
 
-  if (!['ACTIVE', 'INACTIVE', 'SUSPENDED'].includes(status)) {
-    return res.status(400).json({
+  const validation = await planLimitsService.canConvertToBusiness(tenantId);
+  
+  if (!validation.canConvert) {
+    res.status(400).json({
       success: false,
-      error: {
-        message: 'Invalid status',
-      },
+      error: { message: validation.reason }
     });
+    return;
   }
 
-  const prisma = getPrismaClient();
-
-  const user = await prisma.fitOSUser.update({
-    where: {
-      id,
-      tenantId,
-    },
-    data: { status },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      role: true,
-      status: true,
-    },
+  // Verificar se subdomain já existe
+  const existingTenant = await prisma.tenant.findUnique({
+    where: { subdomain }
   });
 
-  logger.info('User status updated', {
-    userId: id,
-    newStatus: status,
-    tenantId,
-  });
+  if (existingTenant) {
+    res.status(400).json({
+      success: false,
+      error: { message: 'Subdomain já está em uso' }
+    });
+    return;
+  }
 
-  return res.json({
+  // TODO: Implementar sistema de solicitações para super admin
+  // Por enquanto, apenas retorna sucesso
+  res.json({
     success: true,
-    data: { user },
+    message: 'Solicitação de upgrade para business enviada para aprovação',
+    data: {
+      subdomain,
+      status: 'pending'
+    }
   });
 }));
 
-export { router as adminRoutes };
+/**
+ * POST /api/admin/request-feature
+ * Solicitar habilitação de feature específica
+ */
+router.post('/request-feature', requireAdmin, asyncHandler(async (req: any, res: Response): Promise<void> => {
+  const tenantId = req.tenantId;
+  const { featureName, reason } = req.body;
+
+  if (!tenantId) {
+    res.status(401).json({
+      success: false,
+      error: { message: 'Tenant not found' }
+    });
+    return;
+  }
+
+  const features = await planLimitsService.getEnabledFeatures(tenantId);
+
+  if (features[featureName]) {
+    res.status(400).json({
+      success: false,
+      error: { message: 'Feature já está habilitada' }
+    });
+    return;
+  }
+
+  // TODO: Implementar sistema de solicitações para super admin
+  // Por enquanto, apenas retorna sucesso
+  res.json({
+    success: true,
+    message: 'Solicitação de feature enviada para aprovação',
+    data: {
+      featureName,
+      reason,
+      status: 'pending'
+    }
+  });
+}));
+
+export default router;
