@@ -17,7 +17,7 @@ const userFormSchema = z.object({
   lastName: z.string().min(1, 'Sobrenome é obrigatório'),
   email: z.string().email('Email inválido'),
   phone: z.string().optional(),
-  role: z.enum(['MEMBER', 'TRAINER', 'ADMIN', 'OWNER', 'SUPER_ADMIN'] as const),
+  role: z.enum(['CLIENT', 'TRAINER', 'ADMIN', 'OWNER', 'SUPER_ADMIN'] as const),
   password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres').optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'DELETED'] as const).optional(),
 });
@@ -56,7 +56,7 @@ export function UserForm({
       lastName: initialData?.lastName || '',
       email: initialData?.email || '',
       phone: initialData?.phone || '',
-      role: initialData?.role || 'MEMBER',
+      role: initialData?.role || 'CLIENT',
       status: initialData?.status || 'ACTIVE',
       password: ''
     }
@@ -78,7 +78,7 @@ export function UserForm({
       OWNER: 'Proprietário',
       ADMIN: 'Administrador',
       TRAINER: 'Personal Trainer',
-      MEMBER: 'Membro',
+      CLIENT: 'Cliente',
       SUPER_ADMIN: 'Super Admin'
     };
     return roleNames[role] || role;
@@ -196,7 +196,7 @@ export function UserForm({
                   <SelectValue placeholder="Selecione o role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MEMBER">Membro</SelectItem>
+                  <SelectItem value="CLIENT">Cliente</SelectItem>
                   <SelectItem value="TRAINER">Personal Trainer</SelectItem>
                   <SelectItem value="ADMIN">Administrador</SelectItem>
                   <SelectItem value="OWNER">Proprietário</SelectItem>

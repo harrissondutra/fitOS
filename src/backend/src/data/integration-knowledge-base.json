@@ -1,0 +1,783 @@
+{
+  "openai": {
+    "context7Id": "/openai/openai-node",
+    "category": "ai",
+    "displayName": "OpenAI",
+    "icon": "openai.svg",
+    "configFields": [
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "OpenAI API Key starting with sk-",
+        "validation": "^sk-[a-zA-Z0-9]+$"
+      },
+      {
+        "name": "organizationId",
+        "type": "text",
+        "required": false,
+        "description": "Optional organization ID"
+      },
+      {
+        "name": "timeout",
+        "type": "number",
+        "required": false,
+        "default": 600000,
+        "description": "Request timeout in milliseconds"
+      }
+    ],
+    "testEndpoint": "/models",
+    "testMethod": "GET"
+  },
+  "anthropic": {
+    "context7Id": "/anthropics/anthropic-sdk-typescript",
+    "category": "ai",
+    "displayName": "Anthropic (Claude)",
+    "icon": "anthropic.svg",
+    "configFields": [
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "Anthropic API Key starting with sk-ant-",
+        "validation": "^sk-ant-[a-zA-Z0-9]+$"
+      },
+      {
+        "name": "timeout",
+        "type": "number",
+        "required": false,
+        "default": 600000,
+        "description": "Request timeout in milliseconds"
+      }
+    ],
+    "testEndpoint": "/messages",
+    "testMethod": "POST"
+  },
+  "groq": {
+    "context7Id": "/groq/groq-typescript",
+    "category": "ai",
+    "displayName": "Groq",
+    "icon": "groq.svg",
+    "configFields": [
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "Groq API Key",
+        "validation": "^gsk_[a-zA-Z0-9]+$"
+      },
+      {
+        "name": "model",
+        "type": "select",
+        "required": false,
+        "default": "llama3-70b-8192",
+        "options": ["llama3-70b-8192", "mixtral-8x7b-32768", "gemma-7b-it"],
+        "description": "Default model to use"
+      }
+    ],
+    "testEndpoint": "/chat/completions",
+    "testMethod": "POST"
+  },
+  "ollama": {
+    "context7Id": "/ollama/ollama-js",
+    "category": "ai",
+    "displayName": "Ollama (Local AI)",
+    "icon": "ollama.svg",
+    "configFields": [
+      {
+        "name": "baseUrl",
+        "type": "text",
+        "required": true,
+        "default": "http://localhost:11434",
+        "description": "Ollama server URL"
+      },
+      {
+        "name": "model",
+        "type": "text",
+        "required": false,
+        "default": "llama2",
+        "description": "Default model to use"
+      }
+    ],
+    "testEndpoint": "/api/tags",
+    "testMethod": "GET"
+  },
+  "deepseek": {
+    "context7Id": "/deepseek-ai/deepseek-api",
+    "category": "ai",
+    "displayName": "DeepSeek",
+    "icon": "deepseek.svg",
+    "configFields": [
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "DeepSeek API Key",
+        "validation": "^sk-[a-zA-Z0-9]+$"
+      },
+      {
+        "name": "baseUrl",
+        "type": "text",
+        "required": false,
+        "default": "https://api.deepseek.com",
+        "description": "DeepSeek API Base URL"
+      },
+      {
+        "name": "timeout",
+        "type": "number",
+        "required": false,
+        "default": 60000,
+        "description": "Request timeout in milliseconds"
+      }
+    ],
+    "testEndpoint": "/chat/completions",
+    "testMethod": "POST"
+  },
+  "stripe": {
+    "context7Id": "/stripe/stripe-node",
+    "category": "payment",
+    "displayName": "Stripe",
+    "icon": "stripe.svg",
+    "configFields": [
+      {
+        "name": "environment",
+        "type": "select",
+        "required": true,
+        "options": ["test", "live"],
+        "default": "test",
+        "description": "Environment mode"
+      },
+      {
+        "name": "secretKeyTest",
+        "type": "password",
+        "required": true,
+        "description": "Test Secret Key",
+        "validation": "^sk_test_"
+      },
+      {
+        "name": "secretKeyLive",
+        "type": "password",
+        "required": false,
+        "description": "Live Secret Key",
+        "validation": "^sk_live_"
+      },
+      {
+        "name": "webhookSecret",
+        "type": "password",
+        "required": false,
+        "description": "Webhook Signing Secret"
+      }
+    ],
+    "testEndpoint": "/customers",
+    "testMethod": "GET"
+  },
+  "mercadopago": {
+    "context7Id": "/mercadopago/sdk-nodejs",
+    "category": "payment",
+    "displayName": "Mercado Pago",
+    "icon": "mercadopago.svg",
+    "configFields": [
+      {
+        "name": "accessToken",
+        "type": "password",
+        "required": true,
+        "description": "Access Token"
+      },
+      {
+        "name": "publicKey",
+        "type": "text",
+        "required": true,
+        "description": "Public Key"
+      },
+      {
+        "name": "environment",
+        "type": "select",
+        "required": true,
+        "options": ["test", "production"],
+        "default": "test"
+      }
+    ],
+    "testEndpoint": "/payment_methods",
+    "testMethod": "GET"
+  },
+  "evolutionapi": {
+    "context7Id": null,
+    "category": "communication",
+    "displayName": "Evolution API (WhatsApp)",
+    "icon": "evolution.svg",
+    "configFields": [
+      {
+        "name": "apiUrl",
+        "type": "text",
+        "required": true,
+        "description": "Evolution API Base URL",
+        "default": "http://localhost:8080"
+      },
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "API Key"
+      },
+      {
+        "name": "instanceName",
+        "type": "text",
+        "required": true,
+        "description": "Instance Name"
+      }
+    ],
+    "testEndpoint": "/instance/connectionState",
+    "testMethod": "GET"
+  },
+  "whatsappweb": {
+    "context7Id": null,
+    "category": "communication",
+    "displayName": "WhatsApp Web.js",
+    "icon": "whatsapp.svg",
+    "configFields": [
+      {
+        "name": "sessionName",
+        "type": "text",
+        "required": true,
+        "description": "Session Name"
+      },
+      {
+        "name": "qrCodeEnabled",
+        "type": "toggle",
+        "required": false,
+        "default": true,
+        "description": "Enable QR Code generation"
+      }
+    ],
+    "testEndpoint": "/status",
+    "testMethod": "GET"
+  },
+  "chatwoot": {
+    "context7Id": "/chatwoot/docs",
+    "category": "communication",
+    "displayName": "Chatwoot",
+    "icon": "chatwoot.svg",
+    "configFields": [
+      {
+        "name": "baseUrl",
+        "type": "text",
+        "required": true,
+        "description": "Chatwoot Base URL",
+        "default": "https://app.chatwoot.com"
+      },
+      {
+        "name": "apiAccessToken",
+        "type": "password",
+        "required": true,
+        "description": "API Access Token"
+      },
+      {
+        "name": "accountId",
+        "type": "text",
+        "required": true,
+        "description": "Account ID"
+      }
+    ],
+    "testEndpoint": "/api/v1/accounts/:accountId/inboxes",
+    "testMethod": "GET"
+  },
+  "n8n": {
+    "context7Id": "/n8n-io/n8n-docs",
+    "category": "automation",
+    "displayName": "n8n",
+    "icon": "n8n.svg",
+    "configFields": [
+      {
+        "name": "baseUrl",
+        "type": "text",
+        "required": true,
+        "description": "n8n Instance URL",
+        "default": "http://localhost:5678"
+      },
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "API Key"
+      }
+    ],
+    "testEndpoint": "/api/v1/workflows",
+    "testMethod": "GET"
+  },
+  "webhooks": {
+    "context7Id": null,
+    "category": "automation",
+    "displayName": "Webhooks Manager",
+    "icon": "webhook.svg",
+    "configFields": [
+      {
+        "name": "signingSecret",
+        "type": "password",
+        "required": false,
+        "description": "Webhook Signing Secret for validation"
+      },
+      {
+        "name": "allowedOrigins",
+        "type": "textarea",
+        "required": false,
+        "description": "Allowed webhook origins (comma-separated)"
+      }
+    ],
+    "testEndpoint": "/webhooks/test",
+    "testMethod": "POST"
+  },
+  "googlecalendar": {
+    "context7Id": null,
+    "category": "calendar",
+    "displayName": "Google Calendar",
+    "icon": "google-calendar.svg",
+    "configFields": [
+      {
+        "name": "clientId",
+        "type": "text",
+        "required": true,
+        "description": "OAuth Client ID"
+      },
+      {
+        "name": "clientSecret",
+        "type": "password",
+        "required": true,
+        "description": "OAuth Client Secret"
+      },
+      {
+        "name": "redirectUri",
+        "type": "text",
+        "required": true,
+        "description": "OAuth Redirect URI"
+      }
+    ],
+    "testEndpoint": "/calendar/v3/users/me/calendarList",
+    "testMethod": "GET"
+  },
+  "smtp": {
+    "context7Id": null,
+    "category": "email",
+    "displayName": "SMTP/Email",
+    "icon": "email.svg",
+    "configFields": [
+      {
+        "name": "host",
+        "type": "text",
+        "required": true,
+        "description": "SMTP Host"
+      },
+      {
+        "name": "port",
+        "type": "number",
+        "required": true,
+        "default": 587,
+        "description": "SMTP Port"
+      },
+      {
+        "name": "secure",
+        "type": "toggle",
+        "required": false,
+        "default": false,
+        "description": "Use TLS/SSL"
+      },
+      {
+        "name": "username",
+        "type": "text",
+        "required": true,
+        "description": "SMTP Username"
+      },
+      {
+        "name": "password",
+        "type": "password",
+        "required": true,
+        "description": "SMTP Password"
+      }
+    ],
+    "testEndpoint": "/test-email",
+    "testMethod": "POST"
+  },
+  "cloudinary": {
+    "context7Id": null,
+    "category": "storage",
+    "displayName": "Cloudinary",
+    "icon": "cloudinary.svg",
+    "configFields": [
+      {
+        "name": "cloudName",
+        "type": "text",
+        "required": true,
+        "description": "Cloud Name"
+      },
+      {
+        "name": "apiKey",
+        "type": "text",
+        "required": true,
+        "description": "API Key"
+      },
+      {
+        "name": "apiSecret",
+        "type": "password",
+        "required": true,
+        "description": "API Secret"
+      }
+    ],
+    "testEndpoint": "/resources/image",
+    "testMethod": "GET"
+  },
+  "twilio": {
+    "context7Id": null,
+    "category": "communication",
+    "displayName": "Twilio",
+    "icon": "twilio.svg",
+    "configFields": [
+      {
+        "name": "accountSid",
+        "type": "text",
+        "required": true,
+        "description": "Account SID"
+      },
+      {
+        "name": "authToken",
+        "type": "password",
+        "required": true,
+        "description": "Auth Token"
+      },
+      {
+        "name": "phoneNumber",
+        "type": "text",
+        "required": true,
+        "description": "Twilio Phone Number"
+      }
+    ],
+    "testEndpoint": "/Accounts/:AccountSid",
+    "testMethod": "GET"
+  },
+  "sendgrid": {
+    "context7Id": null,
+    "category": "email",
+    "displayName": "SendGrid",
+    "icon": "sendgrid.svg",
+    "configFields": [
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "SendGrid API Key"
+      }
+    ],
+    "testEndpoint": "/mail/send",
+    "testMethod": "POST"
+  },
+  "googlefit": {
+    "context7Id": null,
+    "category": "wearables",
+    "displayName": "Google Fit",
+    "icon": "google-fit.svg",
+    "configFields": [
+      {
+        "name": "clientId",
+        "type": "text",
+        "required": true,
+        "description": "OAuth Client ID"
+      },
+      {
+        "name": "clientSecret",
+        "type": "password",
+        "required": true,
+        "description": "OAuth Client Secret"
+      },
+      {
+        "name": "redirectUri",
+        "type": "text",
+        "required": true,
+        "description": "OAuth Redirect URI"
+      }
+    ],
+    "testEndpoint": "/fitness/v1/users/me/dataSources",
+    "testMethod": "GET"
+  },
+  "applehealth": {
+    "context7Id": null,
+    "category": "wearables",
+    "displayName": "Apple HealthKit",
+    "icon": "apple-health.svg",
+    "configFields": [
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "Apple Health API Key"
+      },
+      {
+        "name": "teamId",
+        "type": "text",
+        "required": true,
+        "description": "Team ID"
+      }
+    ],
+    "testEndpoint": "/healthkit/status",
+    "testMethod": "GET"
+  },
+  "strava": {
+    "context7Id": null,
+    "category": "wearables",
+    "displayName": "Strava",
+    "icon": "strava.svg",
+    "configFields": [
+      {
+        "name": "clientId",
+        "type": "text",
+        "required": true,
+        "description": "OAuth Client ID"
+      },
+      {
+        "name": "clientSecret",
+        "type": "password",
+        "required": true,
+        "description": "OAuth Client Secret"
+      },
+      {
+        "name": "redirectUri",
+        "type": "text",
+        "required": true,
+        "description": "OAuth Redirect URI"
+      }
+    ],
+    "testEndpoint": "/api/v3/athlete",
+    "testMethod": "GET"
+  },
+  "slack": {
+    "context7Id": null,
+    "category": "communication",
+    "displayName": "Slack",
+    "icon": "slack.svg",
+    "configFields": [
+      {
+        "name": "botToken",
+        "type": "password",
+        "required": true,
+        "description": "Bot Token (xoxb-...)"
+      },
+      {
+        "name": "appToken",
+        "type": "password",
+        "required": false,
+        "description": "App Token (xapp-...)"
+      },
+      {
+        "name": "signingSecret",
+        "type": "password",
+        "required": true,
+        "description": "Signing Secret"
+      }
+    ],
+    "testEndpoint": "/auth.test",
+    "testMethod": "POST"
+  },
+  "discord": {
+    "context7Id": null,
+    "category": "communication",
+    "displayName": "Discord",
+    "icon": "discord.svg",
+    "configFields": [
+      {
+        "name": "botToken",
+        "type": "password",
+        "required": true,
+        "description": "Bot Token"
+      },
+      {
+        "name": "applicationId",
+        "type": "text",
+        "required": true,
+        "description": "Application ID"
+      }
+    ],
+    "testEndpoint": "/users/@me",
+    "testMethod": "GET"
+  },
+  "telegram": {
+    "context7Id": null,
+    "category": "communication",
+    "displayName": "Telegram",
+    "icon": "telegram.svg",
+    "configFields": [
+      {
+        "name": "botToken",
+        "type": "password",
+        "required": true,
+        "description": "Bot Token from @BotFather"
+      }
+    ],
+    "testEndpoint": "/getMe",
+    "testMethod": "GET"
+  },
+  "googlemaps": {
+    "context7Id": null,
+    "category": "location",
+    "displayName": "Google Maps",
+    "icon": "google-maps.svg",
+    "configFields": [
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "Google Maps API Key"
+      }
+    ],
+    "testEndpoint": "/maps/api/geocode/json",
+    "testMethod": "GET"
+  },
+  "firebase": {
+    "context7Id": null,
+    "category": "backend",
+    "displayName": "Firebase",
+    "icon": "firebase.svg",
+    "configFields": [
+      {
+        "name": "projectId",
+        "type": "text",
+        "required": true,
+        "description": "Firebase Project ID"
+      },
+      {
+        "name": "privateKey",
+        "type": "textarea",
+        "required": true,
+        "description": "Service Account Private Key (JSON)"
+      }
+    ],
+    "testEndpoint": "/projects/:projectId",
+    "testMethod": "GET"
+  },
+  "supabase": {
+    "context7Id": null,
+    "category": "backend",
+    "displayName": "Supabase",
+    "icon": "supabase.svg",
+    "configFields": [
+      {
+        "name": "projectUrl",
+        "type": "text",
+        "required": true,
+        "description": "Project URL"
+      },
+      {
+        "name": "anonKey",
+        "type": "password",
+        "required": true,
+        "description": "Anon/Public Key"
+      },
+      {
+        "name": "serviceRoleKey",
+        "type": "password",
+        "required": false,
+        "description": "Service Role Key (admin)"
+      }
+    ],
+    "testEndpoint": "/rest/v1/",
+    "testMethod": "GET"
+  },
+  "zapier": {
+    "context7Id": null,
+    "category": "automation",
+    "displayName": "Zapier",
+    "icon": "zapier.svg",
+    "configFields": [
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "Zapier API Key"
+      }
+    ],
+    "testEndpoint": "/v1/zaps",
+    "testMethod": "GET"
+  },
+  "make": {
+    "context7Id": null,
+    "category": "automation",
+    "displayName": "Make (Integromat)",
+    "icon": "make.svg",
+    "configFields": [
+      {
+        "name": "apiKey",
+        "type": "password",
+        "required": true,
+        "description": "Make API Key"
+      },
+      {
+        "name": "teamId",
+        "type": "text",
+        "required": true,
+        "description": "Team ID"
+      }
+    ],
+    "testEndpoint": "/scenarios",
+    "testMethod": "GET"
+  },
+  "googleanalytics": {
+    "context7Id": null,
+    "category": "analytics",
+    "displayName": "Google Analytics",
+    "icon": "google-analytics.svg",
+    "configFields": [
+      {
+        "name": "measurementId",
+        "type": "text",
+        "required": true,
+        "description": "Measurement ID (G-XXXXXXXXXX)"
+      },
+      {
+        "name": "apiSecret",
+        "type": "password",
+        "required": true,
+        "description": "API Secret"
+      }
+    ],
+    "testEndpoint": "/mp/collect",
+    "testMethod": "POST"
+  },
+  "mixpanel": {
+    "context7Id": null,
+    "category": "analytics",
+    "displayName": "Mixpanel",
+    "icon": "mixpanel.svg",
+    "configFields": [
+      {
+        "name": "projectToken",
+        "type": "password",
+        "required": true,
+        "description": "Project Token"
+      },
+      {
+        "name": "apiSecret",
+        "type": "password",
+        "required": false,
+        "description": "API Secret"
+      }
+    ],
+    "testEndpoint": "/track",
+    "testMethod": "POST"
+  },
+  "segment": {
+    "context7Id": null,
+    "category": "analytics",
+    "displayName": "Segment",
+    "icon": "segment.svg",
+    "configFields": [
+      {
+        "name": "writeKey",
+        "type": "password",
+        "required": true,
+        "description": "Write Key"
+      }
+    ],
+    "testEndpoint": "/v1/track",
+    "testMethod": "POST"
+  }
+}
+
+
+
+

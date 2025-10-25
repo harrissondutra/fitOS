@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
-import { config } from '../config/config';
+import { config } from '../config/config-simple';
 import { logger } from '../utils/logger';
+import { costTrackerService } from './cost-tracker.service';
 
 export interface EmailOptions {
   to: string | string[];
@@ -29,10 +30,9 @@ class EmailService {
 
   private initializeTransporter(): void {
     try {
-      // Desabilitar verificação de email temporariamente para desenvolvimento
-      if (!config.email.host || !config.email.auth?.user || !config.email.auth?.pass || 
-          config.email.auth.pass === 'sua-app-password-do-gmail') {
-        logger.warn('Email configuration incomplete or using default values. Email service will not be available.');
+      // Verificar se as credenciais de email estão configuradas
+      if (!config.email.host || !config.email.auth?.user || !config.email.auth?.pass) {
+        logger.warn('Email configuration incomplete. Email service will not be available.');
         return;
       }
 
@@ -40,24 +40,35 @@ class EmailService {
         service: 'gmail',
         host: config.email.host,
         port: config.email.port,
-        secure: config.email.secure, // true for 465, false for other ports
+        secure: false, // Gmail usa STARTTLS na porta 587
         auth: {
           user: config.email.auth.user,
           pass: config.email.auth.pass, // App Password do Gmail
         },
         tls: {
           rejectUnauthorized: false, // Para desenvolvimento
+          ciphers: 'SSLv3'
         },
+        // Configurações específicas para Gmail
+        pool: true,
+        maxConnections: 1,
+        maxMessages: 3,
+        rateDelta: 20000,
+        rateLimit: 5
       });
 
-      // Verificar conexão
-      this.transporter?.verify((error: any, success: any) => {
-        if (error) {
-          logger.error('Email transporter verification failed:', error);
-        } else {
-          logger.info('✅ Email service ready');
-        }
-      });
+      // Verificar conexão apenas em produção
+      if (config.isProduction) {
+        this.transporter?.verify((error: any, success: any) => {
+          if (error) {
+            logger.error('Email transporter verification failed:', error);
+          } else {
+            logger.info('✅ Email service ready');
+          }
+        });
+      } else {
+        logger.info('📧 Email service initialized (verification skipped in development)');
+      }
     } catch (error) {
       logger.error('Failed to initialize email transporter:', error);
     }
@@ -81,6 +92,23 @@ class EmailService {
 
       const result = await this.transporter.sendMail(mailOptions);
       logger.info('Email sent successfully', { messageId: result.messageId });
+      
+      // Rastrear custo do email
+      try {
+        const recipientCount = Array.isArray(options.to) ? options.to.length : 1;
+        await costTrackerService.trackEmailUsage({
+          recipientCount,
+          metadata: {
+            subject: options.subject,
+            messageId: result.messageId,
+            hasAttachments: options.attachments && options.attachments.length > 0,
+            attachmentCount: options.attachments?.length || 0,
+          },
+        });
+      } catch (error) {
+        logger.warn('Failed to track email usage:', error);
+      }
+      
       return true;
     } catch (error) {
       logger.error('Failed to send email:', error);

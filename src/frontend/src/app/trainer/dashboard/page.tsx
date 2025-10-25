@@ -1,10 +1,15 @@
 'use client';
 
+// Configurações SSR
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
+import ModeToggle from '@/components/mode-toggle';
 import { toastUtils } from '@/lib/toast-utils';
 import { 
   Users, 
@@ -41,7 +46,7 @@ export default function TrainerDashboardPage() {
             </div>
             
             <div className="flex items-center space-x-4">
-              <ThemeToggle />
+              <ModeToggle />
               <Button variant="ghost" onClick={() => router.push('/auth/login')}>
                 Sair
               </Button>

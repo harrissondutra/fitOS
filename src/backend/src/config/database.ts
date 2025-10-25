@@ -1,47 +1,61 @@
 import { PrismaClient } from '@prisma/client';
-import { config } from './config';
+import { config } from './config-simple';
 import { logger } from '../utils/logger';
-import dotenv from 'dotenv';
+// import dotenv from 'dotenv';
 
-// Carregar .env da raiz do projeto
-dotenv.config({ path: '../../.env' });
+// Carregar .env da raiz do projeto - DESABILITADO TEMPORARIAMENTE
+// dotenv.config({ path: '../../.env' });
 
 let prisma: PrismaClient;
 
 export const connectDatabase = async (): Promise<void> => {
   try {
+    // Configurar URL do banco com parâmetros de pool otimizados
+    const databaseUrl = process.env.DATABASE_URL || config.database.url;
+    
+    // Pool otimizado: menos conexões em dev, mais em prod
+    const isDev = config.nodeEnv === 'development';
+    const connectionLimit = isDev ? 5 : 20;
+    const poolTimeout = isDev ? 30 : 60;
+    const connectTimeout = isDev ? 30 : 60;
+    
+    const urlWithPool = databaseUrl.includes('?') 
+      ? `${databaseUrl}&connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}&connect_timeout=${connectTimeout}`
+      : `${databaseUrl}?connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}&connect_timeout=${connectTimeout}`;
+
+    // Configuração de logs otimizada
+    const logConfig: any[] = [
+      {
+        emit: 'event',
+        level: 'error',
+      },
+      {
+        emit: 'event',
+        level: 'warn',
+      },
+    ];
+
+    // Adicionar logs de query apenas se DEBUG_QUERIES=true
+    if (process.env.DEBUG_QUERIES === 'true') {
+      logConfig.push({
+        emit: 'event',
+        level: 'query',
+      });
+    }
+
     prisma = new PrismaClient({
       datasources: {
         db: {
-          url: process.env.DATABASE_URL || config.database.url,
+          url: urlWithPool,
         },
       },
-      log: [
-        {
-          emit: 'event',
-          level: 'query',
-        },
-        {
-          emit: 'event',
-          level: 'error',
-        },
-        {
-          emit: 'event',
-          level: 'info',
-        },
-        {
-          emit: 'event',
-          level: 'warn',
-        },
-      ],
+      log: logConfig,
     });
 
-    // Log database queries in development
-    if (config.nodeEnv === 'development') {
+    // Log database queries apenas em modo DEBUG
+    if (process.env.DEBUG_QUERIES === 'true') {
       (prisma as any).$on('query', (e: any) => {
-        logger.debug('Query: ' + e.query);
-        logger.debug('Params: ' + e.params);
-        logger.debug('Duration: ' + e.duration + 'ms');
+        logger.query(e.query, e.params, e.duration);
       });
     }
 
@@ -50,8 +64,21 @@ export const connectDatabase = async (): Promise<void> => {
       logger.error('Database error:', e);
     });
 
+    // Log warnings
+    (prisma as any).$on('warn', (e: any) => {
+      logger.warn('Database warning:', e);
+    });
+
     // Test connection
     await prisma.$connect();
+    
+    // Set search path to fitos schema
+    await prisma.$executeRaw`SET search_path TO fitos, public;`;
+    
+    // Marcar como conectado
+    isConnected = true;
+    prismaInstance = prisma;
+    
     logger.info('✅ Database connected successfully');
   } catch (error) {
     logger.error('❌ Database connection failed:', error);
@@ -69,9 +96,43 @@ export const disconnectDatabase = async (): Promise<void> => {
   }
 };
 
+// Cache da instância do Prisma para lazy loading
+let prismaInstance: PrismaClient | null = null;
+let isConnected = false;
+
 export const getPrismaClient = (): PrismaClient => {
-  if (!prisma) {
-    throw new Error('Database not connected. Call connectDatabase() first.');
+  if (!prismaInstance) {
+    // Lazy loading: criar instância apenas quando necessário
+    logger.debug('Creating PrismaClient instance (lazy loading)');
+    prismaInstance = new PrismaClient({
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL || config.database.url,
+        },
+      },
+      log: [
+        {
+          emit: 'event',
+          level: 'error',
+        },
+        {
+          emit: 'event',
+          level: 'warn',
+        },
+      ],
+    });
   }
-  return prisma;
+  
+  // Se não está conectado, tentar conectar
+  if (!isConnected) {
+    logger.debug('PrismaClient not connected, attempting connection...');
+    prismaInstance.$connect().then(() => {
+      isConnected = true;
+      logger.debug('PrismaClient connected successfully');
+    }).catch((error) => {
+      logger.error('Failed to connect PrismaClient:', error);
+    });
+  }
+  
+  return prismaInstance;
 };

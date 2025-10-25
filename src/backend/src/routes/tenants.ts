@@ -4,10 +4,10 @@ import { TenantService } from '../services/tenant.service';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
-import { authRateLimiter } from '../middleware/rateLimiter';
+import { rateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
-const tenantService = TenantService.getInstance();
+const tenantService = new TenantService(null as any);
 
 // Validation rules
 const createTenantValidation = [
@@ -29,7 +29,7 @@ const updateTenantValidation = [
 ];
 
 // Create new tenant
-router.post('/', authRateLimiter, createTenantValidation, asyncHandler(async (req: Request, res: Response) => {
+router.post('/', rateLimiter, createTenantValidation, asyncHandler(async (req: Request, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({
@@ -75,7 +75,7 @@ router.post('/', authRateLimiter, createTenantValidation, asyncHandler(async (re
 }));
 
 // Get tenant by ID
-router.get('/:id', authRateLimiter, asyncHandler(async (req: Request, res: Response) => {
+router.get('/:id', rateLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
@@ -106,7 +106,7 @@ router.get('/:id', authRateLimiter, asyncHandler(async (req: Request, res: Respo
 }));
 
 // Update tenant
-router.put('/:id', authRateLimiter, updateTenantValidation, asyncHandler(async (req: Request, res: Response) => {
+router.put('/:id', rateLimiter, updateTenantValidation, asyncHandler(async (req: Request, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({
@@ -154,7 +154,7 @@ router.put('/:id', authRateLimiter, updateTenantValidation, asyncHandler(async (
 }));
 
 // Delete tenant (soft delete)
-router.delete('/:id', authRateLimiter, asyncHandler(async (req: Request, res: Response) => {
+router.delete('/:id', rateLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   try {
@@ -187,7 +187,7 @@ router.delete('/:id', authRateLimiter, asyncHandler(async (req: Request, res: Re
 }));
 
 // List tenants
-router.get('/', authRateLimiter, asyncHandler(async (req: Request, res: Response) => {
+router.get('/', rateLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { status, plan, limit, offset } = req.query;
 
   try {
@@ -216,7 +216,7 @@ router.get('/', authRateLimiter, asyncHandler(async (req: Request, res: Response
 }));
 
 // Get current tenant info (for authenticated requests)
-router.get('/me/info', authRateLimiter, asyncHandler(async (req: RequestWithTenant, res: Response) => {
+router.get('/me/info', rateLimiter, asyncHandler(async (req: RequestWithTenant, res: Response) => {
   const tenantId = req.tenantId;
 
   if (!tenantId) {
@@ -235,7 +235,7 @@ router.get('/me/info', authRateLimiter, asyncHandler(async (req: RequestWithTena
 }));
 
 // Update current tenant settings
-router.put('/me/settings', authRateLimiter, asyncHandler(async (req: RequestWithTenant, res: Response) => {
+router.put('/me/settings', rateLimiter, asyncHandler(async (req: RequestWithTenant, res: Response) => {
   const tenantId = req.tenantId;
   const { settings } = req.body;
 

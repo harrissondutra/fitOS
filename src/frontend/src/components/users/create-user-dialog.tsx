@@ -17,7 +17,7 @@ const userFormSchema = z.object({
   lastName: z.string().min(1, 'Sobrenome é obrigatório'),
   email: z.string().email('Email inválido'),
   phone: z.string().optional(),
-  role: z.enum(['MEMBER', 'TRAINER', 'ADMIN', 'OWNER', 'SUPER_ADMIN'] as const),
+  role: z.enum(['CLIENT', 'TRAINER', 'ADMIN', 'OWNER', 'SUPER_ADMIN'] as const),
   password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
 });
 
@@ -32,7 +32,7 @@ interface CreateUserDialogProps {
 export function CreateUserDialog({ 
   onCreateUser, 
   loading = false,
-  userRole = 'MEMBER'
+  userRole = 'CLIENT'
 }: CreateUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -83,7 +83,7 @@ export function CreateUserDialog({
       OWNER: 'Proprietário',
       ADMIN: 'Administrador',
       TRAINER: 'Personal Trainer',
-      MEMBER: 'Membro',
+      CLIENT: 'Cliente',
       SUPER_ADMIN: 'Super Admin'
     };
     return roleNames[role] || role;
@@ -92,7 +92,7 @@ export function CreateUserDialog({
   // Filtrar roles baseado no usuário atual
   const getAvailableRoles = () => {
     const allRoles: { value: UserRole; label: string }[] = [
-      { value: 'MEMBER', label: 'Membro' },
+      { value: 'CLIENT', label: 'Cliente' },
       { value: 'TRAINER', label: 'Personal Trainer' },
       { value: 'ADMIN', label: 'Administrador' },
       { value: 'OWNER', label: 'Proprietário' },
@@ -103,9 +103,9 @@ export function CreateUserDialog({
       allRoles.push({ value: 'SUPER_ADMIN', label: 'Super Admin' });
     }
 
-    // ADMIN só pode criar MEMBER e TRAINER
+    // ADMIN só pode criar CLIENT e TRAINER
     if (userRole === 'ADMIN') {
-      return allRoles.filter(role => ['MEMBER', 'TRAINER'].includes(role.value));
+      return allRoles.filter(role => ['CLIENT', 'TRAINER'].includes(role.value));
     }
 
     return allRoles;
