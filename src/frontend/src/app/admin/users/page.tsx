@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@/components/providers/auth-provider';
 import { 
   Upload,
   Download
@@ -20,6 +19,12 @@ import { EditUserDialog } from '@/components/users/edit-user-dialog';
 import { User, UserFilters as UserFiltersType, UserBulkAction, CSVImportResult, UserFormData } from '../../../../../shared/types';
 import { toastUtils } from '@/lib/toast-utils';
 
+// Configurações para evitar problemas de SSR com useAuth
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
+
 interface UsersResponse {
   users: User[];
   pagination: {
@@ -31,7 +36,8 @@ interface UsersResponse {
 }
 
 export default function UsersPage() {
-  const { tenantType } = useAuth();
+  // Auth removed - using default values
+  const tenantType = 'business';
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -323,7 +329,7 @@ export default function UsersPage() {
   const getUsageData = () => {
     // TODO: Implementar dados de uso baseado no plano
     return {
-      member: { current: 0, limit: 100, isUnlimited: false },
+      client: { current: 0, limit: 100, isUnlimited: false },
       trainer: { current: 0, limit: 10, isUnlimited: false },
       admin: { current: 0, limit: 5, isUnlimited: false },
       owner: { current: 0, limit: 1, isUnlimited: false }

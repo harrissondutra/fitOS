@@ -35,6 +35,25 @@ export const tenantMiddleware = (
       return;
     }
 
+    // SUPER_ADMIN pode acessar qualquer tenant ou não ter tenant específico
+    const userRole = (req as any).user?.role;
+    if (userRole === 'SUPER_ADMIN') {
+      const host = req.get('host') || '';
+      const tenantIdFromHeader = req.headers['x-tenant-id'] as string;
+      
+      // Se não especificar tenant, usar 'sistema' como padrão para SUPER_ADMIN
+      const tenantId = tenantIdFromHeader || resolveTenantFromHost(host) || 'sistema';
+      
+      req.tenantId = tenantId;
+      res.set('X-Tenant-ID', tenantId);
+      
+      if (process.env.DEBUG === 'true') {
+        logger.debug('Tenant resolved for SUPER_ADMIN', { tenantId, host, userRole });
+      }
+      next();
+      return;
+    }
+
     const host = req.get('host') || '';
     const tenantIdFromHeader = req.headers['x-tenant-id'] as string;
     
@@ -59,7 +78,10 @@ export const tenantMiddleware = (
     // Add tenant ID to response headers
     res.set('X-Tenant-ID', tenantId);
     
-    logger.debug('Tenant resolved', { tenantId, host });
+    // Log apenas em modo DEBUG
+    if (process.env.DEBUG === 'true') {
+      logger.debug('Tenant resolved', { tenantId, host });
+    }
     next();
   } catch (error) {
     logger.error('Tenant middleware error:', error);

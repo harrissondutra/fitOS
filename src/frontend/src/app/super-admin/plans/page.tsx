@@ -1,6 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+// Configurações SSR
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   CreditCard, 
@@ -71,33 +76,65 @@ export default function PlansPage() {
     pages: 0
   });
 
-  useEffect(() => {
-    fetchPlans();
-  }, [filters, pagination.page]);
-
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
+        page: pagination?.page?.toString() || '1',
+        limit: pagination?.limit?.toString() || '20',
         ...(filters.tenantType && filters.tenantType !== 'all' && { tenantType: filters.tenantType }),
         ...(filters.isCustom && filters.isCustom !== 'all' && { isCustom: filters.isCustom }),
         ...(filters.isActive && filters.isActive !== 'all' && { isActive: filters.isActive })
       });
 
-      const response = await fetch(`/api/super-admin/plan-configs?${params}`);
+      const response = await fetch(`/api/super-admin/plan-configs?${params}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
       if (response.ok) {
-        const data: PlansResponse = await response.json();
-        setPlans(data.plans);
-        setPagination(data.pagination);
+        const result = await response.json();
+        const data = result.data || result; // Suporte para ambos os formatos
+        setPlans(data.plans || []);
+        setPagination(data.pagination || {
+          page: 1,
+          limit: 20,
+          total: 0,
+          pages: 0
+        });
+      } else {
+        console.error('Failed to fetch plans:', response.status, response.statusText);
+        if (response.status === 401) {
+          console.error('Usuário não autenticado');
+        } else if (response.status === 403) {
+          console.error('Acesso negado - apenas super administradores');
+        }
+        setPlans([]);
+        setPagination({
+          page: 1,
+          limit: 20,
+          total: 0,
+          pages: 0
+        });
       }
     } catch (error) {
       console.error('Error fetching plans:', error);
+      setPlans([]);
+      setPagination({
+        page: 1,
+        limit: 20,
+        total: 0,
+        pages: 0
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, pagination?.page, pagination?.limit]);
+
+  useEffect(() => {
+    fetchPlans();
+  }, [fetchPlans]);
 
   const handleToggleActive = async (planId: string, isActive: boolean) => {
     const plan = plans.find(p => p.id === planId);
@@ -383,14 +420,14 @@ export default function PlansPage() {
       )}
 
       {/* Pagination */}
-      {pagination.pages > 1 && (
+      {pagination?.pages && pagination.pages > 1 && (
         <Card>
           <CardContent className="px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex-1 flex justify-between sm:hidden">
                 <Button
-                  onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
-                  disabled={pagination.page === 1}
+                  onClick={() => setPagination({ ...pagination, page: (pagination?.page || 1) - 1 })}
+                  disabled={!pagination?.page || pagination.page === 1}
                   variant="outline"
                   size="sm"
                 >
@@ -398,8 +435,8 @@ export default function PlansPage() {
                   Anterior
                 </Button>
                 <Button
-                  onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
-                  disabled={pagination.page === pagination.pages}
+                  onClick={() => setPagination({ ...pagination, page: (pagination?.page || 1) + 1 })}
+                  disabled={!pagination?.page || !pagination?.pages || pagination.page === pagination.pages}
                   variant="outline"
                   size="sm"
                 >
@@ -412,30 +449,30 @@ export default function PlansPage() {
                   <p className="text-sm text-muted-foreground">
                     Mostrando{' '}
                     <span className="font-medium text-foreground">
-                      {(pagination.page - 1) * pagination.limit + 1}
+                      {((pagination?.page || 1) - 1) * (pagination?.limit || 20) + 1}
                     </span>{' '}
                     até{' '}
                     <span className="font-medium text-foreground">
-                      {Math.min(pagination.page * pagination.limit, pagination.total)}
+                      {Math.min((pagination?.page || 1) * (pagination?.limit || 20), pagination?.total || 0)}
                     </span>{' '}
                     de{' '}
-                    <span className="font-medium text-foreground">{pagination.total}</span> resultados
+                    <span className="font-medium text-foreground">{pagination?.total || 0}</span> resultados
                   </p>
                 </div>
                 <div className="flex items-center space-x-1">
                   <Button
-                    onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
-                    disabled={pagination.page === 1}
+                    onClick={() => setPagination({ ...pagination, page: (pagination?.page || 1) - 1 })}
+                    disabled={!pagination?.page || pagination.page === 1}
                     variant="outline"
                     size="sm"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  {[...Array(pagination.pages)].map((_, i) => (
+                  {[...Array(pagination?.pages || 0)].map((_, i) => (
                     <Button
                       key={i + 1}
                       onClick={() => setPagination({ ...pagination, page: i + 1 })}
-                      variant={pagination.page === i + 1 ? "default" : "outline"}
+                      variant={(pagination?.page || 1) === i + 1 ? "default" : "outline"}
                       size="sm"
                       className="w-10"
                     >
@@ -443,8 +480,8 @@ export default function PlansPage() {
                     </Button>
                   ))}
                   <Button
-                    onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}
-                    disabled={pagination.page === pagination.pages}
+                    onClick={() => setPagination({ ...pagination, page: (pagination?.page || 1) + 1 })}
+                    disabled={!pagination?.page || !pagination?.pages || pagination.page === pagination.pages}
                     variant="outline"
                     size="sm"
                   >

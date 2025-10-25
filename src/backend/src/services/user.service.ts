@@ -1,5 +1,7 @@
 import { PrismaClient, User } from '@prisma/client';
-import { UserRole, UserStatus } from '../middleware/auth';
+// Tipos temporários para evitar erros de compilação após remoção da autenticação
+type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
+type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DELETED';
 import bcrypt from 'bcryptjs';
 import { logger } from '../utils/logger';
 import { UserFilters, UserBulkAction, CSVImportResult, UserFormData } from '../../../shared/types';
@@ -24,9 +26,13 @@ export class UserService {
     } = filters;
 
     const where: any = {
-      tenantId,
       status: { not: 'DELETED' } // Excluir usuários deletados por padrão
     };
+    
+    // SUPER_ADMIN pode ver todos os usuários, outros roles precisam de tenantId
+    if (tenantId) {
+      where.tenantId = tenantId;
+    }
 
     // Filtro por busca (nome ou email)
     if (search) {
@@ -99,7 +105,12 @@ export class UserService {
    * Buscar usuário por ID
    */
   async getUserById(id: string, tenantId: string, userRole: UserRole): Promise<User | null> {
-    const where: any = { id, tenantId };
+    const where: any = { id };
+    
+    // SUPER_ADMIN pode ver qualquer usuário, outros roles precisam de tenantId
+    if (tenantId) {
+      where.tenantId = tenantId;
+    }
 
     // SUPER_ADMIN pode acessar qualquer tenant
     if (userRole !== 'SUPER_ADMIN') {
@@ -125,11 +136,13 @@ export class UserService {
    */
   async createUser(userData: UserFormData, tenantId: string, createdBy: string): Promise<User> {
     // Verificar se email já existe no tenant
+    const where: any = { email: userData.email };
+    if (tenantId) {
+      where.tenantId = tenantId;
+    }
+    
     const existingUser = await this.prisma.user.findFirst({
-      where: {
-        email: userData.email,
-        tenantId
-      }
+      where
     });
 
     if (existingUser) {

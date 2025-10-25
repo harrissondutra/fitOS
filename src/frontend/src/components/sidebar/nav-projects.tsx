@@ -37,6 +37,13 @@ export function NavProjects({
 }) {
   const { isMobile } = useSidebar()
 
+  console.log('NavProjects rendered with projects:', projects);
+
+  if (!projects || projects.length === 0) {
+    console.log('NavProjects: No projects to display');
+    return null;
+  }
+
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Empresas</SidebarGroupLabel>
