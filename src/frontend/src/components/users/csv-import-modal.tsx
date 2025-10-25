@@ -95,7 +95,7 @@ export function CSVImportModal({
 
   const downloadExampleCSV = () => {
     const csvContent = `firstName,lastName,email,phone,role,status
-João,Silva,joao.silva@email.com,(11) 99999-9999,MEMBER,ACTIVE
+João,Silva,joao.silva@email.com,(11) 99999-9999,CLIENT,ACTIVE
 Maria,Santos,maria.santos@email.com,(11) 88888-8888,TRAINER,ACTIVE
 Pedro,Costa,pedro.costa@email.com,,ADMIN,ACTIVE`;
 

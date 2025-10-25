@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { requireAuth } from '../middleware/auth';
+import { getPrismaClient } from '../config/database';
+import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { requireSuperAdmin, requireAdminOrSuperAdmin, requireTenantAccess } from '../middleware/superAdmin';
 import { PlanLimitsService } from '../services/plan-limits.service';
 import { CustomPlanService } from '../services/custom-plan.service';
@@ -8,13 +8,67 @@ import { PaymentService } from '../services/payment.service';
 import { asyncHandler } from '../utils/asyncHandler';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const planLimitsService = new PlanLimitsService(prisma);
 const customPlanService = new CustomPlanService(prisma);
 const paymentService = new PaymentService();
 
 // Aplicar middleware de autenticação em todas as rotas
-router.use(requireAuth);
+const authMiddleware = getAuthMiddleware(prisma);
+router.use(authMiddleware.requireAuth());
+
+// === Dashboard Stats ===
+
+/**
+ * GET /api/super-admin/dashboard/stats
+ * Obter estatísticas gerais do sistema
+ */
+router.get('/dashboard/stats', requireSuperAdmin, asyncHandler(async (req, res) => {
+  try {
+    const [
+      totalTenants,
+      totalUsers,
+      totalWorkouts,
+      totalExercises,
+      activeTenants,
+      recentUsers
+    ] = await Promise.all([
+      prisma.tenant.count(),
+      prisma.user.count(),
+      prisma.workout.count(),
+      prisma.exercise.count(),
+      prisma.tenant.count({ where: { status: 'active' } }),
+      prisma.user.count({ 
+        where: { 
+          createdAt: { 
+            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // Últimos 30 dias
+          } 
+        } 
+      })
+    ]);
+
+    const stats = {
+      totalTenants,
+      totalUsers,
+      totalWorkouts,
+      totalExercises,
+      activeTenants,
+      recentUsers,
+      inactiveTenants: totalTenants - activeTenants
+    };
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas do dashboard:', error);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Erro interno do servidor' }
+    });
+  }
+}));
 
 // === Gestão de Tenants ===
 
@@ -23,83 +77,127 @@ router.use(requireAuth);
  * Listar todos os tenants com estatísticas de uso
  */
 router.get('/tenants', requireSuperAdmin, asyncHandler(async (req, res) => {
-  const { 
-    page = 1, 
-    limit = 20, 
-    tenantType, 
-    hasCustomPlan, 
-    search,
-    sortBy = 'createdAt',
-    sortOrder = 'desc'
-  } = req.query;
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      tenantType, 
+      hasCustomPlan, 
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
 
-  const where: any = {};
+    console.log('Fetching tenants with params:', { page, limit, tenantType, hasCustomPlan, search, sortBy, sortOrder });
 
-  if (tenantType) {
-    where.tenantType = tenantType;
-  }
+    const where: any = {};
 
-  if (hasCustomPlan !== undefined) {
-    where.customPlanId = hasCustomPlan === 'true' ? { not: null } : null;
-  }
-
-  if (search) {
-    where.OR = [
-      { name: { contains: search as string, mode: 'insensitive' } },
-      { subdomain: { contains: search as string, mode: 'insensitive' } }
-    ];
-  }
-
-  const [tenants, total] = await Promise.all([
-    prisma.tenant.findMany({
-      where,
-      include: {
-        customPlan: true,
-        _count: {
-          select: {
-            users: true,
-            members: true
-          }
-        }
-      },
-      orderBy: { [sortBy as string]: sortOrder },
-      take: Number(limit),
-      skip: (Number(page) - 1) * Number(limit)
-    }),
-    prisma.tenant.count({ where })
-  ]);
-
-  // Adicionar estatísticas de uso para cada tenant
-  const tenantsWithStats = await Promise.all(
-    tenants.map(async (tenant) => {
-      const userCounts = await planLimitsService.getUserCountByRole(tenant.id);
-      const limits = await planLimitsService.getPlanLimits(tenant.id);
-      const features = await planLimitsService.getEnabledFeatures(tenant.id);
-
-      return {
-        ...tenant,
-        stats: {
-          userCounts,
-          limits,
-          features,
-          isCustomPlan: !!tenant.customPlanId
-        }
-      };
-    })
-  );
-
-  res.json({
-    success: true,
-    data: {
-      tenants: tenantsWithStats,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        pages: Math.ceil(total / Number(limit))
-      }
+    if (tenantType) {
+      where.tenantType = tenantType;
     }
-  });
+
+    if (hasCustomPlan !== undefined) {
+      where.customPlanId = hasCustomPlan === 'true' ? { not: null } : null;
+    }
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search as string, mode: 'insensitive' } },
+        { subdomain: { contains: search as string, mode: 'insensitive' } }
+      ];
+    }
+
+    console.log('Database query where clause:', where);
+
+    // Executar queries separadamente para evitar problemas de conexão
+    let tenants, total;
+    
+    try {
+      tenants = await prisma.tenant.findMany({
+        where,
+        include: {
+          customPlan: true,
+          _count: {
+            select: {
+              users: true,
+              clients: true
+            }
+          }
+        },
+        orderBy: { [sortBy as string]: sortOrder },
+        take: Number(limit),
+        skip: (Number(page) - 1) * Number(limit)
+      });
+
+      total = await prisma.tenant.count({ where });
+    } catch (dbError) {
+      console.error('Database error in tenants query:', dbError);
+      const errorMessage = dbError instanceof Error ? dbError.message : 'Erro desconhecido';
+      throw new Error(`Erro de conexão com o banco de dados: ${errorMessage}`);
+    }
+
+    console.log(`Found ${tenants.length} tenants out of ${total} total`);
+
+    // Adicionar estatísticas de uso para cada tenant
+    const tenantsWithStats = await Promise.all(
+      tenants.map(async (tenant) => {
+        try {
+          const userCounts = await planLimitsService.getUserCountByRole(tenant.id);
+          const limits = await planLimitsService.getPlanLimits(tenant.id);
+          const features = await planLimitsService.getEnabledFeatures(tenant.id);
+
+          return {
+            ...tenant,
+            stats: {
+              userCounts,
+              limits,
+              features,
+              isCustomPlan: !!tenant.customPlanId
+            }
+          };
+        } catch (error) {
+          console.error(`Error getting stats for tenant ${tenant.id}:`, error);
+          // Return tenant without stats if there's an error
+          return {
+            ...tenant,
+            stats: {
+              userCounts: {},
+              limits: {},
+              features: {},
+              isCustomPlan: !!tenant.customPlanId
+            }
+          };
+        }
+      })
+    );
+
+    const response = {
+      success: true,
+      data: {
+        tenants: tenantsWithStats,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          pages: Math.ceil(total / Number(limit))
+        }
+      }
+    };
+
+    console.log('Sending response with', tenantsWithStats.length, 'tenants');
+    res.json(response);
+  } catch (error) {
+    console.error('Error in GET /tenants:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erro interno do servidor ao buscar empresas',
+        details: process.env.NODE_ENV === 'development' ? 
+          (error instanceof Error ? error.message : String(error)) : 
+          undefined
+      }
+    });
+  }
 }));
 
 /**
@@ -126,7 +224,7 @@ router.get('/tenants/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
       },
       _count: {
         select: {
-          members: true,
+          clients: true,
           workouts: true
         }
       }
@@ -754,7 +852,7 @@ router.delete('/tenants/:id', requireSuperAdmin, asyncHandler(async (req, res) =
   // Verificar se pode excluir
   const tenant = await prisma.tenant.findUnique({
     where: { id },
-    include: { _count: { select: { users: true, members: true } } }
+    include: { _count: { select: { users: true, clients: true } } }
   });
   
   if (!tenant) {
@@ -764,14 +862,14 @@ router.delete('/tenants/:id', requireSuperAdmin, asyncHandler(async (req, res) =
     });
   }
   
-  if (tenant._count.users > 0 || tenant._count.members > 0) {
+  if (tenant._count.users > 0 || tenant._count.clients > 0) {
     return res.status(400).json({
       success: false,
       error: { 
         message: 'Não é possível excluir tenant com usuários ou membros',
         details: { 
-          users: tenant._count.users, 
-          members: tenant._count.members 
+          users: tenant._count.users,
+          clients: tenant._count.clients
         }
       }
     });

@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import auth from '../config/auth';
 import { getTenantPrisma, getTenantIdFromRequest } from '../lib/prisma-tenant';
 import { RequestWithTenant } from '../middleware/tenant';
 import { logger } from '../utils/logger';
@@ -10,16 +9,10 @@ const router = Router();
  * Exemplo de rota que usa PrismaClient por tenant
  * GET /api/tenant-example/users
  */
-router.get('/api/tenant-example/users', async (req: RequestWithTenant, res: Response) => {
+router.get('/api/tenant-example/users',  async (req: RequestWithTenant, res: Response) => {
   try {
-    // 1. Verificar sessão do Better Auth (global)
-    const session = await auth.api.getSession(req as any);
-    if (!session) {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Unauthorized' }
-      });
-    }
+    // req.user já está populado pelo middleware requireAuth
+    const authenticatedUser = req.user!;
 
     // 2. Obter PrismaClient do tenant
     const tenantId = getTenantIdFromRequest(req);
@@ -65,16 +58,10 @@ router.get('/api/tenant-example/users', async (req: RequestWithTenant, res: Resp
  * Exemplo de rota para criar usuário no tenant
  * POST /api/tenant-example/users
  */
-router.post('/api/tenant-example/users', async (req: RequestWithTenant, res: Response) => {
+router.post('/api/tenant-example/users',  async (req: RequestWithTenant, res: Response) => {
   try {
-    // 1. Verificar sessão do Better Auth (global)
-    const session = await auth.api.getSession(req as any);
-    if (!session) {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Unauthorized' }
-      });
-    }
+    // req.user já está populado pelo middleware requireAuth
+    const authenticatedUser = req.user!;
 
     // 2. Obter PrismaClient do tenant
     const tenantId = getTenantIdFromRequest(req);
@@ -110,10 +97,10 @@ router.post('/api/tenant-example/users', async (req: RequestWithTenant, res: Res
         user: {
           id: user.id,
           email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
-          status: user.status,
+          firstName: authenticatedUser.name?.split(' ')[0] || '',
+          lastName: authenticatedUser.name?.split(' ')[1] || '',
+          role: authenticatedUser.role,
+          status: 'ACTIVE',
           tenantId: user.tenantId
         }
       }

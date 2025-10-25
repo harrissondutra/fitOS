@@ -79,18 +79,7 @@ router.post('/users',
       },
     });
 
-    // Criar Account para credenciais
-    await prisma.account.create({
-      data: {
-        id: `credential-${user.id}`,
-        userId: user.id,
-        accountId: user.email,
-        providerId: 'credential',
-        password: hashedPassword,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    });
+    // Senha já foi incluída na criação do usuário acima
 
     logger.info(`User created in schema tenant ${req.tenant?.id}: ${user.email}`);
 

@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-10-21T22:28:06.285Z",
+  "version": "1.0.0",
+  "data": {
+    "tenants": [],
+    "users": [],
+    "members": [],
+    "workouts": [],
+    "appointments": [],
+    "biometricData": [],
+    "exercises": [],
+    "clientGoals": [],
+    "notifications": [],
+    "auditLogs": []
+  }
+}

@@ -3,7 +3,7 @@ import { getPrismaClient } from '../config/database';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
-import { chatRateLimiter } from '../middleware/rateLimiter';
+import { rateLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
@@ -50,7 +50,7 @@ router.get('/', asyncHandler(async (req: RequestWithTenant, res: Response) => {
 }));
 
 // Send message to AI
-router.post('/message', chatRateLimiter, asyncHandler(async (req: RequestWithTenant, res: Response) => {
+router.post('/message', rateLimiter, asyncHandler(async (req: RequestWithTenant, res: Response) => {
   const tenantId = req.tenantId;
   const userId = req.headers['x-user-id'] as string;
   const { message, context } = req.body;

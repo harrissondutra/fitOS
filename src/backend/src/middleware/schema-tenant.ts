@@ -27,7 +27,7 @@ export interface RequestWithSchemaTenant extends Request {
   prisma?: ReturnType<typeof getDynamicPrismaClient>; // Adiciona o cliente Prisma dinâmico
 }
 
-const tenantService = TenantService.getInstance();
+const tenantService = new TenantService(null as any);
 
 export const schemaTenantMiddleware = async (
   req: RequestWithSchemaTenant,

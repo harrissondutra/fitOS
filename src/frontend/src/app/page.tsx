@@ -1,6 +1,8 @@
 'use client';
 
-// Desabilitar pre-rendering estático para esta página
+// Configurações SSR
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
+import { useRedirectIfAuthenticated } from '@/hooks/use-auth';
 import { 
   Dumbbell, 
   Brain, 
@@ -23,13 +26,20 @@ import {
 export default function HomePage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  
+  // Redirecionar usuários autenticados para o dashboard apropriado
+  // const { isAuthenticated, isLoading } = useRedirectIfAuthenticated();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   if (!mounted) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   const features = [
@@ -106,7 +116,7 @@ export default function HomePage() {
                 <Button variant="ghost" onClick={() => router.push('/auth/login')}>
                   Entrar
                 </Button>
-                <Button onClick={() => router.push('/auth/register')}>
+                <Button onClick={() => router.push('/auth/signup')}>
                   Começar
                 </Button>
               </div>
@@ -121,7 +131,7 @@ export default function HomePage() {
         <div className="absolute inset-0 z-0">
           <Image
             src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80"
-            alt="Fitness workout background"
+            alt="Fitness treino background"
             fill
             className="object-cover opacity-20"
             priority
@@ -143,7 +153,7 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Button size="lg" onClick={() => router.push('/auth/register')}>
+            <Button size="lg" onClick={() => router.push('/auth/signup')}>
               <Play className="mr-2 h-5 w-5" />
               Começar Teste Grátis
             </Button>
@@ -260,7 +270,7 @@ export default function HomePage() {
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Junte-se a milhares de usuários que já estão experimentando o futuro do fitness com o FitOS.
           </p>
-          <Button size="lg" onClick={() => router.push('/auth/register')}>
+          <Button size="lg" onClick={() => router.push('/auth/signup')}>
             Começar Agora
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -78,15 +78,7 @@ export default function EmpresaDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
 
-  useEffect(() => {
-    if (params?.id) {
-      fetchEmpresaDetails();
-      fetchPayments();
-      fetchUsers();
-    }
-  }, [params?.id]);
-
-  const fetchEmpresaDetails = async () => {
+  const fetchEmpresaDetails = useCallback(async () => {
     if (!params?.id) return;
     
     try {
@@ -102,9 +94,9 @@ export default function EmpresaDetailsPage() {
     } catch (error) {
       console.error('Error fetching empresa details:', error);
     }
-  };
+  }, [params?.id]);
 
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     if (!params?.id) return;
     
     try {
@@ -123,9 +115,9 @@ export default function EmpresaDetailsPage() {
     } finally {
       setPaymentsLoading(false);
     }
-  };
+  }, [params?.id]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     if (!params?.id) return;
     
     try {
@@ -143,7 +135,15 @@ export default function EmpresaDetailsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params?.id]);
+
+  useEffect(() => {
+    if (params?.id) {
+      fetchEmpresaDetails();
+      fetchPayments();
+      fetchUsers();
+    }
+  }, [params?.id, fetchEmpresaDetails, fetchPayments, fetchUsers]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

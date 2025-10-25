@@ -29,7 +29,7 @@ export async function seedPlanConfigs() {
             owner: 1,
             admin: 0,
             trainer: 0,
-            member: 0
+            client: 0
           },
           price: 29.00,
           extraSlotPrice: {},
@@ -54,7 +54,7 @@ export async function seedPlanConfigs() {
             owner: 1, 
             admin: 1, 
             trainer: 2, 
-            member: 50 
+            client: 50 
           },
           price: 99.00,
           extraSlotPrice: { 
@@ -82,7 +82,7 @@ export async function seedPlanConfigs() {
             owner: 1, 
             admin: 2, 
             trainer: 5, 
-            member: 200 
+            client: 200 
           },
           price: 299.00,
           extraSlotPrice: { 
@@ -110,7 +110,7 @@ export async function seedPlanConfigs() {
             owner: 1, 
             admin: -1, 
             trainer: -1, 
-            member: -1 
+            client: -1 
           },
           price: 599.00,
           extraSlotPrice: {},

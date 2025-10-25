@@ -1,0 +1,538 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id                   String            @id @default(cuid())
+  name                 String
+  subdomain            String?           @unique
+  customDomain         String?           @unique @map("custom_domain")
+  plan                 String            @default("starter")
+  tenantType           String            @default("business") @map("tenant_type")
+  customPlanId         String?           @map("custom_plan_id")
+  planLimits           Json              @default("{}") @map("plan_limits")
+  extraSlots           Json              @default("{}") @map("extra_slots")
+  enabledFeatures      Json              @default("{}") @map("enabled_features")
+  status               String            @default("active")
+  billingEmail         String            @map("billing_email")
+  stripeCustomerId     String?           @map("stripe_customer_id")
+  stripeSubscriptionId String?           @map("stripe_subscription_id")
+  settings             Json              @default("{}")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  activityLogs         ActivityLog[]
+  aiJobs               AiJob[]
+  aiProviders          AiProvider[]
+  aiServiceConfigs     AiServiceConfig[]
+  aiSessions           AiSession[]
+  aiWebhookLogs        AiWebhookLog[]
+  biometricData        BiometricData[]
+  chatMessages         ChatMessage[]
+  churnPredictions     ChurnPrediction[]
+  exercises            Exercise[]
+  members              Member[]
+  subscriptions        Subscription[]
+  customPlan           PlanConfig?       @relation(fields: [customPlanId], references: [id])
+  usageTracking        UsageTracking[]
+  users                User[]
+  workouts             Workout[]
+
+  @@map("tenants")
+}
+
+model User {
+  id              String          @id @default(cuid())
+  tenantId        String?         @default("default-tenant") @map("tenant_id")
+  email           String          @unique
+  firstName       String?         @default("Usuário") @map("first_name")
+  lastName        String?         @default("Sistema") @map("last_name")
+  phone           String?
+  role            String?         @default("MEMBER")
+  status          String          @default("ACTIVE")
+  profile         Json            @default("{}")
+  lastLogin       DateTime?       @map("last_login")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  name            String?
+  emailVerified   Boolean         @default(false) @map("email_verified")
+  image           String?
+  password        String?
+  aiSessions      AiSession[]
+  chatMessages    ChatMessage[]
+  assignedMembers MemberTrainer[]
+  member          Member?
+  refreshTokens   RefreshToken[]
+  sessions        Session[]
+  tenant          Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workouts        Workout[]
+
+  @@map("users")
+}
+
+model Member {
+  id               String            @id @default(cuid())
+  tenantId         String            @map("tenant_id")
+  userId           String?           @unique @map("user_id")
+  name             String
+  email            String?
+  phone            String?
+  membershipType   String            @map("membership_type")
+  status           String            @default("active")
+  biometricData    Json              @default("{}") @map("biometric_data")
+  goals            Json              @default("{}")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  activityLogs     ActivityLog[]
+  biometricRecords BiometricData[]
+  churnPredictions ChurnPrediction[]
+  trainers         MemberTrainer[]
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workouts         Workout[]
+
+  @@map("members")
+}
+
+model Workout {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  memberId    String    @map("member_id")
+  userId      String    @map("user_id")
+  name        String
+  description String?
+  exercises   Json      @default("[]")
+  aiGenerated Boolean   @default(false) @map("ai_generated")
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at")
+  feedback    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  member      Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("workouts")
+}
+
+model AiSession {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  agentType String   @map("agent_type")
+  messages  Json     @default("[]")
+  context   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_sessions")
+}
+
+model BiometricData {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  memberId   String   @map("member_id")
+  dataType   String   @map("data_type")
+  value      Float
+  unit       String
+  recordedAt DateTime @map("recorded_at")
+  source     String
+  createdAt  DateTime @default(now()) @map("created_at")
+  member     Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("biometric_data")
+}
+
+model ChurnPrediction {
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  memberId         String   @map("member_id")
+  churnProbability Float    @map("churn_probability")
+  riskFactors      Json     @default("[]") @map("risk_factors")
+  suggestedActions Json     @default("[]") @map("suggested_actions")
+  predictedAt      DateTime @default(now()) @map("predicted_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  member           Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("churn_predictions")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  sessionId String   @map("session_id")
+  content   String
+  role      String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model SubscriptionPlan {
+  id            String         @id @default(cuid())
+  name          String
+  displayName   String         @map("display_name")
+  description   String?
+  price         Float
+  currency      String         @default("BRL")
+  interval      String
+  stripePriceId String?        @map("stripe_price_id")
+  mercadoPagoId String?        @map("mercado_pago_id")
+  features      Json           @default("[]")
+  limits        Json           @default("{}")
+  isActive      Boolean        @default(true) @map("is_active")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id                   String           @id @default(cuid())
+  tenantId             String           @map("tenant_id")
+  planId               String           @map("plan_id")
+  status               String
+  currentPeriodStart   DateTime         @map("current_period_start")
+  currentPeriodEnd     DateTime         @map("current_period_end")
+  cancelAtPeriodEnd    Boolean          @default(false) @map("cancel_at_period_end")
+  cancelledAt          DateTime?        @map("cancelled_at")
+  stripeSubscriptionId String?          @map("stripe_subscription_id")
+  mercadoPagoId        String?          @map("mercado_pago_id")
+  paymentMethod        String?          @map("payment_method")
+  metadata             Json             @default("{}")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  invoices             Invoice[]
+  plan                 SubscriptionPlan @relation(fields: [planId], references: [id])
+  tenant               Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id              String       @id @default(cuid())
+  subscriptionId  String       @map("subscription_id")
+  amount          Float
+  currency        String       @default("BRL")
+  status          String
+  stripeInvoiceId String?      @map("stripe_invoice_id")
+  mercadoPagoId   String?      @map("mercado_pago_id")
+  paymentIntentId String?      @map("payment_intent_id")
+  paidAt          DateTime?    @map("paid_at")
+  dueDate         DateTime     @map("due_date")
+  metadata        Json         @default("{}")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@map("invoices")
+}
+
+model PlanConfig {
+  id             String   @id @default(cuid())
+  plan           String
+  displayName    String   @map("display_name")
+  tenantType     String   @map("tenant_type")
+  tenantId       String?  @map("tenant_id")
+  isCustom       Boolean  @default(false) @map("is_custom")
+  limits         Json     @default("{}")
+  price          Float
+  extraSlotPrice Json     @default("{}") @map("extra_slot_price")
+  features       Json     @default("{}")
+  contractTerms  String?  @map("contract_terms")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdBy      String?  @map("created_by")
+  tenants        Tenant[]
+
+  @@unique([plan, tenantId])
+  @@map("plan_configs")
+}
+
+model PaymentWebhook {
+  id          String    @id @default(cuid())
+  provider    String
+  eventType   String    @map("event_type")
+  eventId     String    @map("event_id")
+  payload     Json
+  processed   Boolean   @default(false)
+  processedAt DateTime? @map("processed_at")
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([provider, eventId])
+  @@map("payment_webhooks")
+}
+
+model Session {
+  id        String   @id
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  token     String   @unique
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("verification")
+}
+
+model Exercise {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  name         String
+  description  String?
+  category     String
+  muscleGroups Json     @default("[]")
+  equipment    String?
+  difficulty   String   @default("intermediate")
+  instructions Json     @default("[]")
+  videoUrl     String?  @map("video_url")
+  thumbnailUrl String?  @map("thumbnail_url")
+  isPublic     Boolean  @default(true) @map("is_public")
+  createdBy    String?  @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("exercises")
+}
+
+model UsageTracking {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  eventType String   @map("event_type")
+  eventData Json     @default("{}")
+  userId    String?  @map("user_id")
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, eventType, createdAt])
+  @@map("usage_tracking")
+}
+
+model ActivityLog {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  memberId     String?  @map("member_id")
+  userId       String?  @map("user_id")
+  activityType String   @map("activity_type")
+  description  String
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at")
+  member       Member?  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, memberId, createdAt])
+  @@index([tenantId, activityType, createdAt])
+  @@map("activity_logs")
+}
+
+model MemberTrainer {
+  id         String   @id @default(cuid())
+  memberId   String   @map("member_id")
+  trainerId  String   @map("trainer_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  assignedBy String?  @map("assigned_by")
+  isActive   Boolean  @default(true) @map("is_active")
+  member     Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  trainer    User     @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, trainerId])
+  @@map("member_trainers")
+}
+
+model AiProvider {
+  id             String            @id @default(cuid())
+  name           String            @unique
+  displayName    String
+  provider       AiProviderType
+  tenantId       String?           @map("tenant_id")
+  apiKey         String?
+  webhookUrl     String?
+  webhookSecret  String?
+  baseUrl        String?
+  models         Json              @default("[]")
+  isActive       Boolean           @default(true)
+  isDefault      Boolean           @default(false)
+  timeout        Int               @default(30000)
+  maxRetries     Int               @default(3)
+  isAsync        Boolean           @default(false)
+  callbackUrl    String?
+  config         Json              @default("{}")
+  headers        Json?
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  createdBy      String            @map("created_by")
+  tenant         Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceConfigs AiServiceConfig[]
+  webhookLogs    AiWebhookLog[]
+
+  @@map("ai_providers")
+}
+
+model AiServiceConfig {
+  id                   String        @id @default(cuid())
+  serviceType          AiServiceType
+  serviceName          String?
+  providerId           String        @map("provider_id")
+  tenantId             String?       @map("tenant_id")
+  model                String
+  priority             Int           @default(0)
+  isActive             Boolean       @default(true)
+  config               Json          @default("{}")
+  maxRequestsPerMinute Int?          @map("max_requests_per_minute")
+  costPerRequest       Float?        @default(0) @map("cost_per_request")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+  provider             AiProvider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  tenant               Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceType, providerId, serviceName])
+  @@map("ai_service_configs")
+}
+
+model AiWebhookLog {
+  id              String     @id @default(cuid())
+  providerId      String     @map("provider_id")
+  tenantId        String?    @map("tenant_id")
+  direction       String
+  requestUrl      String?    @map("request_url")
+  requestMethod   String?    @map("request_method")
+  requestHeaders  Json?      @map("request_headers")
+  requestBody     Json?      @map("request_body")
+  responseStatus  Int?       @map("response_status")
+  responseHeaders Json?      @map("response_headers")
+  responseBody    Json?      @map("response_body")
+  duration        Int?
+  error           String?
+  jobId           String?    @map("job_id")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  provider        AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  tenant          Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, createdAt])
+  @@index([jobId])
+  @@map("ai_webhook_logs")
+}
+
+model AiJob {
+  id          String    @id @default(cuid())
+  serviceType String    @map("service_type")
+  providerId  String    @map("provider_id")
+  tenantId    String?   @map("tenant_id")
+  status      String
+  input       Json
+  output      Json?
+  error       String?
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  attempts    Int       @default(0)
+  userId      String?   @map("user_id")
+  metadata    Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@map("ai_jobs")
+}
+
+enum AiProviderType {
+  OPENAI
+  GEMINI
+  GROQ
+  OLLAMA
+  CLAUDE
+  MISTRAL
+  COHERE
+  HUGGINGFACE
+  CUSTOM_API
+  N8N_WEBHOOK
+  CUSTOM_WEBHOOK
+}
+
+enum AiServiceType {
+  CHAT
+  MULTIAGENT_CHAT
+  VOICE_WORKOUT_COACH
+  VIRTUAL_WORKOUT_BUDDY
+  FORM_FILLING_ASSISTANT
+  IMAGE_ANALYSIS
+  VIDEO_ANALYSIS
+  POSTURE_ANALYSIS
+  EXERCISE_FORM_CHECKER
+  BODY_COMPOSITION_PREDICTOR
+  NUTRITION_LABEL_SCANNER
+  TRANSCRIPTION
+  TEXT_TO_SPEECH
+  WORKOUT
+  SMART_WARMUP_GENERATOR
+  AUTO_SUBSTITUTE_EXERCISES
+  WORKOUT_DIFFICULTY_ADJUSTER
+  RECOVERY_OPTIMIZER
+  INJURY_PREDICTION
+  NUTRITION
+  MEAL_PLAN_GENERATION
+  SUPPLEMENT_RECOMMENDATION
+  MEDICAL_OCR
+  SENTIMENT_ANALYSIS
+  MOTIVATION_DETECTION
+  MENTAL_HEALTH_MONITOR
+  ANALYTICS
+  CHURN
+  REVENUE_PREDICTION
+  MARKET_INTELLIGENCE
+  COMPETITOR_WORKOUT_DETECTOR
+  MEMBERSHIP_UPSELL_ASSISTANT
+  CONTENT_GENERATION
+  AUTOMATIC_PROGRESS_REPORTS
+  VIDEO_GENERATION
+  PLAYLIST_GENERATION
+  SCHEDULING_ASSISTANT
+  EMBEDDINGS
+  RAG_COACH
+  RAG_NUTRITION
+  RAG_MEDICAL
+  CUSTOM
+}

@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-10-21T01:39:45.450Z",
+  "databaseUrl": "postgresql://postgres:Sistudo@2025@129.213.36.229:5432/sistudo?sslmode=disable",
+  "tables": [],
+  "users": [],
+  "tenants": [],
+  "sessions": {
+    "tableExists": false
+  },
+  "refreshTokens": {
+    "tableExists": false
+  },
+  "verification": {
+    "tableExists": false
+  },
+  "recommendations": [],
+  "warnings": [],
+  "errors": [
+    "Erro durante auditoria: PrismaClientKnownRequestError: \nInvalid `prisma.$queryRaw()` invocation:\n\n\nRaw query failed. Code: `N/A`. Message: `Failed to deserialize column of type 'information_schema._sql_identifier'. If you're using $queryRaw and this column is explicitly marked as `Unsupported` in your Prisma schema, try casting this column to any supported Prisma type such as `String`.`"
+  ]
+}

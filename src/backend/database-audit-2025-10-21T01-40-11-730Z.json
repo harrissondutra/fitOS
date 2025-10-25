@@ -1,0 +1,111 @@
+{
+  "timestamp": "2025-10-21T01:40:11.730Z",
+  "databaseUrl": "postgresql://postgres:Sistudo@2025@129.213.36.229:5432/sistudo?sslmode=disable",
+  "tables": [
+    "_prisma_migrations",
+    "activity_logs",
+    "ai_jobs",
+    "ai_providers",
+    "ai_service_configs",
+    "ai_sessions",
+    "ai_webhook_logs",
+    "biometric_data",
+    "chat_messages",
+    "churn_predictions",
+    "exercises",
+    "invoices",
+    "member_trainers",
+    "members",
+    "payment_webhooks",
+    "plan_configs",
+    "refresh_tokens",
+    "sessions",
+    "subscription_plans",
+    "subscriptions",
+    "tenants",
+    "usage_tracking",
+    "users",
+    "verification",
+    "workouts"
+  ],
+  "users": [
+    {
+      "id": "cmgxchxng0001131d8besicpe",
+      "email": "admin@fitos.com",
+      "role": "ADMIN",
+      "tenantId": "default-tenant",
+      "status": "ACTIVE",
+      "createdAt": "2025-10-20T23:06:41.554Z",
+      "lastLogin": null
+    },
+    {
+      "id": "cmgxcqb6z000111vo38rfqllt",
+      "email": "test@fitos.com",
+      "role": "ADMIN",
+      "tenantId": "default-tenant",
+      "status": "ACTIVE",
+      "createdAt": "2025-10-20T23:06:41.728Z",
+      "lastLogin": null
+    },
+    {
+      "id": "cmgxzaxno00017a33frl9igvb",
+      "email": "teste@exemplo.com",
+      "role": "MEMBER",
+      "tenantId": "default-tenant",
+      "status": "ACTIVE",
+      "createdAt": "2025-10-20T23:06:41.819Z",
+      "lastLogin": null
+    },
+    {
+      "id": "admin-user-id",
+      "email": "harrissondutra@gmail.com",
+      "role": "SUPER_ADMIN",
+      "tenantId": "sistema",
+      "status": "ACTIVE",
+      "createdAt": "2025-10-20T23:06:41.907Z",
+      "lastLogin": "2025-10-21T00:15:08.805Z"
+    }
+  ],
+  "tenants": [
+    {
+      "id": "sistema",
+      "name": "Sistema FitOS",
+      "subdomain": "sistema",
+      "customDomain": null,
+      "plan": "enterprise",
+      "status": "active",
+      "isSistemaTenant": true,
+      "userCount": 1,
+      "createdAt": "2025-10-20T23:06:29.001Z"
+    },
+    {
+      "id": "default-tenant",
+      "name": "FitOS Default",
+      "subdomain": "default",
+      "customDomain": null,
+      "plan": "starter",
+      "status": "active",
+      "isSistemaTenant": false,
+      "userCount": 3,
+      "createdAt": "2025-10-20T23:06:29.744Z"
+    }
+  ],
+  "sessions": {
+    "tableExists": true,
+    "rowCount": 1
+  },
+  "refreshTokens": {
+    "tableExists": true,
+    "rowCount": 5
+  },
+  "verification": {
+    "tableExists": true,
+    "rowCount": 0
+  },
+  "recommendations": [
+    "Superuser já existe. Verificar se role é SUPER_ADMIN e senha está correta.",
+    "Usar tenant 'sistema' existente (ID: sistema) para SUPER_ADMIN."
+  ],
+  "warnings": [],
+  "errors": []
+}

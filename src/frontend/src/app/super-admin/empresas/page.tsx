@@ -1,6 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+
+// Configurações para evitar problemas de SSR com useAuth
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
 import Link from 'next/link';
 import { 
   Building2, 
@@ -85,6 +91,7 @@ export default function EmpresasPage() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({
     tenantType: 'all',
@@ -111,25 +118,72 @@ export default function EmpresasPage() {
         ...(filters.status && filters.status !== 'all' && { status: filters.status })
       });
 
+      console.log('Fetching empresas with params:', params.toString());
+      
+      const accessToken = localStorage.getItem('accessToken');
+      console.log('Empresas: Access token:', accessToken ? 'existe' : 'não existe');
+      
+      if (!accessToken) {
+        setError('Token de acesso não encontrado. Faça login novamente.');
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(`/api/super-admin/tenants?${params}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
         }
       });
       
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('Response data:', data);
+        
+        // Check if data structure is correct
+        if (!data || !data.data) {
+          console.error('Invalid response structure:', data);
+          setError('Estrutura de resposta inválida do servidor.');
+          setEmpresas([]);
+          return;
+        }
+        
         const result: EmpresasResponse = data.data;
+        
+        // Validate result structure
+        if (!result || !Array.isArray(result.tenants) || !result.pagination) {
+          console.error('Invalid result structure:', result);
+          setError('Dados de empresas inválidos recebidos do servidor.');
+          setEmpresas([]);
+          return;
+        }
+        
         setEmpresas(result.tenants);
         setPagination(result.pagination);
       } else {
+        // Try to get error details from response
+        let errorMessage = `Erro ao buscar empresas: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message;
+          }
+        } catch (e) {
+          // If we can't parse the error response, use the status-based message
+        }
+        
         if (response.status === 401) {
           setError('Usuário não autenticado. Faça login para continuar.');
         } else if (response.status === 403) {
           setError('Acesso negado. Apenas super administradores podem acessar esta funcionalidade.');
+        } else if (response.status === 500) {
+          setError('Erro interno do servidor. Tente novamente em alguns minutos.');
         } else {
-          setError(`Erro ao buscar empresas: ${response.status}`);
+          setError(errorMessage);
         }
         setEmpresas([]);
       }
@@ -140,7 +194,13 @@ export default function EmpresasPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, filters, pagination.page]);
+  }, [search, filters, pagination.page, pagination.limit]);
+
+  const retryFetch = useCallback(() => {
+    setRetryCount(prev => prev + 1);
+    setError(null);
+    fetchEmpresas();
+  }, [fetchEmpresas]);
 
   useEffect(() => {
     fetchEmpresas();
@@ -148,9 +208,18 @@ export default function EmpresasPage() {
 
   const handleToggleStatus = async (id: string, newStatus: string) => {
     try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toastUtils.user.statusError('Token de acesso não encontrado');
+        return;
+      }
+
       const response = await fetch(`/api/super-admin/tenants/${id}/status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
         body: JSON.stringify({ status: newStatus })
       });
 
@@ -172,8 +241,17 @@ export default function EmpresasPage() {
     if (!confirm('Tem certeza que deseja excluir esta empresa?')) return;
 
     try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toastUtils.user.deleteError('Token de acesso não encontrado');
+        return;
+      }
+
       const response = await fetch(`/api/super-admin/tenants/${id}`, { 
-        method: 'DELETE' 
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
       });
 
       if (response.ok) {
@@ -361,12 +439,23 @@ export default function EmpresasPage() {
               {error && (
                 <Card>
                   <CardContent className="p-6">
-                    <div className="flex items-center space-x-2 text-red-600">
-                      <AlertCircle className="h-5 w-5" />
-                      <p className="font-medium">{error}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-red-600">
+                        <AlertCircle className="h-5 w-5" />
+                        <p className="font-medium">{error}</p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={retryFetch}
+                        disabled={loading}
+                      >
+                        Tentar Novamente
+                      </Button>
                     </div>
                     <p className="text-sm text-muted-foreground mt-2">
                       Se você é um super administrador, faça login para acessar esta funcionalidade.
+                      {retryCount > 0 && ` (Tentativa ${retryCount})`}
                     </p>
                   </CardContent>
                 </Card>

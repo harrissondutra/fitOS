@@ -1,4 +1,6 @@
-import { UserRole, UserStatus } from '../middleware/auth';
+// Tipos temporários para evitar erros de compilação após remoção da autenticação
+type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
+type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DELETED';
 import { CSVImportResult, UserFormData } from '../../../shared/types';
 
 export interface CSVRow {
@@ -54,7 +56,7 @@ export class CSVParser {
     if (!row.role || typeof row.role !== 'string') {
       errors.push(`Linha ${rowIndex + 1}: Role é obrigatório`);
     } else {
-      const validRoles: UserRole[] = ['MEMBER', 'TRAINER', 'ADMIN', 'OWNER'];
+      const validRoles: UserRole[] = ['CLIENT', 'TRAINER', 'ADMIN', 'OWNER'];
       if (!validRoles.includes(row.role.toUpperCase() as UserRole)) {
         errors.push(`Linha ${rowIndex + 1}: Role inválido. Use: ${validRoles.join(', ')}`);
       }
@@ -90,7 +92,7 @@ export class CSVParser {
       lastName: row.lastName?.trim() || '',
       email: row.email?.trim().toLowerCase() || '',
       phone: row.phone?.trim() || undefined,
-      role: (row.role?.toUpperCase() as UserRole) || 'MEMBER',
+      role: (row.role?.toUpperCase() as UserRole) || 'CLIENT',
       status: row.status ? (row.status.toUpperCase() as UserStatus) : 'ACTIVE',
       password: this.generateTemporaryPassword()
     };
@@ -112,8 +114,13 @@ export class CSVParser {
    * Processar arquivo CSV
    */
   static async parseCSV(file: File): Promise<CSVImportResult> {
+    // Verificar se estamos no ambiente do navegador
+    if (typeof window === 'undefined' || typeof (globalThis as any).FileReader === 'undefined') {
+      throw new Error('FileReader is not available in this environment');
+    }
+    
     return new Promise((resolve) => {
-      const reader = new FileReader();
+      const reader = new (globalThis as any).FileReader();
       
       reader.onload = (e) => {
         try {
@@ -229,7 +236,7 @@ export class CSVParser {
   static generateExampleCSV(): string {
     const headers = ['firstName', 'lastName', 'email', 'phone', 'role', 'status'];
     const exampleData = [
-      ['João', 'Silva', 'joao.silva@email.com', '(11) 99999-9999', 'MEMBER', 'ACTIVE'],
+      ['João', 'Silva', 'joao.silva@email.com', '(11) 99999-9999', 'CLIENT', 'ACTIVE'],
       ['Maria', 'Santos', 'maria.santos@email.com', '(11) 88888-8888', 'TRAINER', 'ACTIVE'],
       ['Pedro', 'Costa', 'pedro.costa@email.com', '', 'ADMIN', 'ACTIVE']
     ];

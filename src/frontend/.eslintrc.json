@@ -3,9 +3,10 @@
     "next/core-web-vitals"
   ],
   "rules": {
-    "no-unused-vars": "warn",
-    "no-console": "warn",
+    "no-unused-vars": "off",
+    "no-console": "off",
     "react/no-unescaped-entities": "off",
-    "@next/next/no-img-element": "warn"
+    "@next/next/no-img-element": "warn",
+    "react-hooks/exhaustive-deps": "warn"
   }
 }

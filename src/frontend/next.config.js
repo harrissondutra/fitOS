@@ -1,59 +1,58 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 const nextConfig = {
-  // Configuração para desenvolvimento local
+  // Configurações básicas
   reactStrictMode: true,
   
-  // Forçar renderização dinâmica para todas as páginas
-  trailingSlash: false,
-  generateEtags: false,
+  // Configurações de output
+  output: 'standalone',
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   
-  // Configuração de output tracing
-  outputFileTracingRoot: path.join(__dirname, '../..'),
-  
-  // Desabilitar ESLint durante o build
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  
-  // Configuração de imagens
+  // Configurações de imagem
   images: {
-    domains: ['localhost', 'fitos.com', 'images.unsplash.com'],
-    unoptimized: process.env.NODE_ENV === 'development',
-  },
-  
-  // Variáveis de ambiente
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-    NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'FitOS',
-    NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',
-  },
-  
-  // Rewrites para API (desenvolvimento e produção)
-  async rewrites() {
-    // Só aplicar rewrites se NEXT_PUBLIC_API_URL estiver definida
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      return [];
-    }
-    
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    return [
+    remotePatterns: [
       {
-        source: '/api/:path*',
-        destination: `${apiUrl}/api/:path*`,
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '',
+        pathname: '/**',
       },
-      // Better Auth routes
       {
-        source: '/api/auth/:path*',
-        destination: `${apiUrl}/api/auth/:path*`,
+        protocol: 'http',
+        hostname: '127.0.0.1',
+        port: '',
+        pathname: '/**',
       },
-    ];
+      {
+        protocol: 'https',
+        hostname: 'unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
+    formats: ['image/webp', 'image/avif'],
   },
   
-  // Configuração de webpack
-  webpack: (config, { dev, isServer }) => {
+  // Configuração do Turbopack (Next.js 15+)
+  turbopack: {
+    root: path.join(__dirname, '../../'), // Mesmo valor que outputFileTracingRoot
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
+  
+  // Configurações de webpack (apenas quando Turbopack não estiver disponível)
+  webpack: (config, { dev, isServer, webpack }) => {
     // Fallbacks para Node.js modules
     config.resolve.fallback = {
       ...config.resolve.fallback,
@@ -63,31 +62,84 @@ const nextConfig = {
       crypto: false,
     };
     
+    // Cache persistente para desenvolvimento (apenas se não estiver usando Turbopack)
+    if (dev && !process.env.TURBOPACK) {
+      config.cache = {
+        type: 'filesystem',
+        buildDependencies: {
+          config: [__filename],
+        },
+        cacheDirectory: path.join(__dirname, '.next/cache/webpack'),
+      };
+    }
+    
     return config;
   },
   
-  // Configurações experimentais removidas para evitar warnings
-  
-  // Configuração de headers (apenas em desenvolvimento)
+  // Headers de segurança para PWA (seguindo documentação oficial Next.js)
   async headers() {
-    if (process.env.NODE_ENV === 'development') {
-      return [
-        {
-          source: '/(.*)',
-          headers: [
-            {
-              key: 'X-Frame-Options',
-              value: 'DENY',
-            },
-            {
-              key: 'X-Content-Type-Options',
-              value: 'nosniff',
-            },
-          ],
-        },
-      ];
-    }
-    return [];
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+      {
+        source: '/sw.js',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/javascript; charset=utf-8',
+          },
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate',
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: "default-src 'self'; script-src 'self'",
+          },
+        ],
+      },
+    ];
+  },
+  
+  // Configurações de redirects
+  async redirects() {
+    return [
+      {
+        source: '/admin',
+        destination: '/admin/dashboard',
+        permanent: true,
+      },
+    ];
+  },
+  
+  // Configurações de rewrites
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:3001/api/:path*',
+      },
+    ];
+  },
+  
+  // Configurações de PWA
+  async generateBuildId() {
+    return 'fitos-build-' + Date.now();
   },
 };
 

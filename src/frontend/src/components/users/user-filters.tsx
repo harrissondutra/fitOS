@@ -27,7 +27,7 @@ export function UserFilters({
       OWNER: 'Proprietário',
       ADMIN: 'Administrador',
       TRAINER: 'Personal Trainer',
-      MEMBER: 'Membro',
+      CLIENT: 'Cliente',
       SUPER_ADMIN: 'Super Admin'
     };
     return roleNames[role] || role;
@@ -102,7 +102,7 @@ export function UserFilters({
                 <SelectItem value="OWNER">Proprietário</SelectItem>
                 <SelectItem value="ADMIN">Administrador</SelectItem>
                 <SelectItem value="TRAINER">Personal Trainer</SelectItem>
-                <SelectItem value="MEMBER">Membro</SelectItem>
+                <SelectItem value="CLIENT">Cliente</SelectItem>
               </SelectContent>
             </Select>
           </div>

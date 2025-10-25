@@ -1,5 +1,10 @@
 'use client';
 
+// Configurações SSR
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { 
@@ -76,8 +81,8 @@ export default function CustomPlansPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
+        page: (pagination?.page || 1).toString(),
+        limit: (pagination?.limit || 20).toString(),
         isCustom: 'true',
         ...(search && { search }),
         ...(filters.tenantType && filters.tenantType !== 'all' && { tenantType: filters.tenantType }),
@@ -85,18 +90,53 @@ export default function CustomPlansPage() {
         ...(filters.createdBy && filters.createdBy !== 'all' && { createdBy: filters.createdBy })
       });
 
-      const response = await fetch(`/api/super-admin/plan-configs?${params}`);
+      const response = await fetch(`/api/super-admin/plan-configs?${params}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      
       if (response.ok) {
-        const data: CustomPlansResponse = await response.json();
-        setPlans(data.plans);
-        setPagination(data.pagination);
+        const result = await response.json();
+        const data = result.data || result; // Suporte para ambos os formatos
+        
+        setPlans(data.plans || []);
+        // Ensure pagination has all required properties with fallbacks
+        setPagination({
+          page: data.pagination?.page || 1,
+          limit: data.pagination?.limit || 20,
+          total: data.pagination?.total || 0,
+          pages: data.pagination?.pages || 0
+        });
+      } else {
+        console.error('Failed to fetch custom plans:', response.status, response.statusText);
+        if (response.status === 401) {
+          console.error('Usuário não autenticado');
+        } else if (response.status === 403) {
+          console.error('Acesso negado - apenas super administradores');
+        }
+        setPlans([]);
+        setPagination({
+          page: 1,
+          limit: 20,
+          total: 0,
+          pages: 0
+        });
       }
     } catch (error) {
-      // Error fetching custom plans
+      console.error('Error fetching custom plans:', error);
+      setPlans([]);
+      setPagination({
+        page: 1,
+        limit: 20,
+        total: 0,
+        pages: 0
+      });
     } finally {
       setLoading(false);
     }
-  }, [search, filters, pagination.page, pagination.limit]);
+  }, [search, filters, pagination?.page, pagination?.limit]);
 
   useEffect(() => {
     fetchCustomPlans();
@@ -298,7 +338,7 @@ export default function CustomPlansPage() {
           </CardContent>
         ) : (
           <div className="divide-y divide-border">
-            {plans.map((plan) => (
+            {plans?.map((plan) => (
               <Card key={plan.id} className="border-0 rounded-none">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -402,7 +442,7 @@ export default function CustomPlansPage() {
       </Card>
 
       {/* Empty State */}
-      {!loading && plans.length === 0 && (
+      {!loading && (!plans || plans.length === 0) && (
         <Card>
           <CardContent className="text-center py-12">
             <Crown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

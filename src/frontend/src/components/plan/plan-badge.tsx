@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Crown, Star, Building2, User } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface PlanBadgeProps {
   plan: string;
@@ -74,12 +75,9 @@ export function PlanBadge({
   const Icon = planInfo.icon;
 
   return (
-    <span
-      className={`inline-flex items-center font-medium rounded-full ${getSizeClasses()} ${
-        isCustom 
-          ? 'bg-orange-100 text-orange-800 border border-orange-200' 
-          : `${planInfo.bgColor} ${planInfo.color}`
-      } ${className}`}
+    <Badge
+      variant={isCustom ? "secondary" : "default"}
+      className={`${getSizeClasses()} ${className}`}
     >
       {showIcon && (
         <Icon className={`${size === 'sm' ? 'h-3 w-3' : 'h-4 w-4'} mr-1`} />
@@ -92,7 +90,7 @@ export function PlanBadge({
       ) : (
         planInfo.name
       )}
-    </span>
+    </Badge>
   );
 }
 
@@ -123,12 +121,9 @@ export function PlanTypeBadge({
   const isIndividual = tenantType === 'individual';
 
   return (
-    <span
-      className={`inline-flex items-center font-medium rounded-full ${getSizeClasses()} ${
-        isIndividual
-          ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
-          : 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400'
-      } ${className}`}
+    <Badge
+      variant={isIndividual ? "secondary" : "default"}
+      className={`${getSizeClasses()} ${className}`}
     >
       {showIcon && (
         isIndividual ? (
@@ -138,6 +133,6 @@ export function PlanTypeBadge({
         )
       )}
       {isIndividual ? 'Pessoa Física' : 'Profissional'}
-    </span>
+    </Badge>
   );
 }

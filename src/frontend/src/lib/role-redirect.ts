@@ -2,7 +2,7 @@
  * Função para determinar o dashboard correto baseado na role do usuário
  */
 
-export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'MEMBER';
+export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
 
 export interface User {
   id: string;
@@ -33,10 +33,10 @@ export function getDashboardUrl(user: User): string {
       console.log('🔍 Retornando /trainer/dashboard');
       return '/trainer/dashboard';
     
-    case 'MEMBER':
+    case 'CLIENT':
     default:
-      console.log('🔍 Retornando /dashboard (default)');
-      return '/dashboard';
+      console.log('🔍 Retornando /client/workouts (default)');
+      return '/client/workouts';
   }
 }
 
@@ -53,8 +53,8 @@ export function getRoleDisplayName(role: UserRole): string {
       return 'Administrador';
     case 'TRAINER':
       return 'Personal Trainer';
-    case 'MEMBER':
-      return 'Membro';
+    case 'CLIENT':
+      return 'Cliente';
     default:
       return 'Usuário';
   }
@@ -79,9 +79,9 @@ export function hasPermission(user: User, route: string): boolean {
     return route.startsWith('/trainer') || route.startsWith('/dashboard');
   }
   
-  // Member só pode acessar rotas de member
-  if (user.role === 'MEMBER') {
-    return route.startsWith('/dashboard') && !route.startsWith('/admin') && !route.startsWith('/trainer') && !route.startsWith('/super-admin');
+  // Client só pode acessar rotas de client
+  if (user.role === 'CLIENT') {
+    return route.startsWith('/client') && !route.startsWith('/admin') && !route.startsWith('/trainer') && !route.startsWith('/super-admin');
   }
   
   return false;
@@ -123,13 +123,13 @@ export function getAllowedRoutes(role: UserRole): string[] {
         '/trainer/schedule'
       ];
     
-    case 'MEMBER':
+    case 'CLIENT':
     default:
       return [
-        '/dashboard',
-        '/workout',
-        '/profile',
-        '/progress'
+        '/client/workouts',
+        '/client/progress',
+        '/client/exercises',
+        '/profile'
       ];
   }
 }

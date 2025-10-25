@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -64,7 +64,7 @@ export default function CustomPlanWizard() {
   const [selectedBasePlan, setSelectedBasePlan] = useState<string>('');
   const [planData, setPlanData] = useState<CustomPlanData>({
     displayName: '',
-    limits: { owner: 1, admin: 0, trainer: 0, member: 0 },
+    limits: { owner: 1, admin: 0, trainer: 0, client: 0 },
     price: 0,
     extraSlotPrice: {},
     features: {},
@@ -73,11 +73,7 @@ export default function CustomPlanWizard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetchTenantAndPlans();
-  }, []);
-
-  const fetchTenantAndPlans = async () => {
+  const fetchTenantAndPlans = useCallback(async () => {
     if (!params?.id) return;
     
     try {
@@ -101,7 +97,11 @@ export default function CustomPlanWizard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params?.id]);
+
+  useEffect(() => {
+    fetchTenantAndPlans();
+  }, [fetchTenantAndPlans]);
 
   const handleBasePlanSelect = (planId: string) => {
     const plan = basePlans.find(p => p.id === planId);

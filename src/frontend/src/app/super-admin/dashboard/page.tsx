@@ -1,6 +1,13 @@
 'use client';
 
+// Configurações SSR
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
+
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { 
   Building2, 
   Users, 
@@ -23,6 +30,8 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
+import { authenticatedApiRequest, API_ENDPOINTS } from '@/lib/api-url';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 interface DashboardStats {
   totalTenants: number;
@@ -50,7 +59,21 @@ export default function SuperAdminDashboard() {
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await fetch('/api/super-admin/dashboard/stats');
+      // Verificar se estamos no cliente
+      if (typeof window === 'undefined') {
+        return;
+      }
+      
+      const accessToken = localStorage.getItem('accessToken');
+      console.log('Dashboard: Access token:', accessToken ? 'existe' : 'não existe');
+      console.log('Dashboard: Token length:', accessToken?.length || 0);
+      
+      if (!accessToken) {
+        console.error('Dashboard: Token não encontrado');
+        return;
+      }
+
+      const response = await authenticatedApiRequest(API_ENDPOINTS.SUPER_ADMIN.DASHBOARD_STATS);
       if (response.ok) {
         const data = await response.json();
         setStats(data.data);
@@ -149,21 +172,20 @@ export default function SuperAdminDashboard() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
-              <Card key={i}>
-                <CardHeader className="pb-2">
-                  <div className="h-4 bg-muted rounded w-1/2"></div>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-8 bg-muted rounded w-3/4"></div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+          <p className="text-sm text-muted-foreground">Verificando autenticação...</p>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              localStorage.clear();
+              window.location.href = '/auth/login';
+            }}
+            className="mt-4"
+          >
+            Voltar ao Login
+          </Button>
         </div>
       </div>
     );
@@ -242,13 +264,27 @@ export default function SuperAdminDashboard() {
   const individualPercentage = Math.round(((stats?.individualTenants || 0) / (stats?.totalTenants || 1)) * 100);
 
   return (
-    <div className="space-y-6">
+    <ErrorBoundary>
+      <div className="space-y-6">
         {/* Header */}
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard Super Admin</h1>
-          <p className="text-muted-foreground">
-            Visão geral do sistema FitOS e gestão de tenants
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Dashboard Super Admin</h1>
+              <p className="text-muted-foreground">
+                Visão geral do sistema FitOS e gestão de tenants
+              </p>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                localStorage.clear();
+                window.location.href = '/auth/login';
+              }}
+            >
+              Voltar ao Login
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -390,7 +426,7 @@ export default function SuperAdminDashboard() {
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Button asChild variant="outline" className="h-auto p-6 flex-col items-start gap-4 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-200 dark:hover:border-blue-800">
-                <a href="/super-admin/tenants" className="w-full">
+                <Link href="/super-admin/tenants" className="w-full">
                   <div className="flex items-center justify-between w-full">
                     <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
                       <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -403,7 +439,7 @@ export default function SuperAdminDashboard() {
                       Visualizar e gerenciar todos os tenants do sistema
                     </p>
                   </div>
-                </a>
+                </Link>
               </Button>
 
               <Button asChild variant="outline" className="h-auto p-6 flex-col items-start gap-4 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:border-orange-200 dark:hover:border-orange-800">
@@ -459,6 +495,7 @@ export default function SuperAdminDashboard() {
             </div>
           </CardContent>
         </Card>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

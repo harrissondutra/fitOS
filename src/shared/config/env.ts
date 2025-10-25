@@ -1,9 +1,14 @@
-import dotenv from 'dotenv';
+// import dotenv from 'dotenv';
 import path from 'path';
 
-// Carregar .env da raiz do projeto
-const envPath = path.resolve(__dirname, '../../../.env');
-dotenv.config({ path: envPath });
+// Carregar .env da raiz do projeto - DESABILITADO TEMPORARIAMENTE
+// const envPath = path.resolve(__dirname, '../../../.env');
+// dotenv.config({ path: envPath });
+
+// Garantir que as variáveis estão carregadas
+if (!process.env.DATABASE_URL) {
+  console.warn('⚠️ DATABASE_URL not found in environment variables');
+}
 
 // Configurações compartilhadas
 export const sharedConfig = {
@@ -71,6 +76,55 @@ export const sharedConfig = {
     chroma: {
       baseUrl: process.env.CHROMA_BASE_URL || 'http://localhost:8000',
       collection: process.env.CHROMA_COLLECTION || 'fitos-knowledge',
+    },
+  },
+
+  // Google Calendar OAuth
+  google: {
+    oauth: {
+      clientId: process.env.GOOGLE_OAUTH_ID || '',
+      clientSecret: process.env.GOOGLE_OAUTH_SECRET || '',
+      redirectUri: process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/google-calendar/callback',
+    },
+  },
+
+  // WhatsApp Business API
+  whatsapp: {
+    provider: process.env.WHATSAPP_PROVIDER || 'twilio',
+    phoneNumber: process.env.WHATSAPP_PHONE_NUMBER || '',
+    apiKey: process.env.WHATSAPP_API_KEY || '',
+    apiSecret: process.env.WHATSAPP_API_SECRET || '',
+    webhookUrl: process.env.WHATSAPP_WEBHOOK_URL || '',
+  },
+
+  // SMS Service
+  sms: {
+    provider: process.env.SMS_PROVIDER || 'twilio',
+    accountSid: process.env.SMS_ACCOUNT_SID || '',
+    authToken: process.env.SMS_AUTH_TOKEN || '',
+    fromNumber: process.env.SMS_FROM_NUMBER || '',
+  },
+
+  // File Storage
+  storage: {
+    provider: process.env.STORAGE_PROVIDER || 'cloudinary',
+    cloudinary: {
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME || 'dwmi8p7mo',
+      apiKey: process.env.CLOUDINARY_API_KEY || '262953911313355',
+      apiSecret: process.env.CLOUDINARY_API_SECRET || 'EJzZ3APhGl_Brg2qeigm4aramS8',
+      url: process.env.CLOUDINARY_URL || 'cloudinary://262953911313355:EJzZ3APhGl_Brg2qeigm4aramS8@dwmi8p7mo',
+    },
+    s3: {
+      bucket: process.env.S3_BUCKET || '',
+      region: process.env.S3_REGION || 'us-east-1',
+      accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
+      secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+    },
+    minio: {
+      endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
+      accessKey: process.env.MINIO_ACCESS_KEY || 'minioadmin',
+      secretKey: process.env.MINIO_SECRET_KEY || 'minioadmin123',
+      bucket: process.env.MINIO_BUCKET || 'fitos',
     },
   },
 
