@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../utils/logger';
-import { config } from '../config/config';
+import { config } from '../config/config-simple';
 
 export interface AppError extends Error {
   statusCode?: number;

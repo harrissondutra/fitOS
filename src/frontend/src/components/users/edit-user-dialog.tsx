@@ -18,7 +18,7 @@ const userFormSchema = z.object({
   lastName: z.string().min(1, 'Sobrenome é obrigatório'),
   email: z.string().email('Email inválido'),
   phone: z.string().optional(),
-  role: z.enum(['MEMBER', 'TRAINER', 'ADMIN', 'OWNER', 'SUPER_ADMIN'] as const),
+  role: z.enum(['CLIENT', 'TRAINER', 'ADMIN', 'OWNER', 'SUPER_ADMIN'] as const),
   password: z.string().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'DELETED'] as const).optional(),
 });
@@ -62,7 +62,7 @@ export function EditUserDialog({
       lastName: '',
       email: '',
       phone: '',
-      role: 'MEMBER',
+      role: 'CLIENT',
       status: 'ACTIVE',
       password: ''
     }
@@ -78,7 +78,7 @@ export function EditUserDialog({
         lastName: user.lastName || '',
         email: user.email || '',
         phone: user.phone || '',
-        role: user.role || 'MEMBER',
+        role: user.role || 'CLIENT',
         status: user.status || 'ACTIVE',
         password: ''
       });
@@ -155,7 +155,7 @@ export function EditUserDialog({
       OWNER: 'Proprietário',
       ADMIN: 'Administrador',
       TRAINER: 'Personal Trainer',
-      MEMBER: 'Membro',
+      CLIENT: 'Cliente',
       SUPER_ADMIN: 'Super Admin'
     };
     return roleNames[role] || role;
@@ -271,7 +271,7 @@ export function EditUserDialog({
                   <SelectValue placeholder="Selecione o role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="MEMBER">Membro</SelectItem>
+                  <SelectItem value="CLIENT">Cliente</SelectItem>
                   <SelectItem value="TRAINER">Personal Trainer</SelectItem>
                   <SelectItem value="ADMIN">Administrador</SelectItem>
                   <SelectItem value="OWNER">Proprietário</SelectItem>

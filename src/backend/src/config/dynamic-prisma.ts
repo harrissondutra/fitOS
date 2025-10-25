@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { config } from './config'; // Assuming config has database URL
+import { config } from './config-simple'; // Assuming config has database URL
 
 // Cache de clientes Prisma por schema
 const prismaClients: Map<string, PrismaClient> = new Map();

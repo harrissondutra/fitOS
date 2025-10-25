@@ -52,7 +52,7 @@ export function UserTable({
         return <Users className="h-4 w-4 text-blue-500" />;
       case 'TRAINER':
         return <User className="h-4 w-4 text-green-500" />;
-      case 'MEMBER':
+      case 'CLIENT':
         return <User className="h-4 w-4 text-muted-foreground" />;
       default:
         return <User className="h-4 w-4 text-muted-foreground" />;
@@ -64,7 +64,7 @@ export function UserTable({
       OWNER: 'Proprietário',
       ADMIN: 'Administrador',
       TRAINER: 'Personal Trainer',
-      MEMBER: 'Membro',
+      CLIENT: 'Cliente',
       SUPER_ADMIN: 'Super Admin'
     };
     return roleNames[role] || role;

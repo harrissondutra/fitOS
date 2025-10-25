@@ -1,5 +1,10 @@
 'use client';
 
+// Configurações SSR
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
@@ -88,10 +93,18 @@ export default function SuperAdminUsersPage() {
 
       console.log('🔍 [SUPER-ADMIN] Fazendo requisição para:', `/api/users?${params}`);
       
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toastUtils.error('Erro de autenticação', 'Token de acesso não encontrado. Faça login novamente.');
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(`/api/users?${params}`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
         }
       });
       
@@ -170,8 +183,17 @@ export default function SuperAdminUsersPage() {
     if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
 
     try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toastUtils.user.deleteError('Token de acesso não encontrado');
+        return;
+      }
+
       const response = await fetch(`/api/users/${user.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
       });
 
       if (response.ok) {
@@ -190,9 +212,18 @@ export default function SuperAdminUsersPage() {
     const newStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     
     try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toastUtils.user.statusError('Token de acesso não encontrado');
+        return;
+      }
+
       const response = await fetch(`/api/users/${user.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
         body: JSON.stringify({ status: newStatus })
       });
 
@@ -223,9 +254,18 @@ export default function SuperAdminUsersPage() {
     };
 
     try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toastUtils.bulk.error('ação em lote', 'Token de acesso não encontrado');
+        return;
+      }
+
       const response = await fetch('/api/users/bulk-action', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
         body: JSON.stringify(bulkAction)
       });
 
@@ -249,7 +289,17 @@ export default function SuperAdminUsersPage() {
       const params = new URLSearchParams();
       if (userIds) params.append('userIds', userIds);
 
-      const response = await fetch(`/api/users/export/csv?${params}`);
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toastUtils.export.error('Token de acesso não encontrado');
+        return;
+      }
+
+      const response = await fetch(`/api/users/export/csv?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         // TODO: Implementar download do CSV
@@ -297,9 +347,18 @@ export default function SuperAdminUsersPage() {
   const handleCreateUser = async (userData: UserFormData) => {
     try {
       setCreateUserLoading(true);
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toastUtils.user.createError('Token de acesso não encontrado');
+        return;
+      }
+
       const response = await fetch('/api/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
         body: JSON.stringify(userData)
       });
 
@@ -310,8 +369,6 @@ export default function SuperAdminUsersPage() {
         const error = await response.json();
         throw new Error(error.error?.message || 'Erro ao criar usuário');
       }
-    } catch (error: any) {
-      throw error;
     } finally {
       setCreateUserLoading(false);
     }
@@ -322,9 +379,18 @@ export default function SuperAdminUsersPage() {
 
     try {
       setEditLoading(true);
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toastUtils.user.updateError('Token de acesso não encontrado');
+        return;
+      }
+
       const response = await fetch(`/api/users/${editingUser.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
         body: JSON.stringify(userData)
       });
 
@@ -337,8 +403,6 @@ export default function SuperAdminUsersPage() {
         const error = await response.json();
         throw new Error(error.error?.message || 'Erro ao atualizar usuário');
       }
-    } catch (error: any) {
-      throw error;
     } finally {
       setEditLoading(false);
     }
@@ -346,9 +410,18 @@ export default function SuperAdminUsersPage() {
 
   const handleResetPassword = async (userId: string, newPassword: string) => {
     try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        toastUtils.user.passwordError('Token de acesso não encontrado');
+        return;
+      }
+
       const response = await fetch(`/api/users/${userId}/reset-password`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
         body: JSON.stringify({ newPassword })
       });
 
@@ -356,8 +429,8 @@ export default function SuperAdminUsersPage() {
         const error = await response.json();
         throw new Error(error.error?.message || 'Erro ao redefinir senha');
       }
-    } catch (error: any) {
-      throw error;
+    } catch {
+      // Error will be handled by the caller
     }
   };
 

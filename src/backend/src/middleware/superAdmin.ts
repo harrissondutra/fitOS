@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { UserRole } from './auth';
-
-const prisma = new PrismaClient();
+import { getPrismaClient } from '../config/database';
+// Tipos temporários para evitar erros de compilação após remoção da autenticação
+type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
 
 // Extend Request interface to include user information
 declare global {
@@ -47,7 +46,7 @@ export const requireSuperAdmin = async (req: Request, res: Response, next: NextF
     }
 
     // Buscar usuário no banco para verificar role
-    const user = await prisma.user.findUnique({
+    const user = await getPrismaClient().user.findUnique({
       where: { id: userId },
       select: { 
         role: true, 
@@ -76,9 +75,8 @@ export const requireSuperAdmin = async (req: Request, res: Response, next: NextF
       return;
     }
 
-    // Super admin não pertence a nenhum tenant (tenantId = null)
-    // e tem role 'SUPER_ADMIN'
-    if (user.role !== 'SUPER_ADMIN' || user.tenantId !== null) {
+    // Super admin tem role 'SUPER_ADMIN' (pode ter tenantId do tenant "Sistema")
+    if (user.role !== 'SUPER_ADMIN') {
       res.status(403).json({
         success: false,
         error: {
@@ -128,7 +126,7 @@ export const requireAdminOrSuperAdmin = async (req: Request, res: Response, next
     }
 
     // Buscar usuário no banco para verificar role
-    const user = await prisma.user.findUnique({
+    const user = await getPrismaClient().user.findUnique({
       where: { id: userId },
       select: { 
         role: true, 
@@ -158,7 +156,7 @@ export const requireAdminOrSuperAdmin = async (req: Request, res: Response, next
     }
 
     // Verificar se é super admin ou admin/owner
-    const isSuperAdmin = user.role === 'SUPER_ADMIN' && user.tenantId === null;
+    const isSuperAdmin = user.role === 'SUPER_ADMIN';
     const isAdmin = user.role && ['ADMIN', 'OWNER'].includes(user.role) && user.tenantId !== null;
 
     if (!isSuperAdmin && !isAdmin) {
@@ -178,7 +176,7 @@ export const requireAdminOrSuperAdmin = async (req: Request, res: Response, next
     // Adicionar informações do admin ao request
     req.adminInfo = {
       id: userId,
-      role: user.role || 'MEMBER',
+      role: user.role || 'CLIENT',
       tenantId: user.tenantId,
       isSuperAdmin
     };
@@ -223,7 +221,7 @@ export const requireTenantAccess = (tenantIdParam: string = 'tenantId') => {
       }
 
       // Buscar usuário no banco para verificar role
-      const user = await prisma.user.findUnique({
+      const user = await getPrismaClient().user.findUnique({
         where: { id: userId },
         select: { 
           role: true, 
@@ -250,12 +248,12 @@ export const requireTenantAccess = (tenantIdParam: string = 'tenantId') => {
         });
       }
 
-      // Super admin pode acessar qualquer tenant
-      if (user.role === 'SUPER_ADMIN' && user.tenantId === null) {
+      // Super admin pode acessar qualquer tenant (tenant "Sistema" ou null)
+      if (user.role === 'SUPER_ADMIN') {
         req.adminInfo = {
           id: userId,
-          role: user.role || 'MEMBER',
-          tenantId: null,
+          role: user.role || 'CLIENT',
+          tenantId: user.tenantId,
           isSuperAdmin: true
         };
         return next();
@@ -265,7 +263,7 @@ export const requireTenantAccess = (tenantIdParam: string = 'tenantId') => {
       if (user.role && ['ADMIN', 'OWNER'].includes(user.role) && user.tenantId === targetTenantId) {
         req.adminInfo = {
           id: userId,
-          role: user.role || 'MEMBER',
+          role: user.role || 'CLIENT',
           tenantId: user.tenantId,
           isSuperAdmin: false
         };

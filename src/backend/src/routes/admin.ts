@@ -1,6 +1,5 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { requireAdmin } from '../middleware/auth';
 import { asyncHandler } from '../utils/asyncHandler';
 import { PlanLimitsService } from '../services/plan-limits.service';
 
@@ -72,7 +71,7 @@ router.get('/plan-info', asyncHandler(async (req: any, res: Response): Promise<v
  * GET /api/admin/users/by-role
  * Contagem de usuários por role
  */
-router.get('/users/by-role', requireAdmin, asyncHandler(async (req: any, res: Response): Promise<void> => {
+router.get('/users/by-role',  asyncHandler(async (req: any, res: Response): Promise<void> => {
   const tenantId = req.tenantId;
 
   if (!tenantId) {
@@ -95,7 +94,7 @@ router.get('/users/by-role', requireAdmin, asyncHandler(async (req: any, res: Re
     acc[role] = {
       current,
       limit: isUnlimited ? -1 : limit,
-      available: isUnlimited ? -1 : Math.max(0, limit - current),
+      available: isUnlimited ? -1 : Math.max(0, (limit || 0) - current),
       isUnlimited
     };
     
@@ -116,7 +115,7 @@ router.get('/users/by-role', requireAdmin, asyncHandler(async (req: any, res: Re
  * POST /api/admin/request-extra-slots
  * Solicitar slots extras (gera pedido para super admin aprovar)
  */
-router.post('/request-extra-slots', requireAdmin, asyncHandler(async (req: any, res: Response): Promise<void> => {
+router.post('/request-extra-slots',  asyncHandler(async (req: any, res: Response): Promise<void> => {
   const tenantId = req.tenantId;
   const { role, quantity, reason } = req.body;
 
@@ -170,7 +169,7 @@ router.post('/request-extra-slots', requireAdmin, asyncHandler(async (req: any, 
  * POST /api/admin/request-upgrade-to-business
  * Pessoa física solicitar upgrade para business (criar subdomain)
  */
-router.post('/request-upgrade-to-business', requireAdmin, asyncHandler(async (req: any, res: Response): Promise<void> => {
+router.post('/request-upgrade-to-business',  asyncHandler(async (req: any, res: Response): Promise<void> => {
   const tenantId = req.tenantId;
   const { subdomain } = req.body;
 
@@ -221,7 +220,7 @@ router.post('/request-upgrade-to-business', requireAdmin, asyncHandler(async (re
  * POST /api/admin/request-feature
  * Solicitar habilitação de feature específica
  */
-router.post('/request-feature', requireAdmin, asyncHandler(async (req: any, res: Response): Promise<void> => {
+router.post('/request-feature',  asyncHandler(async (req: any, res: Response): Promise<void> => {
   const tenantId = req.tenantId;
   const { featureName, reason } = req.body;
 

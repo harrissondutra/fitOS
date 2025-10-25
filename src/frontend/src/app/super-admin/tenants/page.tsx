@@ -1,6 +1,11 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+// Configurações SSR
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
+export const preferredRegion = 'auto'
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { 
   Building2, 
@@ -95,11 +100,7 @@ export default function TenantsPage() {
     pages: 0
   });
 
-  useEffect(() => {
-    fetchTenants();
-  }, [search, filters, pagination.page]);
-
-  const fetchTenants = async () => {
+  const fetchTenants = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -122,7 +123,11 @@ export default function TenantsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, filters, pagination.page, pagination.limit]);
+
+  useEffect(() => {
+    fetchTenants();
+  }, [fetchTenants]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

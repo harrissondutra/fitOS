@@ -4,8 +4,10 @@
     "module": "commonjs",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "..",
+    "rootDir": "../..",
     "composite": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -40,7 +42,8 @@
   },
   "include": [
     "src/**/*",
-    "../shared/**/*"
+    "../shared/**/*",
+    "src/data/integration-knowledge-base.json"
   ],
   "exclude": [
     "node_modules",
