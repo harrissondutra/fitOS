@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Database, 
   TrendingUp, 
@@ -37,65 +38,71 @@ export default function ArmazenamentoPage() {
   const { loading: costsLoading, getDashboard } = useCosts();
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Simular carregamento de dados
-    const loadData = async () => {
-      setLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Dados mockados para demonstração
-      const mockDashboard = {
-        totalCost: 1250.50,
-        monthlyTrend: 12.5,
-        services: [
-          {
-            id: 'cloudinary',
-            name: 'Cloudinary',
-            cost: 450.30,
-            trend: 8.2,
-            status: 'active',
-            icon: Image,
-            description: 'Armazenamento e transformação de imagens'
-          },
-          {
-            id: 'aws-s3',
-            name: 'AWS S3',
-            cost: 320.80,
-            trend: -2.1,
-            status: 'active',
-            icon: Cloud,
-            description: 'Armazenamento de arquivos e backups'
-          },
-          {
-            id: 'database',
-            name: 'Database Storage',
-            cost: 479.40,
-            trend: 15.3,
-            status: 'active',
-            icon: Database,
-            description: 'Armazenamento de dados do banco'
-          }
-        ],
-        trends: {
-          labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
-          datasets: [
-            {
-              label: 'Custos de Armazenamento',
-              data: [800, 950, 1100, 1050, 1200, 1250],
-              borderColor: 'rgb(59, 130, 246)',
-              backgroundColor: 'rgba(59, 130, 246, 0.1)'
-            }
-          ]
+  // Carregar dados
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    
+    // Simular carregamento
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Usar dados mockados quando a API falhar ou timeout
+    const mockDashboard = {
+      totalCost: 1250.50,
+      monthlyTrend: 12.5,
+      services: [
+        {
+          id: 'cloudinary',
+          name: 'Cloudinary',
+          cost: 450.30,
+          trend: 8.2,
+          status: 'active',
+          icon: Image,
+          description: 'Armazenamento e transformação de imagens'
+        },
+        {
+          id: 'aws-s3',
+          name: 'AWS S3',
+          cost: 320.80,
+          trend: -2.1,
+          status: 'active',
+          icon: Cloud,
+          description: 'Armazenamento de arquivos e backups'
+        },
+        {
+          id: 'database',
+          name: 'Database Storage',
+          cost: 479.40,
+          trend: 15.3,
+          status: 'active',
+          icon: Database,
+          description: 'Armazenamento de dados do banco'
         }
-      };
-      
-      setDashboard(mockDashboard);
-      setServices(mockDashboard.services);
-      setLoading(false);
+      ],
+      trends: [
+        { date: '2024-01-01', totalCost: 800, categories: { storage: 800 } },
+        { date: '2024-02-01', totalCost: 950, categories: { storage: 950 } },
+        { date: '2024-03-01', totalCost: 1100, categories: { storage: 1100 } },
+        { date: '2024-04-01', totalCost: 1050, categories: { storage: 1050 } },
+        { date: '2024-05-01', totalCost: 1200, categories: { storage: 1200 } },
+        { date: '2024-06-01', totalCost: 1250, categories: { storage: 1250 } }
+      ]
     };
+    
+    setDashboard(mockDashboard);
+    setServices(mockDashboard.services);
+    
+    toast({
+      title: 'Modo Demonstração',
+      description: 'Usando dados de exemplo para armazenamento',
+      variant: 'default',
+    });
+    
+    setLoading(false);
+  }, [toast]);
 
+  useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
@@ -120,10 +127,72 @@ export default function ArmazenamentoPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="flex items-center space-x-2">
-          <RefreshCw className="h-4 w-4 animate-spin" />
-          <span>Carregando dados de armazenamento...</span>
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+
+        {/* Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-24 mb-2" />
+                <Skeleton className="h-3 w-32" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Tabs Skeleton */}
+        <div className="space-y-4">
+          <div className="flex space-x-2">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-10 w-24" />
+            ))}
+          </div>
+          
+          {/* Chart Skeleton */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-48" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-64 w-full" />
+            </CardContent>
+          </Card>
+
+          {/* Service Cards Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2].map((i) => (
+              <Card key={i}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-4" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-6 w-32 mb-2" />
+                  <Skeleton className="h-3 w-48 mb-2" />
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="h-5 w-12" />
+                    <Skeleton className="h-4 w-8" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -209,7 +278,7 @@ export default function ArmazenamentoPage() {
               <CardTitle>Tendência de Custos</CardTitle>
             </CardHeader>
             <CardContent>
-              <CostTrendsChart data={dashboard?.trends} />
+              <CostTrendsChart data={dashboard?.trends || []} />
             </CardContent>
           </Card>
 

@@ -252,7 +252,7 @@ const getAdminMenuItems = (userRole: UserRole) => {
         },
         {
           title: "Gerenciamento",
-          url: "/super-admin/management",
+          url: "/super-admin/management/dashboard",
           icon: Settings,
           items: [
             { title: "Dashboard", url: "/super-admin/management/dashboard" },

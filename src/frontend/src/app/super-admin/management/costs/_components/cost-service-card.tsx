@@ -11,14 +11,20 @@ interface CostServiceCardProps {
 }
 
 export function CostServiceCard({ service, onClick }: CostServiceCardProps) {
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | undefined) => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return 'R$ 0,00';
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(amount);
   };
 
-  const formatPercentage = (value: number) => {
+  const formatPercentage = (value: number | undefined) => {
+    if (value === undefined || value === null || isNaN(value)) {
+      return '0.0%';
+    }
     return `${value.toFixed(1)}%`;
   };
 
@@ -103,7 +109,7 @@ export function CostServiceCard({ service, onClick }: CostServiceCardProps) {
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">
-                {service.requestCount.toLocaleString()} requests
+                {(service.requestCount || 0).toLocaleString()} requests
               </span>
             </div>
             <div className="flex items-center gap-2">

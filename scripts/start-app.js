@@ -82,7 +82,8 @@ async function checkRemoteServices() {
   
   // Verificar banco de dados remoto
   return new Promise((resolve) => {
-    exec('npx dotenv-cli -e .env -- node -e "const { PrismaClient } = require(\'@prisma/client\'); const prisma = new PrismaClient(); prisma.$connect().then(() => { console.log(\'OK\'); process.exit(0); }).catch(() => { process.exit(1); });"', (error) => {
+    const backendPath = path.join(__dirname, '..', 'src', 'backend');
+    exec(`cd "${backendPath}" && npx dotenv-cli -e ../../.env -- node -e "const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); prisma.$connect().then(() => { console.log('OK'); process.exit(0); }).catch(() => { process.exit(1); });"`, (error) => {
       if (error) {
         log('red', '❌ Não foi possível conectar ao banco de dados remoto');
         log('yellow', '💡 Verifique as configurações no arquivo .env');

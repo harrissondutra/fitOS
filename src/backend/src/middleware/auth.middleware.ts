@@ -238,12 +238,31 @@ export class AuthMiddleware {
       const token = authHeader && authHeader.split(' ')[1];
 
       if (token) {
-        // Tentar autenticar se token existe
-        await this.authenticateToken(req, res, next);
-      } else {
-        // Continuar sem autenticação
-        next();
+        // Tentar autenticar se token existe, mas não logar erros
+        try {
+          const payload = this.authService.verifyToken(token);
+          
+          // Buscar usuário no banco de dados
+          const user = await this.prisma.user.findUnique({
+            where: { id: payload.userId },
+            include: {
+              tenant: true
+            }
+          });
+
+          if (user && user.status === 'ACTIVE' && user.emailVerified) {
+            // Adicionar dados do usuário ao request
+            (req as any).user = user;
+            (req as any).tenantId = user.tenantId || undefined;
+          }
+        } catch (authError) {
+          // Token inválido ou expirado - continuar sem autenticação
+          // Não logar erro para evitar spam no console
+        }
       }
+      
+      // Continuar sem autenticação (com ou sem usuário)
+      next();
     } catch (error) {
       // Em caso de erro, continuar sem autenticação
       next();

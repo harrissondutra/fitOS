@@ -1,6 +1,8 @@
 import { getPrismaClient } from '../config/database';
 import { calculateCost, getModelPricing, isDiscountTime } from '../config/ai-pricing';
 import { Prisma } from '@prisma/client';
+import { logger } from '@/utils/logger';
+import { cache } from '@/config/redis';
 
 const prisma = getPrismaClient();
 
@@ -53,63 +55,133 @@ export interface CostAlert {
 }
 
 export class AiCostTrackingService {
+  private readonly CACHE_KEY_PREFIX: string;
+  private readonly CACHE_TTL: number;
+  private readonly DEFAULT_CURRENCY: string;
+
+  constructor() {
+    // Usar variáveis de ambiente (ZERO hardcode)
+    const redisPrefix = process.env.REDIS_KEY_PREFIX || 'fitos:';
+    this.CACHE_KEY_PREFIX = `${redisPrefix}costs:ai:`;
+    this.CACHE_TTL = parseInt(process.env.COST_CACHE_TTL_DASHBOARD || process.env.COST_CACHE_TTL || '300');
+    this.DEFAULT_CURRENCY = process.env.COST_DEFAULT_CURRENCY || 'BRL';
+  }
+
+  /**
+   * Calcula custo usando preços das variáveis de ambiente quando disponível
+   */
+  private calculateCostFromEnv(
+    model: string,
+    inputTokens: number,
+    outputTokens: number,
+    provider: string
+  ): number | null {
+    try {
+      // Tentar usar preços das variáveis de ambiente primeiro
+      let inputPricePer1K = 0;
+      let outputPricePer1K = 0;
+
+      // Mapear modelos para variáveis de ambiente
+      if (provider.toLowerCase() === 'openai') {
+        if (model.includes('gpt-4')) {
+          inputPricePer1K = parseFloat(process.env.COST_AI_GPT4_INPUT_PER_1K || '0');
+          outputPricePer1K = parseFloat(process.env.COST_AI_GPT4_OUTPUT_PER_1K || '0');
+        } else if (model.includes('gpt-3.5')) {
+          inputPricePer1K = parseFloat(process.env.COST_AI_GPT35_INPUT_PER_1K || '0');
+          outputPricePer1K = parseFloat(process.env.COST_AI_GPT35_OUTPUT_PER_1K || '0');
+        }
+      } else if (provider.toLowerCase() === 'anthropic') {
+        inputPricePer1K = parseFloat(process.env.COST_AI_CLAUDE_INPUT_PER_1K || '0');
+        outputPricePer1K = parseFloat(process.env.COST_AI_CLAUDE_OUTPUT_PER_1K || '0');
+      }
+
+      // Se temos preços das variáveis de ambiente, usar eles
+      if (inputPricePer1K > 0 && outputPricePer1K > 0) {
+        const inputCost = (inputTokens / 1000) * inputPricePer1K;
+        const outputCost = (outputTokens / 1000) * outputPricePer1K;
+        return inputCost + outputCost;
+      }
+
+      return null; // Fallback para configuração padrão
+    } catch (error) {
+      logger.warn(`Failed to calculate cost from env vars for ${model}:`, error);
+      return null;
+    }
+  }
+
   /**
    * Registra o uso de um modelo de IA e calcula o custo
    */
   async trackUsage(data: Omit<CostTrackingData, 'id' | 'cost' | 'currency' | 'timestamp'>): Promise<CostTrackingData> {
-    const modelPricing = getModelPricing(data.model, data.provider);
-    if (!modelPricing) {
-      throw new Error(`Model not found: ${data.model} from provider: ${data.provider}`);
-    }
+    try {
+      // 1. Tentar calcular custo usando variáveis de ambiente primeiro
+      let cost = this.calculateCostFromEnv(data.model, data.inputTokens, data.outputTokens, data.provider);
+      let currency = this.DEFAULT_CURRENCY;
 
-    const isDiscount = isDiscountTime(data.provider);
-    const cost = calculateCost(
-      data.model,
-      data.inputTokens,
-      data.outputTokens,
-      data.provider,
-      data.isCacheHit,
-      isDiscount
-    );
+      // 2. Se não conseguir, usar configuração padrão
+      if (cost === null) {
+        const modelPricing = getModelPricing(data.model, data.provider);
+        if (!modelPricing) {
+          throw new Error(`Model not found: ${data.model} from provider: ${data.provider}`);
+        }
 
-    const currency = modelPricing.pricing.standard.currency;
-
-    // Salvar no banco de dados
-    const costRecord = await prisma.aiCostTracking.create({
-      data: {
-        clientId: data.clientId,
-        model: data.model,
-        provider: data.provider,
-        inputTokens: data.inputTokens,
-        outputTokens: data.outputTokens,
-        cost: cost,
-        currency: currency,
-        isCacheHit: data.isCacheHit || false,
-        metadata: data.metadata || {},
-        timestamp: new Date()
+        const isDiscount = isDiscountTime(data.provider);
+        cost = calculateCost(
+          data.model,
+          data.inputTokens,
+          data.outputTokens,
+          data.provider,
+          data.isCacheHit,
+          isDiscount
+        );
+        currency = modelPricing.pricing.standard.currency;
       }
-    });
 
-    // Verificar alertas de limite
-    await this.checkCostAlerts(data.clientId);
+      // 3. Salvar no banco de dados
+      const costRecord = await prisma.aiCostTracking.create({
+        data: {
+          clientId: data.clientId,
+          model: data.model,
+          provider: data.provider,
+          inputTokens: data.inputTokens,
+          outputTokens: data.outputTokens,
+          cost: cost,
+          currency: currency,
+          isCacheHit: data.isCacheHit || false,
+          metadata: data.metadata || {},
+          timestamp: new Date()
+        }
+      });
 
-    return {
-      id: costRecord.id,
-      clientId: costRecord.clientId,
-      model: costRecord.model,
-      provider: costRecord.provider,
-      inputTokens: costRecord.inputTokens,
-      outputTokens: costRecord.outputTokens,
-      cost: costRecord.cost,
-      currency: costRecord.currency,
-      timestamp: costRecord.timestamp,
-      isCacheHit: costRecord.isCacheHit,
-      metadata: costRecord.metadata as Record<string, any>
-    };
+      // 4. Invalidar cache relacionado
+      await this.invalidateCache(data.clientId);
+
+      // 5. Verificar alertas de limite
+      await this.checkCostAlerts(data.clientId);
+
+      logger.info(`AI cost tracked: ${data.model} - ${cost.toFixed(4)} ${currency}`);
+
+      return {
+        id: costRecord.id,
+        clientId: costRecord.clientId,
+        model: costRecord.model,
+        provider: costRecord.provider,
+        inputTokens: costRecord.inputTokens,
+        outputTokens: costRecord.outputTokens,
+        cost: costRecord.cost,
+        currency: costRecord.currency,
+        timestamp: costRecord.timestamp,
+        isCacheHit: costRecord.isCacheHit,
+        metadata: costRecord.metadata as Record<string, any>
+      };
+    } catch (error) {
+      logger.error('Failed to track AI usage:', error);
+      throw error;
+    }
   }
 
   /**
-   * Obtém resumo de custos para um período específico
+   * Obtém resumo de custos para um período específico com cache Redis
    */
   async getCostSummary(
     startDate: Date,
@@ -118,77 +190,124 @@ export class AiCostTrackingService {
     provider?: string,
     model?: string
   ): Promise<CostSummary> {
-    const where: Prisma.AiCostTrackingWhereInput = {
-      timestamp: {
-        gte: startDate,
-        lte: endDate
+    try {
+      // 1. Gerar chave de cache
+      const cacheKey = `${this.CACHE_KEY_PREFIX}summary:${startDate.toISOString()}:${endDate.toISOString()}:${clientId || 'all'}:${provider || 'all'}:${model || 'all'}`;
+
+      // 2. Tentar cache Redis primeiro
+      if (process.env.COST_REDIS_CACHE_ENABLED === 'true') {
+        const cached = await cache.get(cacheKey);
+        if (cached) {
+          logger.info('AI cost summary retrieved from cache');
+          return JSON.parse(cached);
+        }
       }
-    };
 
-    if (clientId) where.clientId = clientId;
-    if (provider) where.provider = provider;
-    if (model) where.model = model;
+      // 3. Buscar dados do banco
+      const where: Prisma.AiCostTrackingWhereInput = {
+        timestamp: {
+          gte: startDate,
+          lte: endDate
+        }
+      };
 
-    const costs = await prisma.aiCostTracking.findMany({
-      where,
-      orderBy: { timestamp: 'asc' }
-    });
+      if (clientId) where.clientId = clientId;
+      if (provider) where.provider = provider;
+      if (model) where.model = model;
 
-    const totalCost = costs.reduce((sum, cost) => sum + cost.cost, 0);
-    const totalInputTokens = costs.reduce((sum, cost) => sum + cost.inputTokens, 0);
-    const totalOutputTokens = costs.reduce((sum, cost) => sum + cost.outputTokens, 0);
-    const requestCount = costs.length;
+      const costs = await prisma.aiCostTracking.findMany({
+        where,
+        orderBy: { timestamp: 'asc' }
+      });
 
-    // Agrupar por modelo
-    const costByModel = costs.reduce((acc, cost) => {
-      acc[cost.model] = (acc[cost.model] || 0) + cost.cost;
-      return acc;
-    }, {} as Record<string, number>);
+      // 4. Processar dados
+      const totalCost = costs.reduce((sum, cost) => sum + cost.cost, 0);
+      const totalInputTokens = costs.reduce((sum, cost) => sum + cost.inputTokens, 0);
+      const totalOutputTokens = costs.reduce((sum, cost) => sum + cost.outputTokens, 0);
+      const requestCount = costs.length;
 
-    // Agrupar por provedor
-    const costByProvider = costs.reduce((acc, cost) => {
-      acc[cost.provider] = (acc[cost.provider] || 0) + cost.cost;
-      return acc;
-    }, {} as Record<string, number>);
+      // Agrupar por modelo
+      const costByModel = costs.reduce((acc, cost) => {
+        acc[cost.model] = (acc[cost.model] || 0) + cost.cost;
+        return acc;
+      }, {} as Record<string, number>);
 
-    // Agrupar por cliente
-    const costByClient = costs.reduce((acc, cost) => {
-      acc[cost.clientId] = (acc[cost.clientId] || 0) + cost.cost;
-      return acc;
-    }, {} as Record<string, number>);
+      // Agrupar por provedor
+      const costByProvider = costs.reduce((acc, cost) => {
+        acc[cost.provider] = (acc[cost.provider] || 0) + cost.cost;
+        return acc;
+      }, {} as Record<string, number>);
 
-    // Agrupar por dia
-    const dailyCosts = costs.reduce((acc, cost) => {
-      const date = cost.timestamp.toISOString().split('T')[0];
-      if (!acc[date]) {
-        acc[date] = { cost: 0, requests: 0 };
+      // Agrupar por cliente
+      const costByClient = costs.reduce((acc, cost) => {
+        acc[cost.clientId] = (acc[cost.clientId] || 0) + cost.cost;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Agrupar por dia
+      const dailyCosts = costs.reduce((acc, cost) => {
+        const date = cost.timestamp.toISOString().split('T')[0];
+        if (!acc[date]) {
+          acc[date] = { cost: 0, requests: 0 };
+        }
+        acc[date].cost += cost.cost;
+        acc[date].requests += 1;
+        return acc;
+      }, {} as Record<string, { cost: number; requests: number }>);
+
+      const dailyCostsArray = Object.entries(dailyCosts).map(([date, data]) => ({
+        date,
+        cost: data.cost,
+        requests: data.requests
+      })).sort((a, b) => a.date.localeCompare(b.date));
+
+      const summary: CostSummary = {
+        totalCost,
+        totalInputTokens,
+        totalOutputTokens,
+        requestCount,
+        averageCostPerRequest: requestCount > 0 ? totalCost / requestCount : 0,
+        costByModel,
+        costByProvider,
+        costByClient,
+        dailyCosts: dailyCostsArray
+      };
+
+      // 5. Armazenar no cache Redis
+      if (process.env.COST_REDIS_CACHE_ENABLED === 'true') {
+        await cache.set(cacheKey, JSON.stringify(summary), this.CACHE_TTL);
+        logger.info(`AI cost summary cached for ${this.CACHE_TTL} seconds`);
       }
-      acc[date].cost += cost.cost;
-      acc[date].requests += 1;
-      return acc;
-    }, {} as Record<string, { cost: number; requests: number }>);
 
-    const dailyCostsArray = Object.entries(dailyCosts).map(([date, data]) => ({
-      date,
-      cost: data.cost,
-      requests: data.requests
-    })).sort((a, b) => a.date.localeCompare(b.date));
-
-    return {
-      totalCost,
-      totalInputTokens,
-      totalOutputTokens,
-      requestCount,
-      averageCostPerRequest: requestCount > 0 ? totalCost / requestCount : 0,
-      costByModel,
-      costByProvider,
-      costByClient,
-      dailyCosts: dailyCostsArray
-    };
+      return summary;
+    } catch (error) {
+      logger.error('Failed to get AI cost summary:', error);
+      throw error;
+    }
   }
 
   /**
-   * Obtém histórico de custos com paginação
+   * Invalida cache relacionado a um cliente
+   */
+  private async invalidateCache(clientId: string): Promise<void> {
+    if (process.env.COST_REDIS_CACHE_ENABLED !== 'true') {
+      return;
+    }
+
+    try {
+      // Buscar todas as chaves relacionadas ao cliente
+      const pattern = `${this.CACHE_KEY_PREFIX}*${clientId}*`;
+      // Note: Redis keys method not available in current interface
+      // For now, we'll skip cache invalidation by pattern
+      // TODO: Implement proper cache invalidation when Redis interface is extended
+      logger.info(`Cache invalidation skipped for client ${clientId} - pattern matching not available`);
+    } catch (error) {
+      logger.warn('Failed to invalidate cache:', error);
+    }
+  }
+
+  /**
+   * Obtém histórico de custos com paginação e cache
    */
   async getCostHistory(
     page: number = 1,
@@ -201,49 +320,74 @@ export class AiCostTrackingService {
       endDate?: Date;
     } = {}
   ) {
-    const where: Prisma.AiCostTrackingWhereInput = {};
+    try {
+      // Gerar chave de cache
+      const cacheKey = `${this.CACHE_KEY_PREFIX}history:${page}:${limit}:${JSON.stringify(filters)}`;
 
-    if (filters.clientId) where.clientId = filters.clientId;
-    if (filters.provider) where.provider = filters.provider;
-    if (filters.model) where.model = filters.model;
-    if (filters.startDate || filters.endDate) {
-      where.timestamp = {};
-      if (filters.startDate) where.timestamp.gte = filters.startDate;
-      if (filters.endDate) where.timestamp.lte = filters.endDate;
-    }
-
-    const [costs, total] = await Promise.all([
-      prisma.aiCostTracking.findMany({
-        where,
-        orderBy: { timestamp: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit
-      }),
-      prisma.aiCostTracking.count({ where })
-    ]);
-
-    return {
-      costs: costs.map(cost => ({
-        id: cost.id,
-        clientId: cost.clientId,
-        model: cost.model,
-        provider: cost.provider,
-        inputTokens: cost.inputTokens,
-        outputTokens: cost.outputTokens,
-        cost: cost.cost,
-        currency: cost.currency,
-        timestamp: cost.timestamp,
-        isCacheHit: cost.isCacheHit,
-        metadata: cost.metadata as Record<string, any>
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
+      // Tentar cache Redis primeiro
+      if (process.env.COST_REDIS_CACHE_ENABLED === 'true') {
+        const cached = await cache.get(cacheKey);
+        if (cached) {
+          logger.info('AI cost history retrieved from cache');
+          return JSON.parse(cached);
+        }
       }
-    };
+
+      const where: Prisma.AiCostTrackingWhereInput = {};
+
+      if (filters.clientId) where.clientId = filters.clientId;
+      if (filters.provider) where.provider = filters.provider;
+      if (filters.model) where.model = filters.model;
+      if (filters.startDate || filters.endDate) {
+        where.timestamp = {};
+        if (filters.startDate) where.timestamp.gte = filters.startDate;
+        if (filters.endDate) where.timestamp.lte = filters.endDate;
+      }
+
+      const [costs, total] = await Promise.all([
+        prisma.aiCostTracking.findMany({
+          where,
+          orderBy: { timestamp: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit
+        }),
+        prisma.aiCostTracking.count({ where })
+      ]);
+
+      const result = {
+        costs: costs.map(cost => ({
+          id: cost.id,
+          clientId: cost.clientId,
+          model: cost.model,
+          provider: cost.provider,
+          inputTokens: cost.inputTokens,
+          outputTokens: cost.outputTokens,
+          cost: cost.cost,
+          currency: cost.currency,
+          timestamp: cost.timestamp,
+          isCacheHit: cost.isCacheHit,
+          metadata: cost.metadata as Record<string, any>
+        })),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      };
+
+      // Armazenar no cache Redis
+      if (process.env.COST_REDIS_CACHE_ENABLED === 'true') {
+        await cache.set(cacheKey, JSON.stringify(result), this.CACHE_TTL);
+      }
+
+      return result;
+    } catch (error) {
+      logger.error('Failed to get AI cost history:', error);
+      throw error;
+    }
   }
+
 
   /**
    * Define limite de custos para um cliente

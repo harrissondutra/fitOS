@@ -1,7 +1,7 @@
 generator client {
   provider        = "prisma-client-js"
-  engineType      = "binary"
   previewFeatures = ["multiSchema"]
+  engineType      = "binary"
 }
 
 datasource db {
@@ -11,64 +11,60 @@ datasource db {
 }
 
 model Tenant {
-  id                       String                     @id @default(cuid())
-  name                     String
-  subdomain                String?                    @unique
-  customDomain             String?                    @unique @map("custom_domain")
-  plan                     String                     @default("starter")
-  tenantType               String                     @default("business") @map("tenant_type")
-  customPlanId             String?                    @map("custom_plan_id")
-  planLimits               Json                       @default("{}") @map("plan_limits")
-  extraSlots               Json                       @default("{}") @map("extra_slots")
-  enabledFeatures          Json                       @default("{}") @map("enabled_features")
-  status                   String                     @default("active")
-  billingEmail             String                     @map("billing_email")
-  stripeCustomerId         String?                    @map("stripe_customer_id")
-  stripeSubscriptionId     String?                    @map("stripe_subscription_id")
-  settings                 Json                       @default("{}")
-  createdAt                DateTime                   @default(now()) @map("created_at")
-  updatedAt                DateTime                   @updatedAt @map("updated_at")
-  activityLogs             ActivityLog[]
-  aiJobs                   AiJob[]
-  aiProviders              AiProvider[]
-  aiServiceConfigs         AiServiceConfig[]
-  aiSessions               AiSession[]
-  aiWebhookLogs            AiWebhookLog[]
-  appointmentComments      AppointmentComment[]
-  appointmentTemplates     AppointmentTemplate[]
-  appointments             Appointment[]
-  attendances              Attendance[]
-  auditLogs                AuditLog[]
-  availabilityBlocks       AvailabilityBlock[]
-  biometricData            BiometricData[]
-  campaigns                Campaign[]
-  chatMessages             ChatMessage[]
-  churnPredictions         ChurnPrediction[]
-  clientGoals              ClientGoal[]
-  clientInteractions       ClientInteraction[]
-  clientProfiles           ClientProfile[]
-  crmTasks                 CRMTask[]
-  exercises                Exercise[]
-  googleCalendarTokens     GoogleCalendarToken[]
-  clients                  Client[]
-  notifications            Notification[]
-  professionalAvailability ProfessionalAvailability[]
-  subscriptions            Subscription[]
-  customPlan               PlanConfig?                @relation(fields: [customPlanId], references: [id])
-  usageTracking            UsageTracking[]
-  users                    User[]
-  whatsappConfigs          WhatsAppConfig?
-  workouts                 Workout[]
-  bioimpedanceMeasurements BioimpedanceMeasurement[]
-
-  // Marketplace relations
+  id                        String                     @id @default(cuid())
+  name                      String
+  subdomain                 String?                    @unique
+  customDomain              String?                    @unique @map("custom_domain")
+  plan                      String                     @default("starter")
+  tenantType                String                     @default("business") @map("tenant_type")
+  customPlanId              String?                    @map("custom_plan_id")
+  planLimits                Json                       @default("{}") @map("plan_limits")
+  extraSlots                Json                       @default("{}") @map("extra_slots")
+  enabledFeatures           Json                       @default("{}") @map("enabled_features")
+  status                    String                     @default("active")
+  billingEmail              String                     @map("billing_email")
+  stripeCustomerId          String?                    @map("stripe_customer_id")
+  stripeSubscriptionId      String?                    @map("stripe_subscription_id")
+  settings                  Json                       @default("{}")
+  createdAt                 DateTime                   @default(now()) @map("created_at")
+  updatedAt                 DateTime                   @updatedAt @map("updated_at")
+  activityLogs              ActivityLog[]
+  aiJobs                    AiJob[]
+  aiProviders               AiProvider[]
+  aiServiceConfigs          AiServiceConfig[]
+  aiSessions                AiSession[]
+  aiWebhookLogs             AiWebhookLog[]
+  appointmentComments       AppointmentComment[]
+  appointmentTemplates      AppointmentTemplate[]
+  appointments              Appointment[]
+  attendances               Attendance[]
+  auditLogs                 AuditLog[]
+  availabilityBlocks        AvailabilityBlock[]
+  bioimpedanceMeasurements  BioimpedanceMeasurement[]
+  biometricData             BiometricData[]
+  campaigns                 Campaign[]
+  chatMessages              ChatMessage[]
+  churnPredictions          ChurnPrediction[]
+  clientGoals               ClientGoal[]
+  clientInteractions        ClientInteraction[]
+  clientProfiles            ClientProfile[]
+  clients                   Client[]
+  crmTasks                  CRMTask[]
+  customerHealthScores      CustomerHealthScore[]
+  exercises                 Exercise[]
+  featureUsage              FeatureUsage[]
+  googleCalendarTokens      GoogleCalendarToken[]
   marketplaceListings       MarketplaceListing[]
   marketplaceOrders         MarketplaceOrder[]
   marketplaceSellerProfiles MarketplaceSellerProfile[]
-
-  // Analytics relations
-  customerHealthScores CustomerHealthScore[]
-  featureUsage         FeatureUsage[]
+  notifications             Notification[]
+  professionalAvailability  ProfessionalAvailability[]
+  subscriptions             Subscription[]
+  customPlan                PlanConfig?                @relation(fields: [customPlanId], references: [id])
+  usageTracking             UsageTracking[]
+  users                     User[]
+  whatsappConfigs           WhatsAppConfig?
+  workouts                  Workout[]
 
   @@map("tenants")
   @@schema("fitos")
@@ -98,34 +94,30 @@ model User {
   appointments             Appointment[]              @relation("ProfessionalAppointments")
   auditLogs                AuditLog[]
   availabilityBlocks       AvailabilityBlock[]
+  bioimpedanceMeasurements BioimpedanceMeasurement[]
   campaigns                Campaign[]
   chatMessages             ChatMessage[]
   clientInteractions       ClientInteraction[]
   clientProfiles           ClientProfile[]
-  crmTasks                 CRMTask[]
-  googleCalendarTokens     GoogleCalendarToken[]
   assignedClients          ClientTrainer[]
-  bioimpedanceMeasurements BioimpedanceMeasurement[]
   client                   Client?
+  crmTasks                 CRMTask[]
+  featureUsage             FeatureUsage[]
+  googleCalendarTokens     GoogleCalendarToken[]
+  marketplaceFavorites     MarketplaceFavorite[]      @relation("MarketplaceFavorites")
+  following                MarketplaceFollower[]      @relation("MarketplaceFollowing")
+  sellerListings           MarketplaceListing[]       @relation("SellerListings")
+  buyerOrders              MarketplaceOrder[]         @relation("BuyerOrders")
+  sellerOrders             MarketplaceOrder[]         @relation("SellerOrders")
+  marketplaceQuestions     MarketplaceQuestion[]      @relation("MarketplaceQuestions")
+  marketplaceReviews       MarketplaceReview[]        @relation("MarketplaceReviews")
+  sellerProfile            MarketplaceSellerProfile?  @relation("SellerProfile")
   notifications            Notification[]
   professionalAvailability ProfessionalAvailability[]
   refreshTokens            RefreshToken[]
   sessions                 Session[]
   tenant                   Tenant?                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   workouts                 Workout[]
-
-  // Marketplace relations
-  sellerListings       MarketplaceListing[]      @relation("SellerListings")
-  buyerOrders          MarketplaceOrder[]        @relation("BuyerOrders")
-  sellerOrders         MarketplaceOrder[]        @relation("SellerOrders")
-  marketplaceReviews   MarketplaceReview[]       @relation("MarketplaceReviews")
-  marketplaceQuestions MarketplaceQuestion[]     @relation("MarketplaceQuestions")
-  marketplaceFavorites MarketplaceFavorite[]     @relation("MarketplaceFavorites")
-  sellerProfile        MarketplaceSellerProfile? @relation("SellerProfile")
-  following            MarketplaceFollower[]     @relation("MarketplaceFollowing")
-
-  // Analytics relations
-  featureUsage FeatureUsage[]
 
   @@map("users")
   @@schema("fitos")
@@ -147,15 +139,15 @@ model Client {
   activityLogs             ActivityLog[]
   appointments             Appointment[]
   attendance               Attendance[]
-  biometricRecords         BiometricData[]
   bioimpedanceMeasurements BioimpedanceMeasurement[]
+  biometricRecords         BiometricData[]
   churnPredictions         ChurnPrediction[]
   clientGoals              ClientGoal[]
   clientProfile            ClientProfile?
-  googleCalendarTokens     GoogleCalendarToken[]
   trainers                 ClientTrainer[]
   tenant                   Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user                     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  googleCalendarTokens     GoogleCalendarToken[]
   workouts                 Workout[]
 
   @@map("clients")
@@ -218,101 +210,75 @@ model BiometricData {
 }
 
 model BioimpedanceMeasurement {
-  id             String   @id @default(cuid())
-  tenantId       String   @map("tenant_id")
-  clientId       String   @map("client_id")
-  professionalId String?  @map("professional_id")
-  measurementId  String?  @map("measurement_id") // ID do dispositivo (ex: 050625-1)
-  measuredAt     DateTime @map("measured_at")
-
-  // Dados básicos do usuário
-  height Float // Altura em cm
-  age    Int // Idade em anos
-  gender String // male/female
-
-  // Composição corporal básica
-  weight             Float // Peso em kg
-  totalBodyWater     Float @map("total_body_water") // Água corporal total em L
-  protein            Float // Proteína em kg
-  minerals           Float // Minerais em kg
-  bodyFatMass        Float @map("body_fat_mass") // Massa de gordura em kg
-  skeletalMuscleMass Float @map("skeletal_muscle_mass") // Massa muscular esquelética em kg
-
-  // Análise de obesidade
-  bmi               Float // IMC
-  bodyFatPercentage Float  @map("body_fat_percentage") // PGC - Porcentual de gordura corporal
-  waistHipRatio     Float? @map("waist_hip_ratio") // Relação cintura-quadril
-  visceralFatLevel  Int?   @map("visceral_fat_level") // Nível de gordura visceral (1-59)
-
-  // Dados adicionais
-  fatFreeMass         Float @map("fat_free_mass") // Massa livre de gordura em kg
-  basalMetabolicRate  Float @map("basal_metabolic_rate") // TMB em kcal
-  obesityDegree       Float @map("obesity_degree") // Grau de obesidade em %
-  skeletalMuscleIndex Float @map("skeletal_muscle_index") // SMI em kg/m²
-  recommendedCalories Float @map("recommended_calories") // Ingestão calórica recomendada
-
-  // Peso ideal e controles
-  idealWeight   Float @map("ideal_weight") // Peso ideal em kg
-  weightControl Float @map("weight_control") // Controle de peso em kg
-  fatControl    Float @map("fat_control") // Controle de gordura em kg
-  muscleControl Float @map("muscle_control") // Controle muscular em kg
-
-  // Análise segmentar - Massa magra
-  leftArmMuscle  Float @map("left_arm_muscle") // Braço esquerdo em kg
-  rightArmMuscle Float @map("right_arm_muscle") // Braço direito em kg
-  trunkMuscle    Float @map("trunk_muscle") // Tronco em kg
-  leftLegMuscle  Float @map("left_leg_muscle") // Perna esquerda em kg
-  rightLegMuscle Float @map("right_leg_muscle") // Perna direita em kg
-
-  // Análise segmentar - Gordura
-  leftArmFat  Float @map("left_arm_fat") // Gordura braço esquerdo em kg
-  rightArmFat Float @map("right_arm_fat") // Gordura braço direito em kg
-  trunkFat    Float @map("trunk_fat") // Gordura tronco em kg
-  leftLegFat  Float @map("left_leg_fat") // Gordura perna esquerda em kg
-  rightLegFat Float @map("right_leg_fat") // Gordura perna direita em kg
-
-  // Impedância bioelétrica - 20kHz
-  impedance20kRightArm Float? @map("impedance_20k_right_arm") // Impedância braço direito 20kHz
-  impedance20kLeftArm  Float? @map("impedance_20k_left_arm") // Impedância braço esquerdo 20kHz
-  impedance20kTrunk    Float? @map("impedance_20k_trunk") // Impedância tronco 20kHz
-  impedance20kRightLeg Float? @map("impedance_20k_right_leg") // Impedância perna direita 20kHz
-  impedance20kLeftLeg  Float? @map("impedance_20k_left_leg") // Impedância perna esquerda 20kHz
-
-  // Impedância bioelétrica - 100kHz
-  impedance100kRightArm Float? @map("impedance_100k_right_arm") // Impedância braço direito 100kHz
-  impedance100kLeftArm  Float? @map("impedance_100k_left_arm") // Impedância braço esquerdo 100kHz
-  impedance100kTrunk    Float? @map("impedance_100k_trunk") // Impedância tronco 100kHz
-  impedance100kRightLeg Float? @map("impedance_100k_right_leg") // Impedância perna direita 100kHz
-  impedance100kLeftLeg  Float? @map("impedance_100k_left_leg") // Impedância perna esquerda 100kHz
-
-  // Classificações e faixas normais
-  inbodyScore           Int?    @map("inbody_score") // Pontuação InBody (0-100+)
-  weightClassification  String? @map("weight_classification") // Normal, Acima, Abaixo
-  muscleClassification  String? @map("muscle_classification") // Normal, Acima, Abaixo
-  fatClassification     String? @map("fat_classification") // Normal, Acima, Abaixo
-  bmiClassification     String? @map("bmi_classification") // Normal, Acima, Abaixo
-  bodyFatClassification String? @map("body_fat_classification") // Normal, Acima, Abaixo
-
-  // Faixas normais de referência
-  normalWeightRange   Json @default("{}") @map("normal_weight_range") // {min, max}
-  normalMuscleRange   Json @default("{}") @map("normal_muscle_range") // {min, max}
-  normalFatRange      Json @default("{}") @map("normal_fat_range") // {min, max}
-  normalBMIRange      Json @default("{}") @map("normal_bmi_range") // {min, max}
-  normalBodyFatRange  Json @default("{}") @map("normal_body_fat_range") // {min, max}
-  normalWaistHipRange Json @default("{}") @map("normal_waist_hip_range") // {min, max}
-
-  // Dados adicionais
-  equipment String? // Equipamento utilizado (ex: InBody270)
-  operator  String? // Operador que fez a medição
-  notes     String? // Observações adicionais
-  qrCode    String? @map("qr_code") // Código QR do relatório
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  client       Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  tenant       Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  professional User?  @relation(fields: [professionalId], references: [id])
+  id                    String   @id @default(cuid())
+  tenantId              String   @map("tenant_id")
+  clientId              String   @map("client_id")
+  professionalId        String?  @map("professional_id")
+  measurementId         String?  @map("measurement_id")
+  measuredAt            DateTime @map("measured_at")
+  height                Float
+  age                   Int
+  gender                String
+  weight                Float
+  totalBodyWater        Float    @map("total_body_water")
+  protein               Float
+  minerals              Float
+  bodyFatMass           Float    @map("body_fat_mass")
+  skeletalMuscleMass    Float    @map("skeletal_muscle_mass")
+  bmi                   Float
+  bodyFatPercentage     Float    @map("body_fat_percentage")
+  waistHipRatio         Float?   @map("waist_hip_ratio")
+  visceralFatLevel      Int?     @map("visceral_fat_level")
+  fatFreeMass           Float    @map("fat_free_mass")
+  basalMetabolicRate    Float    @map("basal_metabolic_rate")
+  obesityDegree         Float    @map("obesity_degree")
+  skeletalMuscleIndex   Float    @map("skeletal_muscle_index")
+  recommendedCalories   Float    @map("recommended_calories")
+  idealWeight           Float    @map("ideal_weight")
+  weightControl         Float    @map("weight_control")
+  fatControl            Float    @map("fat_control")
+  muscleControl         Float    @map("muscle_control")
+  leftArmMuscle         Float    @map("left_arm_muscle")
+  rightArmMuscle        Float    @map("right_arm_muscle")
+  trunkMuscle           Float    @map("trunk_muscle")
+  leftLegMuscle         Float    @map("left_leg_muscle")
+  rightLegMuscle        Float    @map("right_leg_muscle")
+  leftArmFat            Float    @map("left_arm_fat")
+  rightArmFat           Float    @map("right_arm_fat")
+  trunkFat              Float    @map("trunk_fat")
+  leftLegFat            Float    @map("left_leg_fat")
+  rightLegFat           Float    @map("right_leg_fat")
+  impedance20kRightArm  Float?   @map("impedance_20k_right_arm")
+  impedance20kLeftArm   Float?   @map("impedance_20k_left_arm")
+  impedance20kTrunk     Float?   @map("impedance_20k_trunk")
+  impedance20kRightLeg  Float?   @map("impedance_20k_right_leg")
+  impedance20kLeftLeg   Float?   @map("impedance_20k_left_leg")
+  impedance100kRightArm Float?   @map("impedance_100k_right_arm")
+  impedance100kLeftArm  Float?   @map("impedance_100k_left_arm")
+  impedance100kTrunk    Float?   @map("impedance_100k_trunk")
+  impedance100kRightLeg Float?   @map("impedance_100k_right_leg")
+  impedance100kLeftLeg  Float?   @map("impedance_100k_left_leg")
+  inbodyScore           Int?     @map("inbody_score")
+  weightClassification  String?  @map("weight_classification")
+  muscleClassification  String?  @map("muscle_classification")
+  fatClassification     String?  @map("fat_classification")
+  bmiClassification     String?  @map("bmi_classification")
+  bodyFatClassification String?  @map("body_fat_classification")
+  normalWeightRange     Json     @default("{}") @map("normal_weight_range")
+  normalMuscleRange     Json     @default("{}") @map("normal_muscle_range")
+  normalFatRange        Json     @default("{}") @map("normal_fat_range")
+  normalBMIRange        Json     @default("{}") @map("normal_bmi_range")
+  normalBodyFatRange    Json     @default("{}") @map("normal_body_fat_range")
+  normalWaistHipRange   Json     @default("{}") @map("normal_waist_hip_range")
+  equipment             String?
+  operator              String?
+  notes                 String?
+  qrCode                String?  @map("qr_code")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  client                Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  professional          User?    @relation(fields: [professionalId], references: [id])
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, clientId, measuredAt])
   @@index([clientId, measuredAt])
@@ -617,19 +583,19 @@ model AiServiceConfig {
 }
 
 model AiCostTracking {
-  id           String    @id @default(cuid())
-  clientId     String    @map("client_id")
+  id           String   @id @default(cuid())
+  clientId     String   @map("client_id")
   model        String
   provider     String
-  inputTokens  Int       @map("input_tokens")
-  outputTokens Int       @map("output_tokens")
+  inputTokens  Int      @map("input_tokens")
+  outputTokens Int      @map("output_tokens")
   cost         Float
-  currency     String    @default("USD")
-  isCacheHit   Boolean   @default(false) @map("is_cache_hit")
-  metadata     Json      @default("{}")
-  timestamp    DateTime  @default(now())
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  currency     String   @default("USD")
+  isCacheHit   Boolean  @default(false) @map("is_cache_hit")
+  metadata     Json     @default("{}")
+  timestamp    DateTime @default(now())
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@index([clientId])
   @@index([timestamp])
@@ -640,37 +606,34 @@ model AiCostTracking {
 }
 
 model ClientCostLimit {
-  id           String    @id @default(cuid())
-  clientId     String    @unique @map("client_id")
-  monthlyLimit Float     @map("monthly_limit")
-  currency     String    @default("USD")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id           String   @id @default(cuid())
+  clientId     String   @unique @map("client_id")
+  monthlyLimit Float    @map("monthly_limit")
+  currency     String   @default("USD")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("client_cost_limits")
   @@schema("fitos")
 }
 
 model CostAlert {
-  id           String    @id @default(cuid())
-  clientId     String?   @map("client_id")
-  budgetId     String?
-  alertType    String    @map("alert_type") // WARNING, CRITICAL, LIMIT_REACHED
-  currentCost  Float     @map("current_cost")
-  limit        Float
-  percentage   Float
-  message      String
-  severity     String    @default("warning")
-  isActive     Boolean   @default(true) @map("is_active")
-  
+  id             String      @id @default(cuid())
+  clientId       String?     @map("client_id")
+  budgetId       String?
+  alertType      String      @map("alert_type")
+  currentCost    Float       @map("current_cost")
+  limit          Float
+  percentage     Float
+  message        String
+  severity       String      @default("warning")
+  isActive       Boolean     @default(true) @map("is_active")
   acknowledgedAt DateTime?
   acknowledgedBy String?
   resolvedAt     DateTime?
-  
-  budget       CostBudget? @relation(fields: [budgetId], references: [id])
-  
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  budget         CostBudget? @relation(fields: [budgetId], references: [id])
 
   @@index([clientId])
   @@index([isActive])
@@ -1068,6 +1031,1101 @@ model Campaign {
   @@schema("fitos")
 }
 
+model IntegrationConfig {
+  id               String                @id @default(cuid())
+  integration      String                @unique
+  displayName      String
+  description      String?
+  category         String
+  icon             String?
+  environment      String                @default("production")
+  config           Json
+  metadata         Json                  @default("{}")
+  isActive         Boolean               @default(false)
+  isConfigured     Boolean               @default(false)
+  lastTested       DateTime?
+  lastTestStatus   String?
+  lastTestMessage  String?
+  sdkVersion       String?
+  documentationUrl String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  createdBy        String
+  usageLogs        IntegrationUsageLog[]
+
+  @@map("integration_configs")
+  @@schema("fitos")
+}
+
+model IntegrationUsageLog {
+  id            String            @id @default(cuid())
+  integrationId String
+  eventType     String
+  requestCount  Int               @default(1)
+  tokensUsed    Int?
+  cost          Float?
+  status        String
+  metadata      Json              @default("{}")
+  timestamp     DateTime          @default(now())
+  integration   IntegrationConfig @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@map("integration_usage_logs")
+  @@schema("fitos")
+}
+
+model IntegrationTemplate {
+  id               String   @id @default(cuid())
+  integration      String   @unique
+  displayName      String
+  category         String
+  icon             String?
+  configSchema     Json
+  requiredFields   Json
+  optionalFields   Json
+  testEndpoint     String?
+  documentationUrl String
+  sdkPackage       String?
+  sdkVersion       String?
+  exampleConfig    Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("integration_templates")
+  @@schema("fitos")
+}
+
+model GlobalLimitsConfig {
+  id            String   @id @default(cuid())
+  plan          String   @unique
+  aiLimits      Json
+  uploadLimits  Json
+  featureLimits Json
+  rateLimits    Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("global_limits_configs")
+  @@schema("fitos")
+}
+
+model TenantLimitOverride {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  plan      String
+  overrides Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tenant_limit_overrides")
+  @@schema("fitos")
+}
+
+model MarketplaceCategory {
+  id          String                @id @default(cuid())
+  name        String
+  slug        String                @unique
+  description String?
+  icon        String?
+  parentId    String?               @map("parent_id")
+  order       Int                   @default(0)
+  isActive    Boolean               @default(true) @map("is_active")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+  parent      MarketplaceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    MarketplaceCategory[] @relation("CategoryHierarchy")
+  listings    MarketplaceListing[]
+
+  @@map("marketplace_categories")
+  @@schema("fitos")
+}
+
+model MarketplaceListing {
+  id               String                 @id @default(cuid())
+  tenantId         String                 @map("tenant_id")
+  sellerId         String                 @map("seller_id")
+  categoryId       String                 @map("category_id")
+  title            String
+  slug             String
+  description      String
+  shortDescription String?                @map("short_description")
+  type             String
+  price            Float
+  compareAtPrice   Float?                 @map("compare_at_price")
+  currency         String                 @default("BRL")
+  stockQuantity    Int?                   @default(0) @map("stock_quantity")
+  lowStockAlert    Int?                   @default(5) @map("low_stock_alert")
+  allowBackorder   Boolean                @default(false) @map("allow_backorder")
+  images           Json                   @default("[]")
+  videos           Json                   @default("[]")
+  thumbnailUrl     String?                @map("thumbnail_url")
+  metaTitle        String?                @map("meta_title")
+  metaDescription  String?                @map("meta_description")
+  tags             Json                   @default("[]")
+  status           String                 @default("draft")
+  approvalStatus   String                 @default("pending") @map("approval_status")
+  rejectionReason  String?                @map("rejection_reason")
+  approvedAt       DateTime?              @map("approved_at")
+  approvedBy       String?                @map("approved_by")
+  viewCount        Int                    @default(0) @map("view_count")
+  favoriteCount    Int                    @default(0) @map("favorite_count")
+  shareCount       Int                    @default(0) @map("share_count")
+  salesCount       Int                    @default(0) @map("sales_count")
+  isFeatured       Boolean                @default(false) @map("is_featured")
+  isBoosted        Boolean                @default(false) @map("is_boosted")
+  boostedUntil     DateTime?              @map("boosted_until")
+  featuredUntil    DateTime?              @map("featured_until")
+  enableReviews    Boolean                @default(true) @map("enable_reviews")
+  enableQuestions  Boolean                @default(true) @map("enable_questions")
+  shippingRequired Boolean                @default(false) @map("shipping_required")
+  shippingOptions  Json                   @default("[]") @map("shipping_options")
+  publishedAt      DateTime?              @map("published_at")
+  expiresAt        DateTime?              @map("expires_at")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+  analytics        MarketplaceAnalytics[]
+  favorites        MarketplaceFavorite[]
+  category         MarketplaceCategory    @relation(fields: [categoryId], references: [id])
+  seller           User                   @relation("SellerListings", fields: [sellerId], references: [id])
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders           MarketplaceOrder[]
+  questions        MarketplaceQuestion[]
+  reviews          MarketplaceReview[]
+  variations       MarketplaceVariation[]
+
+  @@index([tenantId, status, publishedAt])
+  @@index([sellerId, status])
+  @@index([categoryId, status])
+  @@index([slug])
+  @@map("marketplace_listings")
+  @@schema("fitos")
+}
+
+model MarketplaceVariation {
+  id        String             @id @default(cuid())
+  listingId String             @map("listing_id")
+  name      String
+  sku       String?
+  price     Float?
+  stock     Int                @default(0)
+  isActive  Boolean            @default(true) @map("is_active")
+  createdAt DateTime           @default(now()) @map("created_at")
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@map("marketplace_variations")
+  @@schema("fitos")
+}
+
+model MarketplaceOrder {
+  id                   String               @id @default(cuid())
+  tenantId             String               @map("tenant_id")
+  listingId            String               @map("listing_id")
+  buyerId              String               @map("buyer_id")
+  sellerId             String               @map("seller_id")
+  orderNumber          String               @unique @map("order_number")
+  subtotal             Float
+  shippingCost         Float                @default(0) @map("shipping_cost")
+  discount             Float                @default(0)
+  marketplaceComission Float                @map("marketplace_comission")
+  listingFee           Float                @default(0) @map("listing_fee")
+  totalAmount          Float                @map("total_amount")
+  sellerAmount         Float                @map("seller_amount")
+  currency             String               @default("BRL")
+  status               String               @default("pending")
+  paymentStatus        String               @default("pending") @map("payment_status")
+  fulfillmentStatus    String?              @map("fulfillment_status")
+  paymentMethod        String?              @map("payment_method")
+  paymentProvider      String?              @map("payment_provider")
+  paymentIntentId      String?              @map("payment_intent_id")
+  transferId           String?              @map("transfer_id")
+  shippingAddress      Json?                @map("shipping_address")
+  trackingCode         String?              @map("tracking_code")
+  shippedAt            DateTime?            @map("shipped_at")
+  deliveredAt          DateTime?            @map("delivered_at")
+  escrowStatus         String               @default("held") @map("escrow_status")
+  escrowReleasedAt     DateTime?            @map("escrow_released_at")
+  metadata             Json                 @default("{}")
+  buyerNotes           String?              @map("buyer_notes")
+  sellerNotes          String?              @map("seller_notes")
+  createdAt            DateTime             @default(now()) @map("created_at")
+  updatedAt            DateTime             @updatedAt @map("updated_at")
+  dispute              MarketplaceDispute?
+  buyer                User                 @relation("BuyerOrders", fields: [buyerId], references: [id])
+  listing              MarketplaceListing   @relation(fields: [listingId], references: [id])
+  seller               User                 @relation("SellerOrders", fields: [sellerId], references: [id])
+  tenant               Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  shipment             MarketplaceShipment?
+
+  @@index([tenantId, buyerId, createdAt])
+  @@index([sellerId, status])
+  @@index([orderNumber])
+  @@map("marketplace_orders")
+  @@schema("fitos")
+}
+
+model MarketplaceReview {
+  id                String             @id @default(cuid())
+  listingId         String             @map("listing_id")
+  orderId           String?            @map("order_id")
+  reviewerId        String             @map("reviewer_id")
+  rating            Int
+  title             String?
+  comment           String?
+  images            Json               @default("[]")
+  isVerified        Boolean            @default(false) @map("is_verified")
+  isVisible         Boolean            @default(true) @map("is_visible")
+  helpfulCount      Int                @default(0) @map("helpful_count")
+  sellerResponse    String?            @map("seller_response")
+  sellerRespondedAt DateTime?          @map("seller_responded_at")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  listing           MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  reviewer          User               @relation("MarketplaceReviews", fields: [reviewerId], references: [id])
+
+  @@index([listingId, isVisible])
+  @@map("marketplace_reviews")
+  @@schema("fitos")
+}
+
+model MarketplaceQuestion {
+  id         String             @id @default(cuid())
+  listingId  String             @map("listing_id")
+  askerId    String             @map("asker_id")
+  question   String
+  answer     String?
+  answeredAt DateTime?          @map("answered_at")
+  isVisible  Boolean            @default(true) @map("is_visible")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+  asker      User               @relation("MarketplaceQuestions", fields: [askerId], references: [id])
+  listing    MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, isVisible])
+  @@map("marketplace_questions")
+  @@schema("fitos")
+}
+
+model MarketplaceFavorite {
+  id        String             @id @default(cuid())
+  userId    String             @map("user_id")
+  listingId String             @map("listing_id")
+  createdAt DateTime           @default(now()) @map("created_at")
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  user      User               @relation("MarketplaceFavorites", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@map("marketplace_favorites")
+  @@schema("fitos")
+}
+
+model MarketplaceAnalytics {
+  id        String             @id @default(cuid())
+  listingId String             @map("listing_id")
+  date      DateTime
+  views     Int                @default(0)
+  favorites Int                @default(0)
+  shares    Int                @default(0)
+  questions Int                @default(0)
+  orders    Int                @default(0)
+  revenue   Float              @default(0)
+  listing   MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, date])
+  @@map("marketplace_analytics")
+  @@schema("fitos")
+}
+
+model MarketplaceSellerProfile {
+  id                String                @id @default(cuid())
+  userId            String                @unique @map("user_id")
+  tenantId          String                @map("tenant_id")
+  displayName       String                @map("display_name")
+  bio               String?
+  logo              String?
+  coverImage        String?               @map("cover_image")
+  isVerified        Boolean               @default(false) @map("is_verified")
+  verifiedAt        DateTime?             @map("verified_at")
+  badges            Json                  @default("[]")
+  totalSales        Int                   @default(0) @map("total_sales")
+  totalRevenue      Float                 @default(0) @map("total_revenue")
+  averageRating     Float                 @default(0) @map("average_rating")
+  responseTime      Int?                  @map("response_time")
+  autoApprove       Boolean               @default(false) @map("auto_approve")
+  notifyNewOrder    Boolean               @default(true) @map("notify_new_order")
+  notifyNewQuestion Boolean               @default(true) @map("notify_new_question")
+  commissionRate    Float                 @default(10) @map("commission_rate")
+  customCommission  Boolean               @default(false) @map("custom_commission")
+  followerCount     Int                   @default(0) @map("follower_count")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  credits           MarketplaceCredit[]
+  followers         MarketplaceFollower[]
+  kyc               MarketplaceSellerKYC?
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user              User                  @relation("SellerProfile", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("marketplace_seller_profiles")
+  @@schema("fitos")
+}
+
+model MarketplaceFollower {
+  id         String                   @id @default(cuid())
+  sellerId   String                   @map("seller_id")
+  followerId String                   @map("follower_id")
+  createdAt  DateTime                 @default(now()) @map("created_at")
+  follower   User                     @relation("MarketplaceFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  seller     MarketplaceSellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([sellerId, followerId])
+  @@map("marketplace_followers")
+  @@schema("fitos")
+}
+
+model MarketplaceCredit {
+  id          String                   @id @default(cuid())
+  sellerId    String                   @map("seller_id")
+  amount      Int
+  type        String
+  description String
+  listingId   String?                  @map("listing_id")
+  orderId     String?                  @map("order_id")
+  createdAt   DateTime                 @default(now()) @map("created_at")
+  seller      MarketplaceSellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, createdAt])
+  @@map("marketplace_credits")
+  @@schema("fitos")
+}
+
+model MarketplaceBoost {
+  id          String   @id @default(cuid())
+  listingId   String   @map("listing_id")
+  sellerId    String   @map("seller_id")
+  duration    Int
+  price       Float
+  status      String   @default("active")
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([listingId, status])
+  @@map("marketplace_boosts")
+  @@schema("fitos")
+}
+
+model MarketplaceCoupon {
+  id                 String   @id @default(cuid())
+  sellerId           String   @map("seller_id")
+  code               String   @unique
+  description        String?
+  discountType       String
+  discountValue      Float    @map("discount_value")
+  minPurchase        Float?   @map("min_purchase")
+  maxDiscount        Float?   @map("max_discount")
+  usageLimit         Int?     @map("usage_limit")
+  usageCount         Int      @default(0) @map("usage_count")
+  validFrom          DateTime @map("valid_from")
+  validUntil         DateTime @map("valid_until")
+  isActive           Boolean  @default(true) @map("is_active")
+  applicableListings Json     @default("[]") @map("applicable_listings")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@map("marketplace_coupons")
+  @@schema("fitos")
+}
+
+model MarketplaceDispute {
+  id          String           @id @default(cuid())
+  orderId     String           @unique @map("order_id")
+  reason      String
+  description String
+  evidence    Json             @default("[]")
+  status      String           @default("open")
+  resolution  String?
+  openedBy    String           @map("opened_by")
+  resolvedBy  String?          @map("resolved_by")
+  resolvedAt  DateTime?        @map("resolved_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  order       MarketplaceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("marketplace_disputes")
+  @@schema("fitos")
+}
+
+model MarketplaceContentFilter {
+  id        String   @id @default(cuid())
+  type      String
+  word      String
+  severity  String   @default("medium")
+  category  String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([word, type])
+  @@map("marketplace_content_filters")
+  @@schema("fitos")
+}
+
+model MarketplaceFidelityProgram {
+  id           String                           @id @default(cuid())
+  userId       String                           @unique @map("user_id")
+  points       Int                              @default(0)
+  tier         String                           @default("bronze")
+  totalSpent   Float                            @default(0) @map("total_spent")
+  totalOrders  Int                              @default(0) @map("total_orders")
+  createdAt    DateTime                         @default(now()) @map("created_at")
+  updatedAt    DateTime                         @updatedAt @map("updated_at")
+  transactions MarketplaceFidelityTransaction[]
+
+  @@map("marketplace_fidelity_programs")
+  @@schema("fitos")
+}
+
+model MarketplaceFidelityTransaction {
+  id          String                     @id @default(cuid())
+  programId   String                     @map("program_id")
+  points      Int
+  type        String
+  description String
+  orderId     String?                    @map("order_id")
+  createdAt   DateTime                   @default(now()) @map("created_at")
+  program     MarketplaceFidelityProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@index([programId, createdAt])
+  @@map("marketplace_fidelity_transactions")
+  @@schema("fitos")
+}
+
+model MarketplaceAffiliate {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  code            String   @unique
+  commissionRate  Float    @default(5) @map("commission_rate")
+  totalClicks     Int      @default(0) @map("total_clicks")
+  totalSales      Int      @default(0) @map("total_sales")
+  totalCommission Float    @default(0) @map("total_commission")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("marketplace_affiliates")
+  @@schema("fitos")
+}
+
+model MarketplaceEvent {
+  id               String   @id @default(cuid())
+  organizerId      String   @map("organizer_id")
+  title            String
+  description      String
+  type             String
+  date             DateTime
+  duration         Int
+  location         String?
+  isVirtual        Boolean  @default(false) @map("is_virtual")
+  meetingLink      String?  @map("meeting_link")
+  price            Float
+  maxAttendees     Int?     @map("max_attendees")
+  currentAttendees Int      @default(0) @map("current_attendees")
+  image            String?
+  status           String   @default("active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("marketplace_events")
+  @@schema("fitos")
+}
+
+model MarketplaceSpaceRental {
+  id           String   @id @default(cuid())
+  ownerId      String   @map("owner_id")
+  name         String
+  description  String
+  images       Json     @default("[]")
+  location     String
+  address      Json
+  type         String
+  capacity     Int?
+  amenities    Json     @default("[]")
+  pricePerHour Float    @map("price_per_hour")
+  minHours     Int      @default(1) @map("min_hours")
+  availability Json     @default("[]")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("marketplace_space_rentals")
+  @@schema("fitos")
+}
+
+model MarketplaceJob {
+  id           String    @id @default(cuid())
+  employerId   String    @map("employer_id")
+  title        String
+  description  String
+  type         String
+  location     String?
+  isRemote     Boolean   @default(false) @map("is_remote")
+  salaryMin    Float?    @map("salary_min")
+  salaryMax    Float?    @map("salary_max")
+  benefits     Json      @default("[]")
+  requirements String
+  status       String    @default("active")
+  expiresAt    DateTime? @map("expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("marketplace_jobs")
+  @@schema("fitos")
+}
+
+model MarketplaceSellerKYC {
+  id                    String                   @id @default(cuid())
+  sellerId              String                   @unique @map("seller_id")
+  status                String                   @default("pending")
+  trustScore            Int                      @default(0) @map("trust_score")
+  sellerType            String                   @map("seller_type")
+  cpf                   String?                  @unique
+  cpfValid              Boolean                  @default(false) @map("cpf_valid")
+  rgNumber              String?                  @map("rg_number")
+  cnhNumber             String?                  @map("cnh_number")
+  documentFrontUrl      String?                  @map("document_front_url")
+  documentBackUrl       String?                  @map("document_back_url")
+  documentVerified      Boolean                  @default(false) @map("document_verified")
+  cnpj                  String?                  @unique
+  cnpjValid             Boolean                  @default(false) @map("cnpj_valid")
+  companyName           String?                  @map("company_name")
+  contractUrl           String?                  @map("contract_url")
+  selfieUrl             String?                  @map("selfie_url")
+  faceMatchScore        Float?                   @map("face_match_score")
+  faceVerified          Boolean                  @default(false) @map("face_verified")
+  livenessCheck         Boolean                  @default(false) @map("liveness_check")
+  addressProofUrl       String?                  @map("address_proof_url")
+  addressVerified       Boolean                  @default(false) @map("address_verified")
+  addressStreet         String?                  @map("address_street")
+  addressNumber         String?                  @map("address_number")
+  addressCity           String?                  @map("address_city")
+  addressState          String?                  @map("address_state")
+  addressZipCode        String?                  @map("address_zip_code")
+  bankName              String?                  @map("bank_name")
+  bankAccountNumber     String?                  @map("bank_account_number")
+  bankAccountType       String?                  @map("bank_account_type")
+  bankProofUrl          String?                  @map("bank_proof_url")
+  bankVerified          Boolean                  @default(false) @map("bank_verified")
+  pixKey                String?                  @map("pix_key")
+  criminalRecordCheck   Boolean                  @default(false) @map("criminal_record_check")
+  criminalRecordClean   Boolean?                 @map("criminal_record_clean")
+  creditScoreCheck      Boolean                  @default(false) @map("credit_score_check")
+  creditScore           Int?                     @map("credit_score")
+  verificationProvider  String?                  @map("verification_provider")
+  verificationSessionId String?                  @map("verification_session_id")
+  verificationResult    Json?                    @map("verification_result")
+  rejectionReason       String?                  @map("rejection_reason")
+  reviewedBy            String?                  @map("reviewed_by")
+  reviewedAt            DateTime?                @map("reviewed_at")
+  expiresAt             DateTime?                @map("expires_at")
+  createdAt             DateTime                 @default(now()) @map("created_at")
+  updatedAt             DateTime                 @updatedAt @map("updated_at")
+  seller                MarketplaceSellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@map("marketplace_seller_kyc")
+  @@schema("fitos")
+}
+
+model MarketplaceKYCDocument {
+  id            String    @id @default(cuid())
+  kycId         String    @map("kyc_id")
+  type          String
+  url           String
+  status        String    @default("pending")
+  extractedData Json?     @map("extracted_data")
+  uploadedAt    DateTime  @default(now()) @map("uploaded_at")
+  reviewedAt    DateTime? @map("reviewed_at")
+
+  @@map("marketplace_kyc_documents")
+  @@schema("fitos")
+}
+
+model MarketplaceKYCLog {
+  id          String   @id @default(cuid())
+  kycId       String   @map("kyc_id")
+  event       String
+  description String
+  metadata    Json     @default("{}")
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([kycId, createdAt])
+  @@map("marketplace_kyc_logs")
+  @@schema("fitos")
+}
+
+model MarketplaceShipment {
+  id                String                     @id @default(cuid())
+  orderId           String                     @unique @map("order_id")
+  carrier           String
+  serviceType       String?                    @map("service_type")
+  trackingCode      String                     @map("tracking_code")
+  trackingUrl       String?                    @map("tracking_url")
+  status            String                     @default("pending")
+  currentLocation   String?                    @map("current_location")
+  shippedAt         DateTime?                  @map("shipped_at")
+  estimatedDelivery DateTime?                  @map("estimated_delivery")
+  deliveredAt       DateTime?                  @map("delivered_at")
+  weight            Float?
+  dimensions        Json?
+  shippingCost      Float                      @map("shipping_cost")
+  insuranceValue    Float?                     @map("insurance_value")
+  recipientName     String                     @map("recipient_name")
+  recipientPhone    String?                    @map("recipient_phone")
+  address           Json
+  labelUrl          String?                    @map("label_url")
+  labelPrinted      Boolean                    @default(false) @map("label_printed")
+  pickupScheduled   Boolean                    @default(false) @map("pickup_scheduled")
+  pickupDate        DateTime?                  @map("pickup_date")
+  metadata          Json                       @default("{}")
+  createdAt         DateTime                   @default(now()) @map("created_at")
+  updatedAt         DateTime                   @updatedAt @map("updated_at")
+  events            MarketplaceShipmentEvent[]
+  order             MarketplaceOrder           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([trackingCode])
+  @@index([status])
+  @@map("marketplace_shipments")
+  @@schema("fitos")
+}
+
+model MarketplaceShipmentEvent {
+  id          String              @id @default(cuid())
+  shipmentId  String              @map("shipment_id")
+  status      String
+  description String
+  location    String?
+  occurredAt  DateTime            @map("occurred_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  shipment    MarketplaceShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId, occurredAt])
+  @@map("marketplace_shipment_events")
+  @@schema("fitos")
+}
+
+model MarketplaceCarrierConfig {
+  id            String   @id @default(cuid())
+  tenantId      String?  @map("tenant_id")
+  carrier       String   @unique
+  displayName   String   @map("display_name")
+  isActive      Boolean  @default(true) @map("is_active")
+  apiKey        String?  @map("api_key")
+  apiSecret     String?  @map("api_secret")
+  accountNumber String?  @map("account_number")
+  contractCode  String?  @map("contract_code")
+  config        Json     @default("{}")
+  services      Json     @default("[]")
+  handlingFee   Float    @default(0) @map("handling_fee")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("marketplace_carrier_configs")
+  @@schema("fitos")
+}
+
+model MarketplaceTrial {
+  id                  String   @id @default(cuid())
+  listingId           String   @map("listing_id")
+  userId              String   @map("user_id")
+  type                String
+  startDate           DateTime @map("start_date")
+  endDate             DateTime @map("end_date")
+  status              String   @default("active")
+  feedback            String?
+  rating              Int?
+  convertedToPurchase Boolean  @default(false) @map("converted_to_purchase")
+  orderId             String?  @map("order_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@map("marketplace_trials")
+  @@schema("fitos")
+}
+
+model MarketplaceProductAuthenticity {
+  id               String    @id @default(cuid())
+  listingId        String    @map("listing_id")
+  batchNumber      String    @map("batch_number")
+  manufacturerCode String    @map("manufacturer_code")
+  qrCode           String    @unique @map("qr_code")
+  isAuthentic      Boolean   @default(false) @map("is_authentic")
+  verifiedAt       DateTime? @map("verified_at")
+  verifiedBy       String?   @map("verified_by")
+  expirationDate   DateTime  @map("expiration_date")
+  manufactureDate  DateTime  @map("manufacture_date")
+  nftTokenId       String?   @map("nft_token_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@map("marketplace_product_authenticity")
+  @@schema("fitos")
+}
+
+model MarketplaceLiveSession {
+  id               String    @id @default(cuid())
+  hostId           String    @map("host_id")
+  title            String
+  description      String
+  scheduledFor     DateTime  @map("scheduled_for")
+  duration         Int
+  status           String    @default("scheduled")
+  streamUrl        String?   @map("stream_url")
+  streamKey        String?   @map("stream_key")
+  viewerCount      Int       @default(0) @map("viewer_count")
+  peakViewers      Int       @default(0) @map("peak_viewers")
+  totalSales       Float     @default(0) @map("total_sales")
+  ordersCount      Int       @default(0) @map("orders_count")
+  featuredListings Json      @default("[]") @map("featured_listings")
+  liveDiscounts    Json      @default("[]") @map("live_discounts")
+  startedAt        DateTime? @map("started_at")
+  endedAt          DateTime? @map("ended_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@map("marketplace_live_sessions")
+  @@schema("fitos")
+}
+
+model MarketplaceAmbassador {
+  id                  String    @id @default(cuid())
+  userId              String    @map("user_id")
+  status              String    @default("pending")
+  beforePhotos        Json      @default("[]") @map("before_photos")
+  afterPhotos         Json      @default("[]") @map("after_photos")
+  transformationStory String    @map("transformation_story")
+  followersCount      Int       @default(0) @map("followers_count")
+  totalSales          Float     @default(0) @map("total_sales")
+  totalCommission     Float     @default(0) @map("total_commission")
+  conversionRate      Float     @default(0) @map("conversion_rate")
+  favoriteProducts    Json      @default("[]") @map("favorite_products")
+  ambassadorCode      String    @unique @map("ambassador_code")
+  commissionRate      Float     @default(15) @map("commission_rate")
+  approvedAt          DateTime? @map("approved_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@map("marketplace_ambassadors")
+  @@schema("fitos")
+}
+
+model MarketplaceBundle {
+  id               String   @id @default(cuid())
+  createdBy        String   @map("created_by")
+  name             String
+  description      String
+  goal             String
+  listings         Json
+  totalPrice       Float    @map("total_price")
+  bundlePrice      Float    @map("bundle_price")
+  savings          Float
+  discountPercent  Float    @map("discount_percent")
+  scientificProof  Boolean  @default(false) @map("scientific_proof")
+  proofLinks       Json     @default("[]") @map("proof_links")
+  estimatedResults String   @map("estimated_results")
+  successRate      Float?   @map("success_rate")
+  salesCount       Int      @default(0) @map("sales_count")
+  rating           Float    @default(0)
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("marketplace_bundles")
+  @@schema("fitos")
+}
+
+model MarketplaceWarranty {
+  id              String   @id @default(cuid())
+  orderId         String   @map("order_id")
+  type            String
+  duration        Int
+  price           Float
+  coverageDetails Json     @map("coverage_details")
+  status          String   @default("active")
+  claimHistory    Json     @default("[]") @map("claim_history")
+  expiresAt       DateTime @map("expires_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("marketplace_warranties")
+  @@schema("fitos")
+}
+
+model MarketplaceSocialPost {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  type           String
+  content        String
+  media          Json     @default("[]")
+  taggedProducts Json     @default("[]") @map("tagged_products")
+  likesCount     Int      @default(0) @map("likes_count")
+  commentsCount  Int      @default(0) @map("comments_count")
+  sharesCount    Int      @default(0) @map("shares_count")
+  isSponsored    Boolean  @default(false) @map("is_sponsored")
+  sponsorId      String?  @map("sponsor_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("marketplace_social_posts")
+  @@schema("fitos")
+}
+
+model MarketplaceBuyerMetrics {
+  id                String    @id @default(cuid())
+  userId            String    @unique @map("user_id")
+  totalOrders       Int       @default(0) @map("total_orders")
+  totalSpent        Float     @default(0) @map("total_spent")
+  averageOrderValue Float     @default(0) @map("average_order_value")
+  fidelityPoints    Int       @default(0) @map("fidelity_points")
+  fidelityTier      String    @default("bronze") @map("fidelity_tier")
+  cashbackEarned    Float     @default(0) @map("cashback_earned")
+  cashbackUsed      Float     @default(0) @map("cashback_used")
+  cashbackAvailable Float     @default(0) @map("cashback_available")
+  reviewsCount      Int       @default(0) @map("reviews_count")
+  favoritesCount    Int       @default(0) @map("favorites_count")
+  followingCount    Int       @default(0) @map("following_count")
+  lastOrderAt       DateTime? @map("last_order_at")
+  firstOrderAt      DateTime? @map("first_order_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("marketplace_buyer_metrics")
+  @@schema("fitos")
+}
+
+model MarketplaceSellerMetrics {
+  id                 String   @id @default(cuid())
+  sellerId           String   @unique @map("seller_id")
+  totalSales         Int      @default(0) @map("total_sales")
+  totalRevenue       Float    @default(0) @map("total_revenue")
+  averageOrderValue  Float    @default(0) @map("average_order_value")
+  conversionRate     Float    @default(0) @map("conversion_rate")
+  responseRate       Float    @default(0) @map("response_rate")
+  onTimeDeliveryRate Float    @default(0) @map("on_time_delivery_rate")
+  averageRating      Float    @default(0) @map("average_rating")
+  totalReviews       Int      @default(0) @map("total_reviews")
+  positiveReviews    Int      @default(0) @map("positive_reviews")
+  negativeReviews    Int      @default(0) @map("negative_reviews")
+  activeListings     Int      @default(0) @map("active_listings")
+  totalListings      Int      @default(0) @map("total_listings")
+  availableBalance   Float    @default(0) @map("available_balance")
+  pendingBalance     Float    @default(0) @map("pending_balance")
+  totalWithdrawn     Float    @default(0) @map("total_withdrawn")
+  totalFees          Float    @default(0) @map("total_fees")
+  followersCount     Int      @default(0) @map("followers_count")
+  totalViews         Int      @default(0) @map("total_views")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("marketplace_seller_metrics")
+  @@schema("fitos")
+}
+
+model RevenueMetric {
+  id                 String   @id @default(cuid())
+  date               DateTime
+  mrr                Float
+  arr                Float
+  churnRate          Float
+  newRevenue         Float
+  expansionRevenue   Float
+  contractionRevenue Float
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([date])
+  @@map("revenue_metrics")
+  @@schema("fitos")
+}
+
+model CustomerHealthScore {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  score          Float
+  usageScore     Float
+  adoptionScore  Float
+  supportScore   Float
+  paymentScore   Float
+  riskLevel      String
+  lastCalculated DateTime @map("last_calculated")
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, lastCalculated])
+  @@map("customer_health_scores")
+  @@schema("fitos")
+}
+
+model FeatureUsage {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  userId      String   @map("user_id")
+  featureName String   @map("feature_name")
+  usageCount  Int      @default(1) @map("usage_count")
+  lastUsed    DateTime @map("last_used")
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, featureName])
+  @@index([userId, featureName])
+  @@map("feature_usage")
+  @@schema("fitos")
+}
+
+model AdminNotification {
+  id        String   @id @default(cuid())
+  type      String
+  title     String
+  message   String
+  priority  String
+  isRead    Boolean  @default(false) @map("is_read")
+  actionUrl String?  @map("action_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([isRead, priority])
+  @@map("admin_notifications")
+  @@schema("fitos")
+}
+
+model CostCategory {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  displayName String
+  icon        String
+  color       String
+  description String?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  budgets     CostBudget[]
+  entries     CostEntry[]
+  goals       CostGoal[]
+  services    CostService[]
+
+  @@map("cost_categories")
+  @@schema("fitos")
+}
+
+model CostService {
+  id           String       @id @default(cuid())
+  categoryId   String
+  name         String
+  displayName  String
+  provider     String?
+  icon         String?
+  isActive     Boolean      @default(true)
+  captureType  String       @default("manual")
+  costType     String       @default("variable")
+  apiConfig    Json?        @default("{}")
+  pricingModel Json?        @default("{}")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  entries      CostEntry[]
+  category     CostCategory @relation(fields: [categoryId], references: [id])
+
+  @@unique([categoryId, name])
+  @@map("cost_services")
+  @@schema("fitos")
+}
+
+model CostEntry {
+  id               String       @id @default(cuid())
+  categoryId       String
+  serviceId        String
+  tenantId         String?
+  clientId         String?
+  amount           Float
+  currency         String       @default("BRL")
+  date             DateTime     @default(now())
+  month            Int
+  year             Int
+  entryType        String       @default("manual")
+  description      String?
+  tags             String[]     @default([])
+  metadata         Json?        @default("{}")
+  revenueGenerated Float?
+  createdBy        String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  category         CostCategory @relation(fields: [categoryId], references: [id])
+  service          CostService  @relation(fields: [serviceId], references: [id])
+
+  @@index([categoryId, year, month])
+  @@index([serviceId, year, month])
+  @@index([date])
+  @@index([tags])
+  @@map("cost_entries")
+  @@schema("fitos")
+}
+
+model CostBudget {
+  id           String        @id @default(cuid())
+  categoryId   String?
+  monthlyLimit Float
+  currency     String        @default("BRL")
+  alertAt75    Boolean       @default(true)
+  alertAt90    Boolean       @default(true)
+  startDate    DateTime
+  endDate      DateTime?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  alerts       CostAlert[]
+  category     CostCategory? @relation(fields: [categoryId], references: [id])
+
+  @@map("cost_budgets")
+  @@schema("fitos")
+}
+
+model CostGoal {
+  id              String        @id @default(cuid())
+  categoryId      String?
+  title           String
+  targetReduction Float
+  startDate       DateTime
+  endDate         DateTime
+  status          String        @default("active")
+  currentProgress Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  category        CostCategory? @relation(fields: [categoryId], references: [id])
+
+  @@map("cost_goals")
+  @@schema("fitos")
+}
+
+model CostApproval {
+  id              String    @id @default(cuid())
+  costEntryId     String
+  threshold       Float
+  requestedBy     String
+  status          String    @default("pending")
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("cost_approvals")
+  @@schema("fitos")
+}
+
+model ScheduledReport {
+  id         String    @id @default(cuid())
+  title      String
+  frequency  String
+  recipients String[]
+  format     String    @default("pdf")
+  filters    Json?     @default("{}")
+  lastSentAt DateTime?
+  nextSendAt DateTime
+  isActive   Boolean   @default(true)
+  createdBy  String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("scheduled_reports")
+  @@schema("fitos")
+}
+
 enum AiProviderType {
   OPENAI
   GEMINI
@@ -1077,10 +2135,10 @@ enum AiProviderType {
   MISTRAL
   COHERE
   HUGGINGFACE
-  DEEPSEEK
   CUSTOM_API
   N8N_WEBHOOK
   CUSTOM_WEBHOOK
+  DEEPSEEK
 
   @@schema("fitos")
 }
@@ -1129,1416 +2187,5 @@ enum AiServiceType {
   RAG_MEDICAL
   CUSTOM
 
-  @@schema("fitos")
-}
-
-model IntegrationConfig {
-  id               String    @id @default(cuid())
-  integration      String    @unique
-  displayName      String
-  description      String?
-  category         String // 'ai', 'payment', 'communication', 'storage', 'calendar', 'automation', 'wearables', 'analytics', 'backend', 'location'
-  icon             String?
-  environment      String    @default("production")
-  config           Json // Configurações criptografadas
-  metadata         Json      @default("{}") // Campos dinâmicos baseados na doc
-  isActive         Boolean   @default(false)
-  isConfigured     Boolean   @default(false)
-  lastTested       DateTime?
-  lastTestStatus   String?
-  lastTestMessage  String?
-  sdkVersion       String?
-  documentationUrl String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  createdBy        String
-
-  usageLogs IntegrationUsageLog[]
-
-  @@map("integration_configs")
-  @@schema("fitos")
-}
-
-model IntegrationUsageLog {
-  id            String   @id @default(cuid())
-  integrationId String
-  eventType     String // 'api_call', 'webhook', 'test', 'error'
-  requestCount  Int      @default(1)
-  tokensUsed    Int?
-  cost          Float?
-  status        String // 'success', 'failure', 'warning'
-  metadata      Json     @default("{}")
-  timestamp     DateTime @default(now())
-
-  integration IntegrationConfig @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-
-  @@map("integration_usage_logs")
-  @@schema("fitos")
-}
-
-model IntegrationTemplate {
-  id               String   @id @default(cuid())
-  integration      String   @unique
-  displayName      String
-  category         String
-  icon             String?
-  configSchema     Json // JSON Schema para validação
-  requiredFields   Json // Lista de campos obrigatórios
-  optionalFields   Json // Lista de campos opcionais
-  testEndpoint     String? // Endpoint para testar conexão
-  documentationUrl String
-  sdkPackage       String? // Nome do pacote npm
-  sdkVersion       String?
-  exampleConfig    Json? // Exemplo de configuração
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@map("integration_templates")
-  @@schema("fitos")
-}
-
-model GlobalLimitsConfig {
-  id            String   @id @default(cuid())
-  plan          String   @unique
-  aiLimits      Json
-  uploadLimits  Json
-  featureLimits Json
-  rateLimits    Json
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@map("global_limits_configs")
-  @@schema("fitos")
-}
-
-model TenantLimitOverride {
-  id        String   @id @default(cuid())
-  tenantId  String   @unique
-  plan      String
-  overrides Json     @default("{}")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("tenant_limit_overrides")
-  @@schema("fitos")
-}
-
-// ==================== MARKETPLACE MODELS ====================
-
-model MarketplaceCategory {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  icon        String?
-  parentId    String?  @map("parent_id")
-  order       Int      @default(0)
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  parent   MarketplaceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children MarketplaceCategory[] @relation("CategoryHierarchy")
-  listings MarketplaceListing[]
-
-  @@map("marketplace_categories")
-  @@schema("fitos")
-}
-
-model MarketplaceListing {
-  id         String @id @default(cuid())
-  tenantId   String @map("tenant_id")
-  sellerId   String @map("seller_id")
-  categoryId String @map("category_id")
-
-  title            String
-  slug             String
-  description      String
-  shortDescription String? @map("short_description")
-
-  type           String // 'physical', 'digital', 'service'
-  price          Float
-  compareAtPrice Float? @map("compare_at_price")
-  currency       String @default("BRL")
-
-  // Estoque (para produtos físicos)
-  stockQuantity  Int?    @default(0) @map("stock_quantity")
-  lowStockAlert  Int?    @default(5) @map("low_stock_alert")
-  allowBackorder Boolean @default(false) @map("allow_backorder")
-
-  // Mídia
-  images       Json    @default("[]")
-  videos       Json    @default("[]")
-  thumbnailUrl String? @map("thumbnail_url")
-
-  // SEO & Marketing
-  metaTitle       String? @map("meta_title")
-  metaDescription String? @map("meta_description")
-  tags            Json    @default("[]")
-
-  // Status e Aprovação
-  status          String    @default("draft") // draft, pending_approval, approved, rejected, paused, sold_out
-  approvalStatus  String    @default("pending") @map("approval_status")
-  rejectionReason String?   @map("rejection_reason")
-  approvedAt      DateTime? @map("approved_at")
-  approvedBy      String?   @map("approved_by")
-
-  // Métricas
-  viewCount     Int @default(0) @map("view_count")
-  favoriteCount Int @default(0) @map("favorite_count")
-  shareCount    Int @default(0) @map("share_count")
-  salesCount    Int @default(0) @map("sales_count")
-
-  // Destaque & Boost
-  isFeatured    Boolean   @default(false) @map("is_featured")
-  isBoosted     Boolean   @default(false) @map("is_boosted")
-  boostedUntil  DateTime? @map("boosted_until")
-  featuredUntil DateTime? @map("featured_until")
-
-  // Configurações
-  enableReviews    Boolean @default(true) @map("enable_reviews")
-  enableQuestions  Boolean @default(true) @map("enable_questions")
-  shippingRequired Boolean @default(false) @map("shipping_required")
-  shippingOptions  Json    @default("[]") @map("shipping_options")
-
-  // Datas
-  publishedAt DateTime? @map("published_at")
-  expiresAt   DateTime? @map("expires_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  seller   User                @relation("SellerListings", fields: [sellerId], references: [id])
-  category MarketplaceCategory @relation(fields: [categoryId], references: [id])
-
-  orders     MarketplaceOrder[]
-  reviews    MarketplaceReview[]
-  questions  MarketplaceQuestion[]
-  favorites  MarketplaceFavorite[]
-  analytics  MarketplaceAnalytics[]
-  variations MarketplaceVariation[]
-
-  @@index([tenantId, status, publishedAt])
-  @@index([sellerId, status])
-  @@index([categoryId, status])
-  @@index([slug])
-  @@map("marketplace_listings")
-  @@schema("fitos")
-}
-
-model MarketplaceVariation {
-  id        String   @id @default(cuid())
-  listingId String   @map("listing_id")
-  name      String // ex: "Tamanho: M", "Cor: Azul"
-  sku       String?
-  price     Float?
-  stock     Int      @default(0)
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-
-  @@map("marketplace_variations")
-  @@schema("fitos")
-}
-
-model MarketplaceOrder {
-  id        String @id @default(cuid())
-  tenantId  String @map("tenant_id")
-  listingId String @map("listing_id")
-  buyerId   String @map("buyer_id")
-  sellerId  String @map("seller_id")
-
-  orderNumber String @unique @map("order_number")
-
-  // Valores
-  subtotal             Float
-  shippingCost         Float  @default(0) @map("shipping_cost")
-  discount             Float  @default(0)
-  marketplaceComission Float  @map("marketplace_comission")
-  listingFee           Float  @default(0) @map("listing_fee")
-  totalAmount          Float  @map("total_amount")
-  sellerAmount         Float  @map("seller_amount")
-  currency             String @default("BRL")
-
-  // Status
-  status            String  @default("pending") // pending, processing, completed, cancelled, refunded, disputed
-  paymentStatus     String  @default("pending") @map("payment_status") // pending, paid, failed, refunded
-  fulfillmentStatus String? @map("fulfillment_status") // pending, shipped, delivered, pickup_ready
-
-  // Pagamento
-  paymentMethod   String? @map("payment_method")
-  paymentProvider String? @map("payment_provider") // stripe, mercadopago
-  paymentIntentId String? @map("payment_intent_id")
-  transferId      String? @map("transfer_id")
-
-  // Entrega
-  shippingAddress Json?     @map("shipping_address")
-  trackingCode    String?   @map("tracking_code")
-  shippedAt       DateTime? @map("shipped_at")
-  deliveredAt     DateTime? @map("delivered_at")
-
-  // Escrow
-  escrowStatus     String    @default("held") @map("escrow_status") // held, released, refunded
-  escrowReleasedAt DateTime? @map("escrow_released_at")
-
-  // Metadata
-  metadata    Json    @default("{}")
-  buyerNotes  String? @map("buyer_notes")
-  sellerNotes String? @map("seller_notes")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  tenant  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  listing MarketplaceListing @relation(fields: [listingId], references: [id])
-  buyer   User               @relation("BuyerOrders", fields: [buyerId], references: [id])
-  seller  User               @relation("SellerOrders", fields: [sellerId], references: [id])
-
-  dispute  MarketplaceDispute?
-  shipment MarketplaceShipment?
-
-  @@index([tenantId, buyerId, createdAt])
-  @@index([sellerId, status])
-  @@index([orderNumber])
-  @@map("marketplace_orders")
-  @@schema("fitos")
-}
-
-model MarketplaceReview {
-  id         String  @id @default(cuid())
-  listingId  String  @map("listing_id")
-  orderId    String? @map("order_id")
-  reviewerId String  @map("reviewer_id")
-
-  rating  Int // 1-5
-  title   String?
-  comment String?
-  images  Json    @default("[]")
-
-  isVerified Boolean @default(false) @map("is_verified") // compra verificada
-  isVisible  Boolean @default(true) @map("is_visible")
-
-  helpfulCount Int @default(0) @map("helpful_count")
-
-  sellerResponse    String?   @map("seller_response")
-  sellerRespondedAt DateTime? @map("seller_responded_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  listing  MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  reviewer User               @relation("MarketplaceReviews", fields: [reviewerId], references: [id])
-
-  @@index([listingId, isVisible])
-  @@map("marketplace_reviews")
-  @@schema("fitos")
-}
-
-model MarketplaceQuestion {
-  id        String @id @default(cuid())
-  listingId String @map("listing_id")
-  askerId   String @map("asker_id")
-
-  question   String
-  answer     String?
-  answeredAt DateTime? @map("answered_at")
-
-  isVisible Boolean @default(true) @map("is_visible")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  asker   User               @relation("MarketplaceQuestions", fields: [askerId], references: [id])
-
-  @@index([listingId, isVisible])
-  @@map("marketplace_questions")
-  @@schema("fitos")
-}
-
-model MarketplaceFavorite {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  listingId String   @map("listing_id")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user    User               @relation("MarketplaceFavorites", fields: [userId], references: [id], onDelete: Cascade)
-  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, listingId])
-  @@index([userId])
-  @@map("marketplace_favorites")
-  @@schema("fitos")
-}
-
-model MarketplaceAnalytics {
-  id        String   @id @default(cuid())
-  listingId String   @map("listing_id")
-  date      DateTime
-
-  views     Int   @default(0)
-  favorites Int   @default(0)
-  shares    Int   @default(0)
-  questions Int   @default(0)
-  orders    Int   @default(0)
-  revenue   Float @default(0)
-
-  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-
-  @@unique([listingId, date])
-  @@map("marketplace_analytics")
-  @@schema("fitos")
-}
-
-model MarketplaceSellerProfile {
-  id       String @id @default(cuid())
-  userId   String @unique @map("user_id")
-  tenantId String @map("tenant_id")
-
-  displayName String  @map("display_name")
-  bio         String?
-  logo        String?
-  coverImage  String? @map("cover_image")
-
-  // Verificação
-  isVerified Boolean   @default(false) @map("is_verified")
-  verifiedAt DateTime? @map("verified_at")
-  badges     Json      @default("[]")
-
-  // Métricas
-  totalSales    Int   @default(0) @map("total_sales")
-  totalRevenue  Float @default(0) @map("total_revenue")
-  averageRating Float @default(0) @map("average_rating")
-  responseTime  Int?  @map("response_time") // em minutos
-
-  // Configurações
-  autoApprove       Boolean @default(false) @map("auto_approve")
-  notifyNewOrder    Boolean @default(true) @map("notify_new_order")
-  notifyNewQuestion Boolean @default(true) @map("notify_new_question")
-
-  // Comissões e taxas
-  commissionRate   Float   @default(10) @map("commission_rate") // porcentagem
-  customCommission Boolean @default(false) @map("custom_commission")
-
-  // Seguidor
-  followerCount Int @default(0) @map("follower_count")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  user   User   @relation("SellerProfile", fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  followers MarketplaceFollower[]
-  credits   MarketplaceCredit[]
-  kyc       MarketplaceSellerKYC?
-
-  @@map("marketplace_seller_profiles")
-  @@schema("fitos")
-}
-
-model MarketplaceFollower {
-  id         String   @id @default(cuid())
-  sellerId   String   @map("seller_id")
-  followerId String   @map("follower_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  seller   MarketplaceSellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  follower User                     @relation("MarketplaceFollowing", fields: [followerId], references: [id], onDelete: Cascade)
-
-  @@unique([sellerId, followerId])
-  @@map("marketplace_followers")
-  @@schema("fitos")
-}
-
-model MarketplaceCredit {
-  id       String @id @default(cuid())
-  sellerId String @map("seller_id")
-
-  amount      Int // quantidade de créditos
-  type        String // 'purchase', 'reward', 'refund', 'usage'
-  description String
-
-  listingId String? @map("listing_id")
-  orderId   String? @map("order_id")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  seller MarketplaceSellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-
-  @@index([sellerId, createdAt])
-  @@map("marketplace_credits")
-  @@schema("fitos")
-}
-
-model MarketplaceBoost {
-  id        String @id @default(cuid())
-  listingId String @map("listing_id")
-  sellerId  String @map("seller_id")
-
-  duration Int // em dias
-  price    Float
-  status   String @default("active") // active, expired, cancelled
-
-  startDate DateTime @map("start_date")
-  endDate   DateTime @map("end_date")
-
-  impressions Int @default(0)
-  clicks      Int @default(0)
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([listingId, status])
-  @@map("marketplace_boosts")
-  @@schema("fitos")
-}
-
-model MarketplaceCoupon {
-  id       String @id @default(cuid())
-  sellerId String @map("seller_id")
-
-  code        String  @unique
-  description String?
-
-  discountType  String // 'percentage', 'fixed'
-  discountValue Float  @map("discount_value")
-
-  minPurchase Float? @map("min_purchase")
-  maxDiscount Float? @map("max_discount")
-
-  usageLimit Int? @map("usage_limit")
-  usageCount Int  @default(0) @map("usage_count")
-
-  validFrom  DateTime @map("valid_from")
-  validUntil DateTime @map("valid_until")
-
-  isActive Boolean @default(true) @map("is_active")
-
-  applicableListings Json @default("[]") @map("applicable_listings") // array de listing IDs
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("marketplace_coupons")
-  @@schema("fitos")
-}
-
-model MarketplaceDispute {
-  id      String @id @default(cuid())
-  orderId String @unique @map("order_id")
-
-  reason      String
-  description String
-  evidence    Json   @default("[]")
-
-  status     String  @default("open") // open, in_review, resolved, closed
-  resolution String?
-
-  openedBy   String    @map("opened_by") // buyer or seller user id
-  resolvedBy String?   @map("resolved_by") // admin user id
-  resolvedAt DateTime? @map("resolved_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  order MarketplaceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@map("marketplace_disputes")
-  @@schema("fitos")
-}
-
-model MarketplaceContentFilter {
-  id        String   @id @default(cuid())
-  type      String // 'forbidden', 'flagged', 'allowed'
-  word      String
-  severity  String   @default("medium") // low, medium, high
-  category  String? // offensive, spam, inappropriate
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@unique([word, type])
-  @@map("marketplace_content_filters")
-  @@schema("fitos")
-}
-
-model MarketplaceFidelityProgram {
-  id     String @id @default(cuid())
-  userId String @map("user_id")
-
-  points Int    @default(0)
-  tier   String @default("bronze") // bronze, silver, gold, platinum
-
-  totalSpent  Float @default(0) @map("total_spent")
-  totalOrders Int   @default(0) @map("total_orders")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  transactions MarketplaceFidelityTransaction[]
-
-  @@unique([userId])
-  @@map("marketplace_fidelity_programs")
-  @@schema("fitos")
-}
-
-model MarketplaceFidelityTransaction {
-  id        String @id @default(cuid())
-  programId String @map("program_id")
-
-  points      Int
-  type        String // 'earned', 'redeemed', 'expired'
-  description String
-
-  orderId String? @map("order_id")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  program MarketplaceFidelityProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
-
-  @@index([programId, createdAt])
-  @@map("marketplace_fidelity_transactions")
-  @@schema("fitos")
-}
-
-model MarketplaceAffiliate {
-  id     String @id @default(cuid())
-  userId String @map("user_id")
-
-  code           String @unique
-  commissionRate Float  @default(5) @map("commission_rate") // porcentagem
-
-  totalClicks     Int   @default(0) @map("total_clicks")
-  totalSales      Int   @default(0) @map("total_sales")
-  totalCommission Float @default(0) @map("total_commission")
-
-  isActive Boolean @default(true) @map("is_active")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("marketplace_affiliates")
-  @@schema("fitos")
-}
-
-model MarketplaceEvent {
-  id          String @id @default(cuid())
-  organizerId String @map("organizer_id")
-
-  title       String
-  description String
-  type        String // workshop, seminar, competition, class
-
-  date        DateTime
-  duration    Int // em minutos
-  location    String?
-  isVirtual   Boolean  @default(false) @map("is_virtual")
-  meetingLink String?  @map("meeting_link")
-
-  price            Float
-  maxAttendees     Int?  @map("max_attendees")
-  currentAttendees Int   @default(0) @map("current_attendees")
-
-  image  String?
-  status String  @default("active") // active, cancelled, completed, sold_out
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("marketplace_events")
-  @@schema("fitos")
-}
-
-model MarketplaceSpaceRental {
-  id      String @id @default(cuid())
-  ownerId String @map("owner_id")
-
-  name        String
-  description String
-  images      Json   @default("[]")
-
-  location String
-  address  Json
-
-  type      String // studio, gym, classroom, outdoor
-  capacity  Int?
-  amenities Json   @default("[]")
-
-  pricePerHour Float @map("price_per_hour")
-  minHours     Int   @default(1) @map("min_hours")
-
-  availability Json @default("[]")
-
-  isActive Boolean @default(true) @map("is_active")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("marketplace_space_rentals")
-  @@schema("fitos")
-}
-
-model MarketplaceJob {
-  id         String @id @default(cuid())
-  employerId String @map("employer_id")
-
-  title       String
-  description String
-  type        String // full_time, part_time, freelance, internship
-
-  location String?
-  isRemote Boolean @default(false) @map("is_remote")
-
-  salaryMin Float? @map("salary_min")
-  salaryMax Float? @map("salary_max")
-  benefits  Json   @default("[]")
-
-  requirements String
-
-  status String @default("active") // active, closed, filled
-
-  expiresAt DateTime? @map("expires_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-
-  @@map("marketplace_jobs")
-  @@schema("fitos")
-}
-
-// KYC Models
-model MarketplaceSellerKYC {
-  id       String @id @default(cuid())
-  sellerId String @unique @map("seller_id")
-
-  // Status
-  status     String @default("pending") // pending, in_review, approved, rejected, expired
-  trustScore Int    @default(0) @map("trust_score") // 0-100
-
-  // Tipo de vendedor
-  sellerType String @map("seller_type") // individual, business
-
-  // Documentos Pessoa Física
-  cpf              String? @unique
-  cpfValid         Boolean @default(false) @map("cpf_valid")
-  rgNumber         String? @map("rg_number")
-  cnhNumber        String? @map("cnh_number")
-  documentFrontUrl String? @map("document_front_url")
-  documentBackUrl  String? @map("document_back_url")
-  documentVerified Boolean @default(false) @map("document_verified")
-
-  // Documentos Pessoa Jurídica
-  cnpj        String? @unique
-  cnpjValid   Boolean @default(false) @map("cnpj_valid")
-  companyName String? @map("company_name")
-  contractUrl String? @map("contract_url")
-
-  // Verificação Facial
-  selfieUrl      String? @map("selfie_url")
-  faceMatchScore Float?  @map("face_match_score") // 0-100
-  faceVerified   Boolean @default(false) @map("face_verified")
-  livenessCheck  Boolean @default(false) @map("liveness_check")
-
-  // Endereço
-  addressProofUrl String? @map("address_proof_url")
-  addressVerified Boolean @default(false) @map("address_verified")
-  addressStreet   String? @map("address_street")
-  addressNumber   String? @map("address_number")
-  addressCity     String? @map("address_city")
-  addressState    String? @map("address_state")
-  addressZipCode  String? @map("address_zip_code")
-
-  // Dados Bancários
-  bankName          String? @map("bank_name")
-  bankAccountNumber String? @map("bank_account_number")
-  bankAccountType   String? @map("bank_account_type") // checking, savings
-  bankProofUrl      String? @map("bank_proof_url")
-  bankVerified      Boolean @default(false) @map("bank_verified")
-  pixKey            String? @map("pix_key")
-
-  // Background Checks
-  criminalRecordCheck Boolean  @default(false) @map("criminal_record_check")
-  criminalRecordClean Boolean? @map("criminal_record_clean")
-  creditScoreCheck    Boolean  @default(false) @map("credit_score_check")
-  creditScore         Int?     @map("credit_score")
-
-  // Integrações Externas
-  verificationProvider  String? @map("verification_provider") // stripe_identity, idwall, veriff
-  verificationSessionId String? @map("verification_session_id")
-  verificationResult    Json?   @map("verification_result")
-
-  // Metadata
-  rejectionReason String?   @map("rejection_reason")
-  reviewedBy      String?   @map("reviewed_by")
-  reviewedAt      DateTime? @map("reviewed_at")
-  expiresAt       DateTime? @map("expires_at") // KYC expira após 2 anos
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  seller MarketplaceSellerProfile @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-
-  @@map("marketplace_seller_kyc")
-  @@schema("fitos")
-}
-
-model MarketplaceKYCDocument {
-  id    String @id @default(cuid())
-  kycId String @map("kyc_id")
-
-  type   String // 'rg_front', 'rg_back', 'cnh', 'selfie', 'address_proof', 'bank_proof', 'contract'
-  url    String
-  status String @default("pending") // pending, approved, rejected
-
-  extractedData Json? @map("extracted_data") // OCR data
-
-  uploadedAt DateTime  @default(now()) @map("uploaded_at")
-  reviewedAt DateTime? @map("reviewed_at")
-
-  @@map("marketplace_kyc_documents")
-  @@schema("fitos")
-}
-
-model MarketplaceKYCLog {
-  id    String @id @default(cuid())
-  kycId String @map("kyc_id")
-
-  event       String // 'document_uploaded', 'verification_started', 'approved', 'rejected'
-  description String
-  metadata    Json   @default("{}")
-
-  createdBy String?  @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([kycId, createdAt])
-  @@map("marketplace_kyc_logs")
-  @@schema("fitos")
-}
-
-// Shipping Models
-model MarketplaceShipment {
-  id      String @id @default(cuid())
-  orderId String @unique @map("order_id")
-
-  // Transportadora
-  carrier     String // correios, fedex, dhl, jadlog, etc
-  serviceType String? @map("service_type") // PAC, SEDEX, Express, etc
-
-  // Rastreamento
-  trackingCode String  @map("tracking_code")
-  trackingUrl  String? @map("tracking_url")
-
-  // Status
-  status          String  @default("pending") // pending, in_transit, out_for_delivery, delivered, failed, returned
-  currentLocation String? @map("current_location")
-
-  // Datas
-  shippedAt         DateTime? @map("shipped_at")
-  estimatedDelivery DateTime? @map("estimated_delivery")
-  deliveredAt       DateTime? @map("delivered_at")
-
-  // Detalhes
-  weight     Float? // em kg
-  dimensions Json? // {length, width, height} em cm
-
-  // Custos
-  shippingCost   Float  @map("shipping_cost")
-  insuranceValue Float? @map("insurance_value")
-
-  // Endereço
-  recipientName  String  @map("recipient_name")
-  recipientPhone String? @map("recipient_phone")
-  address        Json // endereço completo
-
-  // Etiqueta
-  labelUrl     String? @map("label_url")
-  labelPrinted Boolean @default(false) @map("label_printed")
-
-  // Coleta
-  pickupScheduled Boolean   @default(false) @map("pickup_scheduled")
-  pickupDate      DateTime? @map("pickup_date")
-
-  // Metadata
-  metadata Json @default("{}")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  order  MarketplaceOrder           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  events MarketplaceShipmentEvent[]
-
-  @@index([trackingCode])
-  @@index([status])
-  @@map("marketplace_shipments")
-  @@schema("fitos")
-}
-
-model MarketplaceShipmentEvent {
-  id         String @id @default(cuid())
-  shipmentId String @map("shipment_id")
-
-  status      String
-  description String
-  location    String?
-
-  occurredAt DateTime @map("occurred_at")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  shipment MarketplaceShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-
-  @@index([shipmentId, occurredAt])
-  @@map("marketplace_shipment_events")
-  @@schema("fitos")
-}
-
-model MarketplaceCarrierConfig {
-  id       String  @id @default(cuid())
-  tenantId String? @map("tenant_id")
-
-  carrier     String @unique // correios, fedex, dhl, jadlog, etc
-  displayName String @map("display_name")
-
-  isActive Boolean @default(true) @map("is_active")
-
-  // Credenciais
-  apiKey        String? @map("api_key")
-  apiSecret     String? @map("api_secret")
-  accountNumber String? @map("account_number")
-  contractCode  String? @map("contract_code")
-
-  // Configurações
-  config Json @default("{}")
-
-  // Serviços disponíveis
-  services Json @default("[]") // [{code, name, deliveryTime}]
-
-  // Custos
-  handlingFee Float @default(0) @map("handling_fee")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("marketplace_carrier_configs")
-  @@schema("fitos")
-}
-
-// Diferenciais Competitivos Models
-model MarketplaceTrial {
-  id        String @id @default(cuid())
-  listingId String @map("listing_id")
-  userId    String @map("user_id")
-
-  type      String // 'equipment_rental', 'sample', 'free_session', 'preview'
-  startDate DateTime @map("start_date")
-  endDate   DateTime @map("end_date")
-
-  status String @default("active") // active, completed, converted_to_purchase, expired
-
-  feedback String? // Feedback do usuário sobre o trial
-  rating   Int? // Avaliação 1-5
-
-  convertedToPurchase Boolean @default(false) @map("converted_to_purchase")
-  orderId             String? @map("order_id")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("marketplace_trials")
-  @@schema("fitos")
-}
-
-model MarketplaceProductAuthenticity {
-  id        String @id @default(cuid())
-  listingId String @map("listing_id")
-
-  batchNumber      String @map("batch_number")
-  manufacturerCode String @map("manufacturer_code")
-  qrCode           String @unique @map("qr_code")
-
-  isAuthentic Boolean   @default(false) @map("is_authentic")
-  verifiedAt  DateTime? @map("verified_at")
-  verifiedBy  String?   @map("verified_by") // manufacturer, admin
-
-  expirationDate  DateTime @map("expiration_date")
-  manufactureDate DateTime @map("manufacture_date")
-
-  nftTokenId String? @map("nft_token_id") // Certificado NFT (opcional)
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("marketplace_product_authenticity")
-  @@schema("fitos")
-}
-
-model MarketplaceLiveSession {
-  id     String @id @default(cuid())
-  hostId String @map("host_id") // Vendedor ou influencer
-
-  title        String
-  description  String
-  scheduledFor DateTime @map("scheduled_for")
-  duration     Int // em minutos
-
-  status String @default("scheduled") // scheduled, live, ended
-
-  // Streaming
-  streamUrl String? @map("stream_url")
-  streamKey String? @map("stream_key")
-
-  // Métricas
-  viewerCount Int   @default(0) @map("viewer_count")
-  peakViewers Int   @default(0) @map("peak_viewers")
-  totalSales  Float @default(0) @map("total_sales")
-  ordersCount Int   @default(0) @map("orders_count")
-
-  // Produtos em destaque
-  featuredListings Json @default("[]") @map("featured_listings")
-
-  // Ofertas exclusivas da live
-  liveDiscounts Json @default("[]") @map("live_discounts")
-
-  startedAt DateTime? @map("started_at")
-  endedAt   DateTime? @map("ended_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  @@map("marketplace_live_sessions")
-  @@schema("fitos")
-}
-
-model MarketplaceAmbassador {
-  id     String @id @default(cuid())
-  userId String @map("user_id")
-
-  status String @default("pending") // pending, active, suspended
-
-  // Transformação
-  beforePhotos        Json   @default("[]") @map("before_photos")
-  afterPhotos         Json   @default("[]") @map("after_photos")
-  transformationStory String @map("transformation_story")
-
-  // Métricas
-  followersCount  Int   @default(0) @map("followers_count")
-  totalSales      Float @default(0) @map("total_sales")
-  totalCommission Float @default(0) @map("total_commission")
-  conversionRate  Float @default(0) @map("conversion_rate")
-
-  // Produtos que usa/recomenda
-  favoriteProducts Json @default("[]") @map("favorite_products")
-
-  // Código exclusivo
-  ambassadorCode String @unique @map("ambassador_code")
-  commissionRate Float  @default(15) @map("commission_rate") // 15% para embaixadores
-
-  approvedAt DateTime? @map("approved_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-
-  @@map("marketplace_ambassadors")
-  @@schema("fitos")
-}
-
-model MarketplaceBundle {
-  id        String @id @default(cuid())
-  createdBy String @map("created_by") // vendedor ou sistema (IA)
-
-  name        String
-  description String
-  goal        String // hypertrophy, weight_loss, endurance, etc
-
-  // Produtos do bundle
-  listings Json // Array de listing IDs
-
-  // Preços
-  totalPrice      Float @map("total_price")
-  bundlePrice     Float @map("bundle_price")
-  savings         Float // Economia
-  discountPercent Float @map("discount_percent")
-
-  // Validação científica
-  scientificProof Boolean @default(false) @map("scientific_proof")
-  proofLinks      Json    @default("[]") @map("proof_links")
-
-  // Resultados esperados
-  estimatedResults String @map("estimated_results")
-  successRate      Float? @map("success_rate") // % de usuários que atingiram resultado
-
-  // Métricas
-  salesCount Int   @default(0) @map("sales_count")
-  rating     Float @default(0)
-
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("marketplace_bundles")
-  @@schema("fitos")
-}
-
-model MarketplaceWarranty {
-  id      String @id @default(cuid())
-  orderId String @map("order_id")
-
-  type     String // 'extended', 'damage_protection', 'maintenance'
-  duration Int // em meses
-  price    Float
-
-  coverageDetails Json @map("coverage_details")
-
-  status String @default("active") // active, claimed, expired
-
-  claimHistory Json @default("[]") @map("claim_history")
-
-  expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("marketplace_warranties")
-  @@schema("fitos")
-}
-
-model MarketplaceSocialPost {
-  id     String @id @default(cuid())
-  userId String @map("user_id")
-
-  type String // 'workout_video', 'review', 'recipe', 'transformation', 'tip'
-
-  content String
-  media   Json   @default("[]") // fotos e vídeos
-
-  // Produtos mencionados
-  taggedProducts Json @default("[]") @map("tagged_products")
-
-  // Engajamento
-  likesCount    Int @default(0) @map("likes_count")
-  commentsCount Int @default(0) @map("comments_count")
-  sharesCount   Int @default(0) @map("shares_count")
-
-  // Monetização
-  isSponsored Boolean @default(false) @map("is_sponsored")
-  sponsorId   String? @map("sponsor_id")
-
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("marketplace_social_posts")
-  @@schema("fitos")
-}
-
-// Dashboard Metrics Models
-model MarketplaceBuyerMetrics {
-  id     String @id @default(cuid())
-  userId String @unique @map("user_id")
-
-  // Métricas gerais
-  totalOrders       Int   @default(0) @map("total_orders")
-  totalSpent        Float @default(0) @map("total_spent")
-  averageOrderValue Float @default(0) @map("average_order_value")
-
-  // Fidelidade
-  fidelityPoints Int    @default(0) @map("fidelity_points")
-  fidelityTier   String @default("bronze") @map("fidelity_tier")
-
-  // Cashback
-  cashbackEarned    Float @default(0) @map("cashback_earned")
-  cashbackUsed      Float @default(0) @map("cashback_used")
-  cashbackAvailable Float @default(0) @map("cashback_available")
-
-  // Engajamento
-  reviewsCount   Int @default(0) @map("reviews_count")
-  favoritesCount Int @default(0) @map("favorites_count")
-  followingCount Int @default(0) @map("following_count")
-
-  // Comportamento
-  lastOrderAt  DateTime? @map("last_order_at")
-  firstOrderAt DateTime? @map("first_order_at")
-
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("marketplace_buyer_metrics")
-  @@schema("fitos")
-}
-
-model MarketplaceSellerMetrics {
-  id       String @id @default(cuid())
-  sellerId String @unique @map("seller_id")
-
-  // Vendas
-  totalSales        Int   @default(0) @map("total_sales")
-  totalRevenue      Float @default(0) @map("total_revenue")
-  averageOrderValue Float @default(0) @map("average_order_value")
-
-  // Performance
-  conversionRate     Float @default(0) @map("conversion_rate")
-  responseRate       Float @default(0) @map("response_rate")
-  onTimeDeliveryRate Float @default(0) @map("on_time_delivery_rate")
-
-  // Reputação
-  averageRating   Float @default(0) @map("average_rating")
-  totalReviews    Int   @default(0) @map("total_reviews")
-  positiveReviews Int   @default(0) @map("positive_reviews")
-  negativeReviews Int   @default(0) @map("negative_reviews")
-
-  // Produtos
-  activeListings Int @default(0) @map("active_listings")
-  totalListings  Int @default(0) @map("total_listings")
-
-  // Financeiro
-  availableBalance Float @default(0) @map("available_balance")
-  pendingBalance   Float @default(0) @map("pending_balance")
-  totalWithdrawn   Float @default(0) @map("total_withdrawn")
-  totalFees        Float @default(0) @map("total_fees")
-
-  // Engajamento
-  followersCount Int @default(0) @map("followers_count")
-  totalViews     Int @default(0) @map("total_views")
-
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("marketplace_seller_metrics")
-  @@schema("fitos")
-}
-
-// Sprint 5: Business Admin Models
-
-model RevenueMetric {
-  id                 String   @id @default(cuid())
-  date               DateTime
-  mrr                Float
-  arr                Float
-  churnRate          Float
-  newRevenue         Float
-  expansionRevenue   Float
-  contractionRevenue Float
-  metadata           Json     @default("{}")
-  createdAt          DateTime @default(now()) @map("created_at")
-
-  @@index([date])
-  @@map("revenue_metrics")
-  @@schema("fitos")
-}
-
-model CustomerHealthScore {
-  id             String   @id @default(cuid())
-  tenantId       String   @map("tenant_id")
-  score          Float // 0-100
-  usageScore     Float
-  adoptionScore  Float
-  supportScore   Float
-  paymentScore   Float
-  riskLevel      String // 'low', 'medium', 'high'
-  lastCalculated DateTime @map("last_calculated")
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, lastCalculated])
-  @@map("customer_health_scores")
-  @@schema("fitos")
-}
-
-model FeatureUsage {
-  id          String   @id @default(cuid())
-  tenantId    String   @map("tenant_id")
-  userId      String   @map("user_id")
-  featureName String   @map("feature_name")
-  usageCount  Int      @default(1) @map("usage_count")
-  lastUsed    DateTime @map("last_used")
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, featureName])
-  @@index([userId, featureName])
-  @@map("feature_usage")
-  @@schema("fitos")
-}
-
-model AdminNotification {
-  id        String   @id @default(cuid())
-  type      String // 'churn_risk', 'payment_failed', 'milestone'
-  title     String
-  message   String
-  priority  String // 'low', 'medium', 'high', 'critical'
-  isRead    Boolean  @default(false) @map("is_read")
-  actionUrl String?  @map("action_url")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([isRead, priority])
-  @@map("admin_notifications")
-  @@schema("fitos")
-}
-
-// ===========================================
-// COST MANAGEMENT MODELS
-// ===========================================
-
-// Categorias de custos
-model CostCategory {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  displayName String
-  icon        String
-  color       String
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  services    CostService[]
-  entries     CostEntry[]
-  budgets     CostBudget[]
-  goals       CostGoal[]
-  
-  @@map("cost_categories")
-  @@schema("fitos")
-}
-
-// Serviços dentro de cada categoria
-model CostService {
-  id          String   @id @default(cuid())
-  categoryId  String
-  name        String
-  displayName String
-  provider    String?
-  icon        String?
-  isActive    Boolean  @default(true)
-  
-  captureType String   @default("manual")
-  costType    String   @default("variable") // "fixed" | "variable"
-  apiConfig   Json?    @default("{}")
-  pricingModel Json?   @default("{}")
-  
-  category    CostCategory @relation(fields: [categoryId], references: [id])
-  entries     CostEntry[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@unique([categoryId, name])
-  @@map("cost_services")
-  @@schema("fitos")
-}
-
-// Entradas de custos
-model CostEntry {
-  id          String   @id @default(cuid())
-  categoryId  String
-  serviceId   String
-  tenantId    String?
-  clientId    String?
-  
-  amount      Float
-  currency    String   @default("BRL")
-  
-  date        DateTime @default(now())
-  month       Int
-  year        Int
-  
-  entryType   String   @default("manual")
-  
-  description String?
-  tags        String[] @default([])
-  metadata    Json?    @default("{}")
-  
-  revenueGenerated Float? // Para análise de ROI
-  
-  category    CostCategory @relation(fields: [categoryId], references: [id])
-  service     CostService @relation(fields: [serviceId], references: [id])
-  
-  createdBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@index([categoryId, year, month])
-  @@index([serviceId, year, month])
-  @@index([date])
-  @@index([tags])
-  @@map("cost_entries")
-  @@schema("fitos")
-}
-
-// Orçamentos e limites
-model CostBudget {
-  id          String   @id @default(cuid())
-  categoryId  String?
-  
-  monthlyLimit Float
-  currency     String   @default("BRL")
-  
-  alertAt75   Boolean  @default(true)
-  alertAt90   Boolean  @default(true)
-  
-  startDate   DateTime
-  endDate     DateTime?
-  
-  isActive    Boolean  @default(true)
-  
-  category    CostCategory? @relation(fields: [categoryId], references: [id])
-  alerts      CostAlert[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@map("cost_budgets")
-  @@schema("fitos")
-}
-
-
-// Metas de redução de custos
-model CostGoal {
-  id          String   @id @default(cuid())
-  categoryId  String?
-  
-  title       String
-  targetReduction Float
-  startDate   DateTime
-  endDate     DateTime
-  
-  status      String   @default("active") // active, achieved, failed, cancelled
-  currentProgress Float @default(0)
-  
-  category    CostCategory? @relation(fields: [categoryId], references: [id])
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@map("cost_goals")
-  @@schema("fitos")
-}
-
-// Aprovações de custos altos
-model CostApproval {
-  id          String   @id @default(cuid())
-  costEntryId String
-  
-  threshold   Float
-  requestedBy String
-  status      String   @default("pending") // pending, approved, rejected
-  
-  approvedBy  String?
-  approvedAt  DateTime?
-  rejectionReason String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@map("cost_approvals")
-  @@schema("fitos")
-}
-
-// Relatórios agendados
-model ScheduledReport {
-  id          String   @id @default(cuid())
-  
-  title       String
-  frequency   String // daily, weekly, monthly
-  recipients  String[] // emails
-  format      String   @default("pdf") // pdf, csv, json
-  
-  filters     Json?    @default("{}")
-  
-  lastSentAt  DateTime?
-  nextSendAt  DateTime
-  
-  isActive    Boolean  @default(true)
-  
-  createdBy   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  @@map("scheduled_reports")
   @@schema("fitos")
 }

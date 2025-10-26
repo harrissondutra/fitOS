@@ -11,14 +11,20 @@ interface CostCategoryCardProps {
 }
 
 export function CostCategoryCard({ category, onClick }: CostCategoryCardProps) {
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | undefined) => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return 'R$ 0,00';
+    }
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(amount);
   };
 
-  const formatPercentage = (value: number) => {
+  const formatPercentage = (value: number | undefined) => {
+    if (value === undefined || value === null || isNaN(value)) {
+      return '0.0%';
+    }
     return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
   };
 
@@ -60,7 +66,7 @@ export function CostCategoryCard({ category, onClick }: CostCategoryCardProps) {
           {category.displayName}
         </CardTitle>
         <Badge variant="secondary" className="text-xs">
-          {category.percentage.toFixed(1)}%
+          {(category.percentage || 0).toFixed(1)}%
         </Badge>
       </CardHeader>
       <CardContent>

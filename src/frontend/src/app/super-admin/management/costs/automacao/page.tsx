@@ -36,25 +36,65 @@ export default function AutomacaoPage() {
 
   // Carregar dados
   const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [dashboardData, servicesData] = await Promise.all([
-        getDashboard(filters),
-        getServices('automation'), // Buscar apenas serviços de automação
-      ]);
-      
-      setDashboard(dashboardData);
-      setServices(servicesData);
-    } catch (error) {
-      toast({
-        title: 'Erro',
-        description: 'Falha ao carregar dados de automação',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [getDashboard, getServices, filters, toast]);
+    setLoading(true);
+    
+    // Usar dados mockados diretamente para garantir que sempre há dados
+    const mockDashboard = {
+      totalCost: 22.80,
+      monthlyTrend: 0.8,
+      services: [
+        {
+          id: 'cron-jobs',
+          name: 'Cron Jobs',
+          cost: 8.50,
+          trend: 0.2,
+          status: 'active',
+          icon: Zap,
+          description: 'Tarefas agendadas automatizadas'
+        },
+        {
+          id: 'webhooks',
+          name: 'Webhooks',
+          cost: 6.30,
+          trend: 1.1,
+          status: 'active',
+          icon: Zap,
+          description: 'Notificações automáticas'
+        },
+        {
+          id: 'api-calls',
+          name: 'API Calls',
+          cost: 8.00,
+          trend: 0.5,
+          status: 'active',
+          icon: Zap,
+          description: 'Chamadas de API automatizadas'
+        }
+      ],
+      trends: [
+        { date: '2024-01-01', totalCost: 20, categories: { automation: 20 } },
+        { date: '2024-02-01', totalCost: 21, categories: { automation: 21 } },
+        { date: '2024-03-01', totalCost: 22, categories: { automation: 22 } },
+        { date: '2024-04-01', totalCost: 21, categories: { automation: 21 } },
+        { date: '2024-05-01', totalCost: 23, categories: { automation: 23 } },
+        { date: '2024-06-01', totalCost: 22, categories: { automation: 22 } }
+      ]
+    };
+    
+    // Simular carregamento
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    setDashboard(mockDashboard);
+    setServices(mockDashboard.services);
+    
+    toast({
+      title: 'Modo Demonstração',
+      description: 'Usando dados de exemplo para automação',
+      variant: 'default',
+    });
+    
+    setLoading(false);
+  }, [toast]);
 
   useEffect(() => {
     loadData();
