@@ -336,3 +336,6 @@ start-production.js
 src/backend/debug-auth.js
 env.example
 env.example
+env.development
+.gitignore
+env.production
