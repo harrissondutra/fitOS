@@ -75,6 +75,18 @@ import auditLogsRoutes from './routes/audit-logs';
 import whatsappRoutes from './routes/whatsapp';
 import teamCalendarRoutes from './routes/team-calendar';
 
+// Nutrition routes (Sprint 4)
+import nutritionRoutes from './routes/nutrition.routes';
+
+// CRM routes (Sprint 4)
+import crmApiRoutes from './routes/crm.routes';
+
+// AI Agents routes (Sprint 4)
+import aiAgentsRoutes from './routes/ai-agents.routes';
+
+// WhatsApp routes (Sprint 4)
+import whatsappApiRoutes from './routes/whatsapp.routes';
+
 // Upload routes
 import uploadRoutes from './routes/upload';
 
@@ -208,6 +220,18 @@ class FitOSServer {
     this.app.use('/api/audit-logs', authMiddleware.optionalAuth, auditLogsRoutes);
     this.app.use('/api/whatsapp', authMiddleware.optionalAuth, whatsappRoutes);
     this.app.use('/api/appointments/team', authMiddleware.optionalAuth, teamCalendarRoutes);
+
+    // Nutrition API routes (Sprint 4) - com autenticação obrigatória
+    this.app.use('/api/nutrition', authMiddleware.requireAuth, nutritionRoutes);
+
+    // CRM API routes (Sprint 4) - com autenticação obrigatória
+    this.app.use('/api/crm', authMiddleware.requireAuth, crmApiRoutes);
+
+    // AI Agents API routes (Sprint 4) - com autenticação obrigatória
+    this.app.use('/api/ai', authMiddleware.requireAuth, aiAgentsRoutes);
+
+    // WhatsApp API routes (Sprint 4) - com autenticação obrigatória
+    this.app.use('/api/whatsapp', authMiddleware.requireAuth, whatsappApiRoutes);
 
     // Sprint 5 - Admin Business Routes (com autenticação obrigatória)
     this.app.use('/api/admin/tenants', authMiddleware.requireAuth, tenantAdminRoutes);
