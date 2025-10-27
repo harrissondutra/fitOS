@@ -19,7 +19,12 @@
     "env:show": "echo 'Current environment:' && head -5 .env",
     "env:dockploy": "node scripts/generate-dockploy-env.js",
     "setup:dev": "node scripts/setup-dev.js",
-    "pre-push": "node scripts/pre-push.js"
+    "pre-push": "node scripts/pre-push.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report"
   },
   "engines": {
     "node": ">=20.0.0",
@@ -30,12 +35,15 @@
     "src/backend"
   ],
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^20.10.0",
     "@types/nodemailer": "^7.0.2",
+    "@types/qrcode.react": "^1.0.5",
     "concurrently": "^8.2.2",
     "husky": "^8.0.3",
     "lint-staged": "^15.2.0",
+    "qrcode.react": "^4.2.0",
     "shadcn": "^3.4.2",
     "typescript": "^5.3.0"
   },

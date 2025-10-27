@@ -93,14 +93,6 @@ export class AutomationWorkflowService {
           actions: data.actions,
           isActive: data.isActive,
           settings: data.settings || {}
-        },
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          }
         }
       });
 
@@ -138,12 +130,6 @@ export class AutomationWorkflowService {
       const workflow = await this.prisma.automationWorkflow.findUnique({
         where: { id },
         include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
           executions: {
             orderBy: { createdAt: 'desc' },
             take: 10
@@ -191,12 +177,6 @@ export class AutomationWorkflowService {
       const workflows = await this.prisma.automationWorkflow.findMany({
         where: whereClause,
         include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
           executions: {
             select: {
               id: true,
@@ -250,7 +230,7 @@ export class AutomationWorkflowService {
           tenantId,
           isActive: true,
           trigger: {
-            path: '$.type',
+            path: ['type'],
             equals: triggerType
           }
         },
@@ -288,15 +268,7 @@ export class AutomationWorkflowService {
 
       const workflow = await this.prisma.automationWorkflow.update({
         where: { id: data.id },
-        data: updateData,
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          }
-        }
+        data: updateData
       });
 
       // 2. INVALIDAR cache Redis
@@ -358,13 +330,11 @@ export class AutomationWorkflowService {
       }
 
       // Criar execução
-      const execution = await this.prisma.automationExecution.create({
+      const execution = await this.prisma.automationWorkflowExecution.create({
         data: {
           workflowId,
-          triggerData,
           status: 'running',
-          actionsExecuted: 0,
-          actionsFailed: 0
+          result: triggerData
         }
       });
 
@@ -373,19 +343,21 @@ export class AutomationWorkflowService {
       let lastError: string | undefined;
 
       // Executar ações
-      for (const action of workflow.actions) {
+      const actions = Array.isArray(workflow.actions) ? workflow.actions : [];
+      for (const action of actions) {
         try {
           // Aplicar delay se configurado
-          if (action.delay && action.delay > 0) {
-            await new Promise(resolve => setTimeout(resolve, action.delay * 60 * 1000));
+          const actionDelay = (action as any).delay;
+          if (actionDelay && actionDelay > 0) {
+            await new Promise(resolve => setTimeout(resolve, actionDelay * 60 * 1000));
           }
 
-          await this.executeAction(action, triggerData);
+          await this.executeAction(action as any, triggerData);
           actionsExecuted++;
         } catch (error) {
           actionsFailed++;
           lastError = error instanceof Error ? error.message : 'Unknown error';
-          logger.error(`Action execution failed: ${action.type}`, error);
+          logger.error(`Action execution failed: ${(action as any).type}`, error);
         }
       }
 
@@ -393,15 +365,19 @@ export class AutomationWorkflowService {
       const executionTime = Date.now() - startTime;
       const status = actionsFailed === 0 ? 'success' : (actionsExecuted === 0 ? 'failed' : 'partial');
 
-      await this.prisma.automationExecution.update({
+      await this.prisma.automationWorkflowExecution.update({
         where: { id: execution.id },
         data: {
           status,
-          actionsExecuted,
-          actionsFailed,
           executionTime,
           errorMessage: lastError,
-          completedAt: new Date()
+          result: {
+            actionsExecuted,
+            actionsFailed,
+            errorMessage: lastError,
+            executionTime,
+            metadata: triggerData
+          }
         }
       });
 
@@ -554,22 +530,22 @@ export class AutomationWorkflowService {
         this.prisma.automationWorkflow.count({
           where: { tenantId, isActive: true }
         }),
-        this.prisma.automationExecution.count({
+        this.prisma.automationWorkflowExecution.count({
           where: { workflow: { tenantId } }
         }),
-        this.prisma.automationExecution.count({
+        this.prisma.automationWorkflowExecution.count({
           where: { 
             workflow: { tenantId },
             status: 'success'
           }
         }),
-        this.prisma.automationExecution.count({
+        this.prisma.automationWorkflowExecution.count({
           where: { 
             workflow: { tenantId },
             status: 'failed'
           }
         }),
-        this.prisma.automationExecution.groupBy({
+        this.prisma.automationWorkflowExecution.groupBy({
           by: ['workflowId'],
           where: { workflow: { tenantId } },
           _count: { workflowId: true }
@@ -579,7 +555,7 @@ export class AutomationWorkflowService {
       const successRate = totalExecutions > 0 ? (successfulExecutions / totalExecutions) * 100 : 0;
 
       // Calcular tempo médio de execução
-      const executions = await this.prisma.automationExecution.findMany({
+      const executions = await this.prisma.automationWorkflowExecution.findMany({
         where: { workflow: { tenantId } },
         select: { executionTime: true }
       });

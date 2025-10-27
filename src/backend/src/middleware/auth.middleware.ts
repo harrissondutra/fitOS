@@ -98,7 +98,8 @@ export class AuthMiddleware {
       }
 
       // Verificar se email foi verificado (opcional)
-      if (!user.emailVerified) {
+      // SUPER_ADMIN sempre pode acessar, mesmo sem email verificado
+      if (!user.emailVerified && user.role !== 'SUPER_ADMIN') {
         res.status(401).json({
           success: false,
           error: 'EMAIL_NOT_VERIFIED',
@@ -486,3 +487,15 @@ export function getAuthMiddleware(prisma: PrismaClient): AuthMiddleware {
   }
   return authMiddlewareInstance;
 }
+
+// Export direto de authenticateToken para compatibilidade
+export const authenticateToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  // Esta função criará uma instância temporária do middleware
+  // Para uso direto sem precisar instanciar a classe
+  const prisma = new PrismaClient();
+  const authMiddleware = getAuthMiddleware(prisma);
+  await authMiddleware.authenticateToken(req, res, next);
+};
+
+// Alias para compatibilidade
+export const requireAuth = authenticateToken;

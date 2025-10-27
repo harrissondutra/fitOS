@@ -9,7 +9,7 @@
 // TIPOS DE USUÁRIO E ROLES
 // ============================================================================
 
-export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
+export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
 
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING';
 
@@ -267,6 +267,7 @@ export const DEFAULT_ROLE_REDIRECTS: RoleRedirectConfig = {
   OWNER: '/admin/dashboard',
   ADMIN: '/admin/dashboard',
   TRAINER: '/trainer/dashboard',
+  NUTRITIONIST: '/nutritionist/dashboard',
   CLIENT: '/client/workouts'
 };
 

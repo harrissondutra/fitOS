@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { requireRole } from '../middleware/permissions';
 import { body, validationResult } from 'express-validator';
 import { costTrackerService } from '../services/cost-tracker.service';
+import { whatsAppConfigManager } from '../config/whatsapp.config';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -129,6 +130,9 @@ router.put('/config',
         });
       }
 
+      // ✅ Invalidar cache quando config é atualizada
+      whatsAppConfigManager.invalidateCache(req.user.tenantId);
+
       res.json({ success: true, config });
     } catch (error: any) {
       console.error('Erro ao atualizar configuração WhatsApp:', error);
@@ -223,13 +227,8 @@ router.post('/send',
 
       const { phone, template, variables = {} } = req.body;
 
-      // Buscar configuração
-      const config = await prisma.whatsAppConfig.findFirst({
-        where: { 
-          tenantId: req.user.tenantId,
-          isActive: true
-        }
-      });
+      // ✅ Buscar configuração usando config central
+      const config = await whatsAppConfigManager.getConfig(req.user.tenantId);
 
       if (!config) {
         return res.status(400).json({ 

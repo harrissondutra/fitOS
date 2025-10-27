@@ -1,5 +1,5 @@
-import { logger } from '@/utils/logger';
-import { cache } from '@/config/redis';
+import { logger } from '../utils/logger';
+import { cache } from '../config/redis';
 
 interface CloudinaryUsage {
   credits: {

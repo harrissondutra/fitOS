@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 // Tipos temporários para evitar erros de compilação após remoção da autenticação
-type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
+type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
 
 export interface AuthenticatedRequest extends Request {
   user?: {

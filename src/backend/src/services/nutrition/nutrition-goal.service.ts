@@ -103,6 +103,13 @@ export class NutritionGoalService {
   }
 
   /**
+   * Alias for createGoal - creates a nutrition goal
+   */
+  async createNutritionGoal(data: NutritionGoalCreateInput) {
+    return this.createGoal(data);
+  }
+
+  /**
    * Busca objetivo por ID com cache
    */
   async getGoalById(id: string) {
@@ -158,6 +165,13 @@ export class NutritionGoalService {
       logger.error('Error getting nutrition goal by ID:', error);
       throw error;
     }
+  }
+
+  /**
+   * Alias for getGoalById - gets a nutrition goal by ID
+   */
+  async getNutritionGoalById(id: string) {
+    return this.getGoalById(id);
   }
 
   /**
@@ -232,6 +246,53 @@ export class NutritionGoalService {
   }
 
   /**
+   * Alias for getClientGoals - gets nutrition goals
+   */
+  async getNutritionGoals(filters: NutritionGoalFilters) {
+    return this.getClientGoals(filters);
+  }
+
+  /**
+   * Calcula estatísticas de metas nutricionais
+   */
+  async getNutritionGoalStats(tenantId: string) {
+    try {
+      const goals = await this.prisma.nutritionGoal.findMany({
+        where: { tenantId },
+        select: {
+          type: true,
+          isActive: true,
+          currentValue: true,
+          targetValue: true
+        }
+      });
+
+      const total = goals.length;
+      const active = goals.filter(g => g.isActive).length;
+      const completed = goals.filter(g => 
+        g.currentValue !== null && 
+        g.targetValue !== null && 
+        g.currentValue >= g.targetValue
+      ).length;
+
+      const byType = goals.reduce((acc: Record<string, number>, goal) => {
+        acc[goal.type] = (acc[goal.type] || 0) + 1;
+        return acc;
+      }, {});
+
+      return {
+        total,
+        active,
+        completed,
+        byType
+      };
+    } catch (error) {
+      logger.error('Error getting nutrition goal stats:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Atualiza objetivo nutricional
    * Pattern: SEMPRE escrever no PostgreSQL + Invalidar cache
    */
@@ -282,6 +343,13 @@ export class NutritionGoalService {
   }
 
   /**
+   * Alias for updateGoal - updates a nutrition goal
+   */
+  async updateNutritionGoal(data: NutritionGoalUpdateInput) {
+    return this.updateGoal(data);
+  }
+
+  /**
    * Ativa/desativa objetivo nutricional
    */
   async toggleGoalStatus(id: string, isActive: boolean) {
@@ -322,6 +390,13 @@ export class NutritionGoalService {
       logger.error('Error deleting nutrition goal:', error);
       throw error;
     }
+  }
+
+  /**
+   * Alias for deleteGoal - deletes a nutrition goal
+   */
+  async deleteNutritionGoal(id: string) {
+    return this.deleteGoal(id);
   }
 
   /**

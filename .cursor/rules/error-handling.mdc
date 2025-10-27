@@ -1,0 +1,325 @@
+---
+alwaysApply: true
+description: Padrões de tratamento de erros, try-catch, logs e mensagens amigáveis
+---
+
+# Tratamento de Erros
+
+## Propósito
+
+Estabelecer padrões consistentes para tratamento de erros, garantindo logs estruturados e mensagens amigáveis ao usuário.
+
+## Regras Obrigatórias
+
+### ✅ SEMPRE Fazer
+
+- Try-catch em operações assíncronas
+- Error middleware centralizado
+- Logs estruturados para debugging
+- Mensagens de erro amigáveis ao usuário
+- Status codes HTTP apropriados
+- Stack trace apenas em desenvolvimento
+- Monitoramento de erros em produção
+- Categorizar erros (operacionais vs programáticos)
+
+### ❌ NUNCA Fazer
+
+- NÃO deixar erros sem tratamento
+- NÃO logar dados sensíveis
+- NÃO expor stacks de erro em produção
+- NÃO criar mensagens de erro vagas
+- NÃO engolir erros silenciosamente
+
+## Padrões e Exemplos
+
+### Error Classes Customizadas
+
+```typescript
+// ✅ Tipos de erros customizados
+export class AppError extends Error {
+  statusCode: number;
+  isOperational: boolean;
+
+  constructor(message: string, statusCode: number = 500, isOperational: boolean = true) {
+    super(message);
+    this.statusCode = statusCode;
+    this.isOperational = isOperational;
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(message: string) {
+    super(message, 400, true);
+    this.name = 'ValidationError';
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(resource: string) {
+    super(`${resource} not found`, 404, true);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class ConflictError extends AppError {
+  constructor(message: string) {
+    super(message, 409, true);
+    this.name = 'ConflictError';
+  }
+}
+
+export class PlanLimitError extends AppError {
+  constructor(limit: string) {
+    super(`Plan limit reached for ${limit}`, 403, true);
+    this.name = 'PlanLimitError';
+  }
+}
+```
+
+### Error Middleware Centralizado
+
+```typescript
+// ✅ Error handling centralizado
+import { Request, Response, NextFunction } from 'express';
+import { logger } from '../utils/logger';
+
+export function errorHandler(
+  err: Error | AppError,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  // Log erro
+  logger.error('Error occurred:', {
+    message: err.message,
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    ip: req.ip,
+    userId: req.userId,
+    tenantId: req.tenantId
+  });
+
+  // Status code apropriado
+  const statusCode = err instanceof AppError ? err.statusCode : 500;
+  const isOperational = err instanceof AppError ? err.isOperational : false;
+
+  // Resposta baseada no ambiente
+  const response: any = {
+    success: false,
+    error: isOperational ? err.message : 'Internal server error'
+  };
+
+  // Adicionar stack trace em desenvolvimento
+  if (process.env.NODE_ENV !== 'production') {
+    response.stack = err.stack;
+  }
+
+  res.status(statusCode).json(response);
+}
+
+// ✅ Uso com async/await
+router.use(errorHandler);
+```
+
+### Try-Catch em Operações
+
+```typescript
+// ✅ Try-catch em operações assíncronas
+router.post('/users', authMiddleware, tenantMiddleware, async (req, res, next) => {
+  try {
+    const user = await userService.createUser(req.body, req.tenantId);
+    res.status(201).json({
+      success: true,
+      data: user,
+      message: 'User created successfully'
+    });
+  } catch (error) {
+    // Passar para error handler
+    next(error);
+  }
+});
+
+// ✅ Service com tratamento adequado
+export class UserService {
+  async createUser(data: CreateUserDto, tenantId: string): Promise<User> {
+    try {
+      // Validação
+      if (!data.email || !data.name) {
+        throw new ValidationError('Email and name are required');
+      }
+
+      // Verificar duplicata
+      const existing = await prisma.user.findUnique({
+        where: { email: data.email }
+      });
+
+      if (existing) {
+        throw new ConflictError('Email already exists');
+      }
+
+      // Verificar limite do plano
+      await this.checkPlanLimit(tenantId, 'users');
+
+      // Criar usuário
+      return await prisma.user.create({
+        data: { ...data, tenantId }
+      });
+
+    } catch (error) {
+      // Re-throw erros conhecidos
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      // Logar erro inesperado
+      logger.error('Unexpected error creating user:', error);
+      throw new AppError('Failed to create user', 500, false);
+    }
+  }
+}
+```
+
+### Logs Estruturados
+
+```typescript
+// ✅ Logs estruturados
+logger.error('Failed to create user', {
+  error: err.message,
+  stack: err.stack,
+  userId: user.id,
+  tenantId: tenantId,
+  email: data.email,
+  timestamp: new Date().toISOString(),
+  endpoint: '/users',
+  method: 'POST',
+  ip: req.ip,
+  userAgent: req.headers['user-agent']
+});
+
+// ✅ Logs por nível
+logger.debug('Debug information:', { data });
+logger.info('Operation successful:', { userId });
+logger.warn('Warning condition:', { message });
+logger.error('Error occurred:', { error });
+
+// ❌ NUNCA logar dados sensíveis
+logger.error('Login failed', {
+  email: user.email,
+  password: user.password  // ERRADO!
+});
+```
+
+### Error Boundaries (Frontend)
+
+```typescript
+// ✅ Error boundary em componentes React
+'use client';
+
+import { Component, ErrorInfo, ReactNode } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
+interface Props {
+  children: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error: Error | null;
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+    
+    // Logar erro
+    logger.error('React Error Boundary:', {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack
+    });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Alert variant="destructive">
+          <AlertTitle>Algo deu errado</AlertTitle>
+          <AlertDescription>
+            {process.env.NODE_ENV === 'development' 
+              ? this.state.error?.message 
+              : 'Por favor, recarregue a página.'}
+          </AlertDescription>
+        </Alert>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+```
+
+### Mensagens Amigáveis
+
+```typescript
+// ✅ Mensagens de erro amigáveis
+function translateError(error: Error | AppError): string {
+  if (error instanceof ValidationError) {
+    return 'Verifique os dados informados';
+  }
+
+  if (error instanceof NotFoundError) {
+    return 'Recurso não encontrado';
+  }
+
+  if (error instanceof ConflictError) {
+    return 'Este recurso já existe';
+  }
+
+  if (error instanceof PlanLimitError) {
+    return 'Limite do plano atingido. Considere fazer upgrade.';
+  }
+
+  // Erro genérico
+  return 'Ocorreu um erro. Por favor, tente novamente.';
+}
+
+// Uso
+try {
+  await createUser(data, tenantId);
+} catch (error) {
+  const message = translateError(error);
+  toast.error(message);
+}
+```
+
+## Exceções
+
+- Erros de validação podem ser mais verbosos em desenvolvimento
+- Alguns erros de sistema podem precisar de alertas externos
+
+## Verificação
+
+- ✅ Try-catch em operações assíncronas
+- ✅ Error middleware centralizado
+- ✅ Logs estruturados
+- ✅ Mensagens amigáveis ao usuário
+- ✅ Status codes apropriados
+- ✅ Sem dados sensíveis em logs
+
+## Recursos Relacionados
+
+- [Security](./security.mdc)
+- [Backend Patterns](./backend-patterns.mdc)
+- [Testing](./testing.mdc)
+- [Deployment](./deployment.mdc)

@@ -291,6 +291,17 @@ const getAdminMenuItems = (userRole: UserRole) => {
           ],
         },
         {
+          title: "WhatsApp Business",
+          url: "/super-admin/whatsapp",
+          icon: MessageSquare,
+          items: [
+            { title: "Configuração", url: "/super-admin/whatsapp" },
+            { title: "Mensagens", url: "/professional/whatsapp/messages" },
+            { title: "Templates", url: "/professional/whatsapp/templates" },
+            { title: "Analytics", url: "/professional/whatsapp/analytics" },
+          ],
+        },
+        {
           title: "Configurações do Sistema",
           url: "/super-admin/system/config",
           icon: Wrench,

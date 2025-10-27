@@ -453,36 +453,32 @@ router.post('/:id/duplicate', asyncHandler(async (req: Request, res: Response) =
 router.get('/stats/summary', asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.user?.tenantId || 'global';
 
-  const [total, active, byServiceType, byProvider] = await prisma.$transaction([
-    prisma.aiServiceConfig.count({
-      where: { tenantId }
-    }),
-    prisma.aiServiceConfig.count({
-      where: { tenantId, isActive: true }
-    }),
-    prisma.aiServiceConfig.groupBy({
-      by: ['serviceType'],
-      where: { tenantId, isActive: true },
-      _count: { serviceType: true },
-      orderBy: { serviceType: 'asc' }
-    }),
-    prisma.aiServiceConfig.groupBy({
-      by: ['providerId'],
-      where: { tenantId, isActive: true },
-      _count: { providerId: true },
-      orderBy: { providerId: 'asc' }
-    })
-  ]);
+  const total = await prisma.aiServiceConfig.count({ where: { tenantId } });
+  const active = await prisma.aiServiceConfig.count({ where: { tenantId, isActive: true } });
+  const byServiceType = await prisma.$queryRaw`
+    SELECT "serviceType", COUNT(*) as count 
+    FROM "fitos"."ai_service_configs" 
+    WHERE "tenant_id" = ${tenantId} AND "is_active" = true
+    GROUP BY "serviceType"
+    ORDER BY "serviceType" ASC
+  ` as Array<{ serviceType: string; count: bigint }>;
+  const byProvider = await prisma.$queryRaw`
+    SELECT "provider_id", COUNT(*) as count 
+    FROM "fitos"."ai_service_configs" 
+    WHERE "tenant_id" = ${tenantId} AND "is_active" = true
+    GROUP BY "provider_id"
+    ORDER BY "provider_id" ASC
+  ` as Array<{ provider_id: string; count: bigint }>;
 
   const byServiceTypeMap = byServiceType.reduce((acc, item) => {
-    acc[item.serviceType] = (item._count as any)?.serviceType || 0;
+    acc[item.serviceType] = Number(item.count);
     return acc;
   }, {} as Record<string, number>);
 
   const byProviderMap = byProvider.reduce((acc, item) => {
-    acc[item.providerId] = {
-      count: (item._count as any)?.providerId || 0,
-      providerName: 'Unknown' // Não temos acesso ao provider no groupBy
+    acc[item.provider_id] = {
+      count: Number(item.count),
+      providerName: 'Unknown' // Não temos acesso ao provider no raw query
     };
     return acc;
   }, {} as Record<string, { count: number; providerName: string }>);

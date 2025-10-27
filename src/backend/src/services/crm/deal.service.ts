@@ -89,51 +89,15 @@ export class DealService {
         data: {
           tenantId: data.tenantId,
           pipelineId: data.pipelineId,
+          clientProfileId: data.clientId!,
           title: data.title,
           description: data.description,
-          value: data.value,
+          value: data.value || 0,
           stage: data.stage,
           status: data.status,
-          clientId: data.clientId,
-          assignedTo: data.assignedTo,
-          expectedCloseDate: data.expectedCloseDate,
-          priority: data.priority,
-          source: data.source,
-          tags: data.tags || [],
-          customFields: data.customFields || {}
-        },
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          pipeline: {
-            select: {
-              id: true,
-              name: true,
-              stages: true
-            }
-          },
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          assignedUser: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
+          assignedUserId: data.assignedTo,
+          expectedCloseDate: data.expectedCloseDate || new Date(),
+          probability: 50
         }
       });
 
@@ -169,51 +133,7 @@ export class DealService {
       // 2. Buscar PostgreSQL
       logger.info(`🗄️ Cache MISS - Deal by ID: ${id}`);
       const deal = await this.prisma.deal.findUnique({
-        where: { id },
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          pipeline: {
-            select: {
-              id: true,
-              name: true,
-              stages: true
-            }
-          },
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          assignedUser: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          },
-          activities: {
-            orderBy: { createdAt: 'desc' },
-            take: 10
-          },
-          notes: {
-            orderBy: { createdAt: 'desc' },
-            take: 5
-          },
-          attachments: {
-            orderBy: { createdAt: 'desc' }
-          }
-        }
+        where: { id }
       });
 
       // 3. Cachear se encontrado
@@ -255,39 +175,6 @@ export class DealService {
       const whereClause = this.buildWhereClause(filters);
       const deals = await this.prisma.deal.findMany({
         where: whereClause,
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          pipeline: {
-            select: {
-              id: true,
-              name: true,
-              stages: true
-            }
-          },
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          assignedUser: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        },
         take: filters.limit || 20,
         skip: filters.offset || 0,
         orderBy: { updatedAt: 'desc' }
@@ -320,50 +207,13 @@ export class DealService {
       if (data.value !== undefined) updateData.value = data.value;
       if (data.stage) updateData.stage = data.stage;
       if (data.status) updateData.status = data.status;
-      if (data.clientId !== undefined) updateData.clientId = data.clientId;
-      if (data.assignedTo !== undefined) updateData.assignedTo = data.assignedTo;
+      if (data.clientId !== undefined) updateData.clientProfileId = data.clientId;
+      if (data.assignedTo !== undefined) updateData.assignedUserId = data.assignedTo;
       if (data.expectedCloseDate !== undefined) updateData.expectedCloseDate = data.expectedCloseDate;
-      if (data.priority) updateData.priority = data.priority;
-      if (data.source !== undefined) updateData.source = data.source;
-      if (data.tags) updateData.tags = data.tags;
-      if (data.customFields) updateData.customFields = data.customFields;
 
       const deal = await this.prisma.deal.update({
         where: { id: data.id },
-        data: updateData,
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          pipeline: {
-            select: {
-              id: true,
-              name: true,
-              stages: true
-            }
-          },
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          assignedUser: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        }
+        data: updateData
       });
 
       // 2. INVALIDAR cache Redis
@@ -407,33 +257,25 @@ export class DealService {
       const deal = await this.prisma.deal.update({
         where: { id: dealId },
         data: {
-          stage: newStage,
-          updatedAt: new Date()
-        },
-        include: {
-          pipeline: {
-            select: {
-              stages: true
-            }
-          }
+          stage: newStage
         }
       });
 
-      // Criar atividade de avanço
-      if (notes) {
-        await this.prisma.dealActivity.create({
-          data: {
-            dealId,
-            type: 'stage_change',
-            description: `Deal moved to ${newStage}`,
-            metadata: {
-              oldStage: deal.stage,
-              newStage,
-              notes
-            }
-          }
-        });
-      }
+      // TODO: Criar atividade de avanço quando modelo dealActivity for criado
+      // if (notes) {
+      //   await this.prisma.dealActivity.create({
+      //     data: {
+      //       dealId,
+      //       type: 'stage_change',
+      //       description: `Deal moved to ${newStage}`,
+      //       metadata: {
+      //         oldStage: deal.stage,
+      //         newStage,
+      //         notes
+      //       }
+      //     }
+      //   });
+      // }
 
       // Invalidar cache
       await this.invalidateDealCache(deal.tenantId, deal.pipelineId, deal.id);
@@ -455,23 +297,22 @@ export class DealService {
         where: { id: dealId },
         data: {
           status,
-          closedAt: new Date(),
-          updatedAt: new Date()
+          closedAt: new Date()
         }
       });
 
-      // Criar atividade de fechamento
-      await this.prisma.dealActivity.create({
-        data: {
-          dealId,
-          type: 'deal_closed',
-          description: `Deal ${status}`,
-          metadata: {
-            status,
-            notes
-          }
-        }
-      });
+      // TODO: Criar atividade de fechamento quando modelo dealActivity for criado
+      // await this.prisma.dealActivity.create({
+      //   data: {
+      //     dealId,
+      //     type: 'deal_closed',
+      //     description: `Deal ${status}`,
+      //     metadata: {
+      //       status,
+      //       notes
+      //     }
+      //   }
+      // });
 
       // Invalidar cache
       await this.invalidateDealCache(deal.tenantId, deal.pipelineId, deal.id);
@@ -632,29 +473,6 @@ export class DealService {
           expectedCloseDate: {
             lte: futureDate,
             gte: new Date()
-          }
-        },
-        include: {
-          pipeline: {
-            select: {
-              name: true
-            }
-          },
-          client: {
-            include: {
-              user: {
-                select: {
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          assignedUser: {
-            select: {
-              name: true,
-              email: true
-            }
           }
         },
         orderBy: { expectedCloseDate: 'asc' }

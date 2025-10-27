@@ -1,0 +1,444 @@
+---
+alwaysApply: true
+description: Padrões de frontend, Next.js 15, React 18, ShadcnUI e state management
+---
+
+# Padrões Frontend
+
+## Propósito
+
+Estabelecer padrões para desenvolvimento frontend usando Next.js 15, React 18, ShadcnUI, garantindo uma experiência de usuário consistente e código manutenível.
+
+## Regras Obrigatórias
+
+### ✅ SEMPRE Fazer
+
+- Usar Next.js 15 App Router para navegação e estrutura
+- Distinguir Server Components (padrão) de Client Components ('use client')
+- Usar componentes do ShadcnUI para toda a interface
+- Usar Lucide React para ícones (nunca criar SVGs customizados)
+- Usar Tailwind CSS com design tokens para estilização
+- Usar Zustand para state management global
+- Usar SWR para server state e cache de dados
+- Usar React Hook Form + Zod para formulários com validação
+- Implementar dark mode com next-themes
+- Mobile-first design em todos os componentes
+- Loading states em todas as ações assíncronas
+- Error boundaries para captura de erros
+
+### ❌ NUNCA Fazer
+
+- NÃO criar componentes customizados quando existe equivalente no ShadcnUI
+- NÃO usar inline styles (usar Tailwind classes)
+- NÃO usar Redux para state management (usar Zustand)
+- NÃO usar fetch diretamente (usar SWR)
+- NÃO criar ícones customizados (usar Lucide React)
+- NÃO omitir loading states
+- NÃO esquecer de implementar dark mode
+- NÃO criar páginas sem responsividade mobile
+
+## Padrões e Exemplos
+
+### App Router Structure
+
+```typescript
+// ✅ Estrutura Next.js 15 App Router
+src/frontend/src/app/
+├── (auth)/
+│   ├── login/
+│   │   └── page.tsx      # Server Component
+│   └── register/
+│       └── page.tsx
+├── (dashboard)/
+│   ├── dashboard/
+│   │   └── page.tsx
+│   ├── users/
+│   │   └── page.tsx
+│   └── layout.tsx
+├── api/
+│   └── auth/
+│       └── [...auth]/
+│           └── route.ts
+└── layout.tsx           # Root layout
+
+// ✅ Server Component (default)
+export default async function DashboardPage() {
+  const data = await fetchUsers(); // Server-side fetch
+  
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <UserList initialData={data} />
+    </div>
+  );
+}
+
+// ✅ Client Component (quando necessário interatividade)
+'use client';
+
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+
+export default function InteractiveButton() {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <Button onClick={() => setCount(count + 1)}>
+      Count: {count}
+    </Button>
+  );
+}
+```
+
+### ShadcnUI Components
+
+```typescript
+// ✅ SEMPRE usar ShadcnUI
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+export function LoginForm() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Login</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" />
+            </div>
+            <Button type="submit">Entrar</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ❌ NUNCA criar componentes customizados desnecessários
+// ❌ ERRADO
+export function CustomButton({ children }) {
+  return (
+    <button className="bg-blue-500 text-white px-4 py-2 rounded">
+      {children}
+    </button>
+  );
+}
+
+// ✅ CORRETO - Usar Button do ShadcnUI
+import { Button } from '@/components/ui/button';
+```
+
+### Lucide React Icons
+
+```typescript
+// ✅ SEMPRE usar Lucide React
+import { User, Settings, LogOut, Menu, X, Search } from 'lucide-react';
+
+export function UserMenu() {
+  return (
+    <div>
+      <User className="h-4 w-4" />
+      <Settings className="h-5 w-5" />
+      <LogOut className="h-6 w-6" />
+    </div>
+  );
+}
+
+// ❌ NUNCA criar SVGs customizados
+// ❌ ERRADO
+export function UserIcon() {
+  return (
+    <svg>...</svg>
+  );
+}
+```
+
+### Zustand State Management
+
+```typescript
+// ✅ store/user.store.ts
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+interface UserState {
+  user: User | null;
+  isLoading: boolean;
+  setUser: (user: User) => void;
+  logout: () => void;
+}
+
+export const useUserStore = create<UserState>()(
+  persist(
+    (set) => ({
+      user: null,
+      isLoading: false,
+      setUser: (user) => set({ user }),
+      logout: () => set({ user: null }),
+    }),
+    { name: 'user-store' }
+  )
+);
+
+// ✅ Uso nos componentes
+'use client';
+
+import { useUserStore } from '@/store/user.store';
+
+export function UserProfile() {
+  const { user, logout } = useUserStore();
+  
+  return (
+    <div>
+      <p>{user?.name}</p>
+      <Button onClick={logout}>Sair</Button>
+    </div>
+  );
+}
+```
+
+### SWR para Server State
+
+```typescript
+// ✅ hooks/use-users.ts
+import useSWR from 'swr';
+import { User } from '@/types';
+
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch');
+  return res.json();
+};
+
+export function useUsers() {
+  const { data, error, isLoading, mutate } = useSWR<User[]>(
+    '/api/users',
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 60000,
+    }
+  );
+
+  return {
+    users: data,
+    isLoading,
+    isError: error,
+    refresh: mutate,
+  };
+}
+
+// ✅ Uso no componente
+'use client';
+
+import { useUsers } from '@/hooks/use-users';
+import { Button } from '@/components/ui/button';
+
+export function UsersList() {
+  const { users, isLoading, isError, refresh } = useUsers();
+  
+  if (isLoading) return <div>Loading...</div>;
+  if (isError) return <div>Error loading users</div>;
+  
+  return (
+    <div>
+      {users?.map(user => (
+        <div key={user.id}>{user.name}</div>
+      ))}
+      <Button onClick={refresh}>Refresh</Button>
+    </div>
+  );
+}
+```
+
+### React Hook Form + Zod
+
+```typescript
+// ✅ Formulário com validação
+'use client';
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+const createUserSchema = z.object({
+  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
+  email: z.string().email('Email inválido'),
+  password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
+});
+
+type CreateUserForm = z.infer<typeof createUserSchema>;
+
+export function CreateUserForm() {
+  const { register, handleSubmit, formState: { errors } } = useForm<CreateUserForm>({
+    resolver: zodResolver(createUserSchema)
+  });
+
+  const onSubmit = async (data: CreateUserForm) => {
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      
+      if (!res.ok) throw new Error('Failed to create user');
+      // Success
+    } catch (error) {
+      // Error handling
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div>
+        <Label htmlFor="name">Nome</Label>
+        <Input id="name" {...register('name')} />
+        {errors.name && (
+          <Alert variant="destructive">
+            <AlertDescription>{errors.name.message}</AlertDescription>
+          </Alert>
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor="email">Email</Label>
+        <Input id="email" type="email" {...register('email')} />
+        {errors.email && (
+          <Alert variant="destructive">
+            <AlertDescription>{errors.email.message}</AlertDescription>
+          </Alert>
+        )}
+      </div>
+
+      <Button type="submit">Criar Usuário</Button>
+    </form>
+  );
+}
+```
+
+### Loading States
+
+```typescript
+// ✅ Loading states com Skeleton
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+export function UsersList() {
+  const { users, isLoading, isError } = useUsers();
+  
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    );
+  }
+  
+  if (isError) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          Erro ao carregar usuários
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  
+  return (
+    <div>
+      {users?.map(user => (
+        <div key={user.id}>{user.name}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Dark Mode
+
+```typescript
+// ✅ provider/theme-provider.tsx
+'use client';
+
+import { ThemeProvider as NextThemesProvider } from 'next-themes';
+import { type ThemeProviderProps } from 'next-themes';
+
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
+}
+
+// ✅ app/layout.tsx
+import { ThemeProvider } from '@/providers/theme-provider';
+
+export default function RootLayout({ children }) {
+  return (
+    <html suppressHydrationWarning>
+      <body>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}
+
+// ✅ Uso do tema
+'use client';
+
+import { useTheme } from 'next-themes';
+import { Button } from '@/components/ui/button';
+import { Moon, Sun } from 'lucide-react';
+
+export function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+    >
+      <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+    </Button>
+  );
+}
+```
+
+## Exceções
+
+- Componentes muito específicos podem ser customizados, mas devem seguir design tokens
+- Alguns componentes podem precisar de lógica complexa além do ShadcnUI padrão
+- Server Components podem fazer fetch direto quando necessário
+
+## Verificação
+
+- ✅ Usando componentes ShadcnUI
+- ✅ Ícones do Lucide React
+- ✅ Tailwind CSS para estilos
+- ✅ Zustand para state global
+- ✅ SWR para server state
+- ✅ React Hook Form + Zod
+- ✅ Dark mode implementado
+- ✅ Loading states presentes
+- ✅ Mobile-first design
+
+## Recursos Relacionados
+
+- [ShadcnUI Guide](docs/SHADCN-GUIDE.md)
+- [Code Style](./code-style.mdc)
+- [UI/UX](./ui-ux.mdc)
+- [Testing](./testing.mdc)

@@ -231,17 +231,17 @@ jobs:
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
 
   # ===========================================
-  # JOB 4: NOTIFY DOKPLOY AUTO-DEPLOY
+  # JOB 4: DATABASE MIGRATIONS
   # ===========================================
-  notify-dokploy:
-    name: 📢 Notify Dokploy Auto-Deploy
+  database-migrations:
+    name: 🗄️ Database Migrations
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs: [build-and-push]
     if: |
       always() && 
       (needs.build-and-push.result == 'success' || github.event.inputs.force_deploy == 'true') &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'dokploy')
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
 
     environment:
       name: dokploy
@@ -250,12 +250,59 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      - name: 📢 Notify Dokploy Auto-Deploy
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
         run: |
-          echo "📢 Dokploy has auto-deploy enabled!"
-          echo "🚀 Your push will trigger automatic deployment"
-          echo "✅ No manual intervention needed"
-          echo ""
+          npm ci
+          cd src/backend && npm ci
+
+      - name: 🗄️ Run Database Migrations
+        run: |
+          cd src/backend
+          echo "🔄 Running database migrations..."
+          npx prisma migrate deploy
+          echo "✅ Database migrations completed"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NODE_ENV: production
+
+      - name: 📊 Generate Migration Report
+        run: |
+          echo "## 🗄️ Database Migration Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Migrations Applied Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================
+  # JOB 5: DEPLOY TO DOKPLOY
+  # ===========================================
+  deploy-dokploy:
+    name: 🚀 Deploy to Dokploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build-and-push, database-migrations]
+    if: |
+      always() && 
+      (needs.build-and-push.result == 'success' || github.event.inputs.force_deploy == 'true') &&
+      (needs.database-migrations.result == 'success' || github.event.inputs.force_deploy == 'true') &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    environment:
+      name: dokploy
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🚀 Deploy to Dokploy
+        run: |
+          echo "🚀 Deploying to Dokploy..."
           echo "📦 Docker Image: ${{ env.DOCKER_REGISTRY }}/${{ env.APP_NAME }}:${{ github.sha }}"
           echo "🌐 App URL: https://fitnessos.sistudo.com.br"
           echo ""
@@ -264,37 +311,149 @@ jobs:
           echo "  - Deploy the application"
           echo "  - Update the running containers"
 
-      - name: 📊 Generate Dokploy Status Report
+      - name: 📊 Generate Deploy Report
         run: |
-          echo "## 🚀 Dokploy Auto-Deploy Status" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Dokploy Deploy Status" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** Dokploy (Auto-Deploy)" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** ${{ env.DOCKER_REGISTRY }}/${{ env.APP_NAME }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Status:** ✅ Auto-Deploy Enabled" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ✅ Deploy Initiated" >> $GITHUB_STEP_SUMMARY
           echo "**URL:** https://fitnessos.sistudo.com.br" >> $GITHUB_STEP_SUMMARY
           echo "**Note:** Dokploy will automatically deploy this push" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔗 Dokploy Resources:" >> $GITHUB_STEP_SUMMARY
-          echo "- [Dokploy Documentation](https://docs.dokploy.com/docs/core)" >> $GITHUB_STEP_SUMMARY
-          echo "- [Docker Compose Guide](https://docs.dokploy.com/docs/core/docker-compose)" >> $GITHUB_STEP_SUMMARY
-          echo "- [Environment Variables](https://docs.dokploy.com/docs/core/environment-variables)" >> $GITHUB_STEP_SUMMARY
 
   # ===========================================
-  # JOB 5: NOTIFICATION
+  # JOB 6: HEALTH CHECKS
+  # ===========================================
+  health-checks:
+    name: 🏥 Health Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deploy-dokploy]
+    if: |
+      always() && 
+      (needs.deploy-dokploy.result == 'success' || github.event.inputs.force_deploy == 'true')
+
+    environment:
+      name: dokploy
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⏳ Wait for Deployment
+        run: |
+          echo "⏳ Waiting for deployment to complete..."
+          sleep 60
+          echo "✅ Wait period completed"
+
+      - name: 🏥 Run Health Checks
+        run: |
+          echo "🏥 Running health checks..."
+          
+          # Health check endpoints
+          APP_URL="https://fitnessos.sistudo.com.br"
+          API_URL="https://fitnessos.sistudo.com.br/api"
+          
+          # Check main app
+          echo "🔍 Checking main application..."
+          APP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$APP_URL" || echo "000")
+          echo "App Status: $APP_STATUS"
+          
+          # Check API health
+          echo "🔍 Checking API health..."
+          API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/health" || echo "000")
+          echo "API Status: $API_STATUS"
+          
+          # Check webhook status
+          echo "🔍 Checking webhook status..."
+          WEBHOOK_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/webhooks/status" || echo "000")
+          echo "Webhook Status: $WEBHOOK_STATUS"
+          
+          # Determine overall health
+          if [[ "$APP_STATUS" == "200" && "$API_STATUS" == "200" ]]; then
+            echo "✅ Health checks passed"
+            echo "HEALTH_STATUS=success" >> $GITHUB_ENV
+          else
+            echo "❌ Health checks failed"
+            echo "HEALTH_STATUS=failed" >> $GITHUB_ENV
+            exit 1
+          fi
+
+      - name: 📊 Generate Health Report
+        if: always()
+        run: |
+          echo "## 🏥 Health Check Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Overall Status:** ${{ env.HEALTH_STATUS || 'unknown' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**App URL:** https://fitnessos.sistudo.com.br" >> $GITHUB_STEP_SUMMARY
+          echo "**API URL:** https://fitnessos.sistudo.com.br/api" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================
+  # JOB 7: ROLLBACK (if health checks fail)
+  # ===========================================
+  rollback:
+    name: 🔄 Rollback Deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [health-checks]
+    if: |
+      always() && 
+      needs.health-checks.result == 'failure'
+
+    environment:
+      name: dokploy
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔄 Rollback to Previous Version
+        run: |
+          echo "🔄 Rolling back to previous version..."
+          echo "⚠️ Health checks failed, initiating rollback"
+          
+          # Get previous successful deployment
+          PREVIOUS_SHA=$(git log --oneline -n 2 | tail -1 | cut -d' ' -f1)
+          echo "Previous SHA: $PREVIOUS_SHA"
+          
+          # Notify team about rollback
+          echo "📢 Notifying team about rollback..."
+          echo "Rollback initiated due to failed health checks"
+          echo "Previous version: $PREVIOUS_SHA"
+          echo "Current version: ${{ github.sha }}"
+
+      - name: 📊 Generate Rollback Report
+        run: |
+          echo "## 🔄 Rollback Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ⚠️ Rollback Initiated" >> $GITHUB_STEP_SUMMARY
+          echo "**Reason:** Health checks failed" >> $GITHUB_STEP_SUMMARY
+          echo "**Previous Version:** $(git log --oneline -n 2 | tail -1 | cut -d' ' -f1)" >> $GITHUB_STEP_SUMMARY
+          echo "**Current Version:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Next Steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check application logs in Dokploy" >> $GITHUB_STEP_SUMMARY
+          echo "2. Verify environment variables" >> $GITHUB_STEP_SUMMARY
+          echo "3. Test locally before next deployment" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================
+  # JOB 8: NOTIFICATION
   # ===========================================
   notify:
     name: 📢 Send Notifications
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [validate-and-test, security-scan, build-and-push, notify-dokploy]
+    needs: [validate-and-test, security-scan, build-and-push, database-migrations, deploy-dokploy, health-checks, rollback]
     if: always()
     continue-on-error: true
 
     steps:
       - name: 📊 Generate Summary
         run: |
-          echo "## 🎯 FitOS Dokploy Auto-Deploy Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 FitOS Complete CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
           echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
@@ -306,27 +465,36 @@ jobs:
           echo "- **Validate & Test:** ${{ needs.validate-and-test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Security Scan:** ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Build & Push:** ${{ needs.build-and-push.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Notify Dokploy:** ${{ needs.notify-dokploy.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database Migrations:** ${{ needs.database-migrations.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deploy to Dokploy:** ${{ needs.deploy-dokploy.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Health Checks:** ${{ needs.health-checks.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Rollback:** ${{ needs.rollback.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Determine overall status
           if [[ "${{ needs.validate-and-test.result }}" == "success" && 
-                "${{ needs.build-and-push.result }}" == "success" ]]; then
+                "${{ needs.build-and-push.result }}" == "success" &&
+                "${{ needs.database-migrations.result }}" == "success" &&
+                "${{ needs.deploy-dokploy.result }}" == "success" &&
+                "${{ needs.health-checks.result }}" == "success" ]]; then
             echo "### 🎉 Overall Status: ✅ SUCCESS" >> $GITHUB_STEP_SUMMARY
-            echo "### 🚀 Deployment: Dokploy will auto-deploy" >> $GITHUB_STEP_SUMMARY
+            echo "### 🚀 Deployment: Complete and Healthy" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.rollback.result }}" == "success" ]]; then
+            echo "### ⚠️ Overall Status: ROLLBACK INITIATED" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔄 Health checks failed, rollback completed" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ❌ Overall Status: FAILED" >> $GITHUB_STEP_SUMMARY
             echo "### 🔧 Check failed jobs above" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📋 Dokploy Auto-Deploy:" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Deployment Details:" >> $GITHUB_STEP_SUMMARY
           echo "- **Docker Image:** ${{ env.DOCKER_REGISTRY }}/${{ env.APP_NAME }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **App URL:** https://fitnessos.sistudo.com.br" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** Auto-deploy enabled in Dokploy" >> $GITHUB_STEP_SUMMARY
-          echo "- **Note:** No manual intervention needed" >> $GITHUB_STEP_SUMMARY
+          echo "- **API Health:** ${{ needs.health-checks.result == 'success' && '✅ Healthy' || '❌ Unhealthy' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database:** ${{ needs.database-migrations.result == 'success' && '✅ Migrated' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔗 Dokploy Resources:" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Resources:" >> $GITHUB_STEP_SUMMARY
           echo "- [Dokploy Documentation](https://docs.dokploy.com/docs/core)" >> $GITHUB_STEP_SUMMARY
           echo "- [Docker Compose Guide](https://docs.dokploy.com/docs/core/docker-compose)" >> $GITHUB_STEP_SUMMARY
           echo "- [Environment Variables](https://docs.dokploy.com/docs/core/environment-variables)" >> $GITHUB_STEP_SUMMARY

@@ -63,6 +63,21 @@ const ROLE_PROTECTED_ROUTES: Record<string, UserRole[]> = {
   // Rotas do TRAINER (incluindo SUPER_ADMIN)
   '/trainer': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'TRAINER'],
   
+  // Rotas de NUTRITIONIST (apenas profissionais nutricionais)
+  '/nutritionist': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'NUTRITIONIST'],
+  
+  // Rotas de cliente nutricional (todos os usuários autenticados)
+  '/nutrition-client': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'NUTRITIONIST', 'CLIENT'],
+  
+  // Rotas de CRM (apenas profissionais)
+  '/professional/crm': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'NUTRITIONIST'],
+  
+  // Rotas de WhatsApp (apenas profissionais)
+  '/professional/whatsapp': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'NUTRITIONIST'],
+  
+  // Rotas de Marketing (apenas OWNER/ADMIN)
+  '/professional/marketing': ['SUPER_ADMIN', 'OWNER', 'ADMIN'],
+  
   // Rotas do CLIENT (todos podem acessar)
   '/dashboard': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'TRAINER', 'CLIENT'],
   '/client': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'TRAINER', 'CLIENT']

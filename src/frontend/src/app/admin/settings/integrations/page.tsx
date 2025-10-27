@@ -97,6 +97,17 @@ export default function IntegrationsPage() {
       features: ['E-commerce', 'Conversões', 'Funil', 'Relatórios'],
       setupRequired: true,
       href: '/admin/integrations/analytics'
+    },
+    {
+      id: 'whatsapp',
+      name: 'WhatsApp Business',
+      description: 'Configuração centralizada para todo o sistema (Acesso Super Admin)',
+      icon: <MessageSquare className="h-6 w-6" />,
+      status: 'inactive',
+      cost: 'Por mensagem',
+      features: ['Templates', 'Automação', 'Webhooks', 'Multi-tenant'],
+      setupRequired: true,
+      href: '/super-admin/whatsapp'
     }
   ];
 

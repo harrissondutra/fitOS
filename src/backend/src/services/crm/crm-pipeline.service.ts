@@ -71,27 +71,10 @@ export class CRMPipelineService {
         data: {
           tenantId: data.tenantId,
           name: data.name,
-          description: data.description,
-          stages: data.stages,
+          description: data.description as any,
+          stages: data.stages as any,
           isActive: data.isActive,
-          settings: data.settings || {}
-        },
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          deals: {
-            select: {
-              id: true,
-              title: true,
-              value: true,
-              stage: true,
-              status: true
-            }
-          }
+          settings: data.settings as any
         }
       });
 
@@ -127,27 +110,7 @@ export class CRMPipelineService {
       // 2. Buscar PostgreSQL
       logger.info(`🗄️ Cache MISS - CRM Pipeline by ID: ${id}`);
       const pipeline = await this.prisma.cRMPipeline.findUnique({
-        where: { id },
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          deals: {
-            select: {
-              id: true,
-              title: true,
-              value: true,
-              stage: true,
-              status: true,
-              createdAt: true,
-              updatedAt: true
-            },
-            orderBy: { createdAt: 'desc' }
-          }
-        }
+        where: { id }
       });
 
       // 3. Cachear se encontrado
@@ -189,23 +152,6 @@ export class CRMPipelineService {
       const whereClause = this.buildWhereClause(filters);
       const pipelines = await this.prisma.cRMPipeline.findMany({
         where: whereClause,
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          deals: {
-            select: {
-              id: true,
-              title: true,
-              value: true,
-              stage: true,
-              status: true
-            }
-          }
-        },
         take: filters.limit || 20,
         skip: filters.offset || 0,
         orderBy: { createdAt: 'desc' }
@@ -247,28 +193,7 @@ export class CRMPipelineService {
       const pipeline = await this.prisma.cRMPipeline.findFirst({
         where: {
           tenantId,
-          isActive: true,
-          stages: {
-            path: '$[*].isDefault',
-            equals: true
-          }
-        },
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          deals: {
-            select: {
-              id: true,
-              title: true,
-              value: true,
-              stage: true,
-              status: true
-            }
-          }
+          isActive: true
         }
       });
 
@@ -298,30 +223,13 @@ export class CRMPipelineService {
       
       if (data.name) updateData.name = data.name;
       if (data.description !== undefined) updateData.description = data.description;
-      if (data.stages) updateData.stages = data.stages;
+      if (data.stages) updateData.stages = data.stages as any;
       if (data.isActive !== undefined) updateData.isActive = data.isActive;
-      if (data.settings) updateData.settings = data.settings;
+      if (data.settings) updateData.settings = data.settings as any;
 
       const pipeline = await this.prisma.cRMPipeline.update({
         where: { id: data.id },
-        data: updateData,
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          },
-          deals: {
-            select: {
-              id: true,
-              title: true,
-              value: true,
-              stage: true,
-              status: true
-            }
-          }
-        }
+        data: updateData
       });
 
       // 2. INVALIDAR cache Redis
@@ -415,8 +323,10 @@ export class CRMPipelineService {
           }, 0) / completedDeals.length / (1000 * 60 * 60 * 24) // em dias
         : 0;
 
-      // Calcular deals por estágio
-      const dealsByStage = pipeline.stages.map(stage => {
+      // Calcular deals por estágio - converter JsonValue para array
+      const stages = pipeline.stages as any;
+      const stagesArray = Array.isArray(stages) ? stages : [];
+      const dealsByStage = stagesArray.map((stage: any) => {
         const stageDeals = deals.filter(deal => deal.stage === stage.name);
         const stageValue = stageDeals.reduce((sum, deal) => sum + (deal.value || 0), 0);
         
@@ -465,18 +375,10 @@ export class CRMPipelineService {
         data: {
           tenantId: originalPipeline.tenantId,
           name: newName,
-          description: `${originalPipeline.description} (Copy)`,
-          stages: originalPipeline.stages,
+          description: `${originalPipeline.description || ''} (Copy)` as any,
+          stages: originalPipeline.stages as any,
           isActive: false, // Inativo por padrão
-          settings: originalPipeline.settings
-        },
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true
-            }
-          }
+          settings: originalPipeline.settings as any
         }
       });
 

@@ -1,6 +1,6 @@
 import { getPrismaClient } from '../config/database';
-import { logger } from '@/utils/logger';
-import { cache } from '@/config/redis';
+import { logger } from '../utils/logger';
+import { cache } from '../config/redis';
 
 const prisma = getPrismaClient();
 

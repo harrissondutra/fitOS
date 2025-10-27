@@ -26,7 +26,7 @@ import {
   Image,
   FileText,
   Video,
-  Audio,
+  AudioLines,
   MapPin,
   User,
   Zap,
@@ -34,7 +34,9 @@ import {
   Settings,
   Play,
   Pause,
-  RefreshCw
+  RefreshCw,
+  Copy,
+  Save
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -171,7 +173,7 @@ export default function WhatsAppMessagesPage() {
       case 'video':
         return <Video className="w-4 h-4" />;
       case 'audio':
-        return <Audio className="w-4 h-4" />;
+        return <AudioLines className="w-4 h-4" />;
       case 'location':
         return <MapPin className="w-4 h-4" />;
       case 'contact':

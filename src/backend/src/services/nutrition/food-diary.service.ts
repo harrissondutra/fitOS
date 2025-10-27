@@ -76,81 +76,31 @@ export class FoodDiaryService {
         data: {
           tenantId: data.tenantId,
           clientId: data.clientId,
-          foodId: data.foodId,
-          recipeId: data.recipeId,
-          name: data.name,
+          food: data.name, // O campo 'food' é String
           quantity: data.quantity,
           unit: data.unit,
           mealType: data.mealType,
           consumedAt: data.consumedAt,
-          notes: data.notes
-        },
-        include: {
-          food: true,
-          recipe: true,
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true
-                }
-              }
-            }
-          }
+          calories: 0 // Inicial com 0, será calculado depois
         }
       });
 
-      // 2. Calcular macros se alimento estiver disponível
-      if (entry.food) {
-        const macros = foodDatabaseService.calculateMacros(
-          entry.food,
-          entry.quantity,
-          entry.unit
-        );
-        
-        // Atualizar entrada com macros calculados
-        const updatedEntry = await this.prisma.foodDiaryEntry.update({
-          where: { id: entry.id },
-          data: {
-            calories: macros.calories,
-            protein: macros.protein,
-            carbs: macros.carbs,
-            fat: macros.fat,
-            fiber: macros.fiber
-          },
-          include: {
-            food: true,
-            recipe: true,
-            client: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true
-                  }
-                }
-              }
-            }
-          }
-        });
-
-        // 3. INVALIDAR cache Redis
-        await this.invalidateDiaryCache(data.clientId, data.consumedAt);
-
-        logger.info(`✅ Food diary entry added: ${updatedEntry.name} (${updatedEntry.id})`);
-        return updatedEntry;
-      }
-
-      // 3. INVALIDAR cache Redis
+      // 2. INVALIDAR cache Redis
       await this.invalidateDiaryCache(data.clientId, data.consumedAt);
 
-      logger.info(`✅ Food diary entry added: ${entry.name} (${entry.id})`);
+      logger.info(`✅ Food diary entry added: ${entry.food} (${entry.id})`);
       return entry;
     } catch (error) {
       logger.error('Error adding food diary entry:', error);
       throw error;
     }
+  }
+
+  /**
+   * Alias for addEntry - creates a food diary entry
+   */
+  async createFoodDiaryEntry(data: FoodDiaryEntryCreateInput) {
+    return this.addEntry(data);
   }
 
   /**
@@ -177,20 +127,6 @@ export class FoodDiaryService {
       const whereClause = this.buildWhereClause(filters);
       const entries = await this.prisma.foodDiaryEntry.findMany({
         where: whereClause,
-        include: {
-          food: true,
-          recipe: true,
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true
-                }
-              }
-            }
-          }
-        },
         take: filters.limit || 50,
         skip: filters.offset || 0,
         orderBy: { consumedAt: 'desc' }
@@ -207,6 +143,13 @@ export class FoodDiaryService {
       logger.error('Error getting food diary entries:', error);
       throw error;
     }
+  }
+
+  /**
+   * Alias for getEntries - gets food diary entries
+   */
+  async getFoodDiaryEntries(filters: FoodDiaryFilters) {
+    return this.getEntries(filters);
   }
 
   /**
@@ -332,83 +275,33 @@ export class FoodDiaryService {
       // 1. SEMPRE escrever no PostgreSQL (fonte da verdade)
       const updateData: any = {};
       
-      if (data.foodId !== undefined) updateData.foodId = data.foodId;
-      if (data.recipeId !== undefined) updateData.recipeId = data.recipeId;
-      if (data.name) updateData.name = data.name;
+      if (data.name) updateData.food = data.name; // Mapear name para food
       if (data.quantity !== undefined) updateData.quantity = data.quantity;
       if (data.unit) updateData.unit = data.unit;
       if (data.mealType) updateData.mealType = data.mealType;
       if (data.consumedAt) updateData.consumedAt = data.consumedAt;
-      if (data.notes !== undefined) updateData.notes = data.notes;
 
       const entry = await this.prisma.foodDiaryEntry.update({
         where: { id: data.id },
-        data: updateData,
-        include: {
-          food: true,
-          recipe: true,
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true
-                }
-              }
-            }
-          }
-        }
+        data: updateData
       });
 
-      // 2. Recalcular macros se necessário
-      if (entry.food && (data.quantity !== undefined || data.unit)) {
-        const macros = foodDatabaseService.calculateMacros(
-          entry.food,
-          entry.quantity,
-          entry.unit
-        );
-        
-        const updatedEntry = await this.prisma.foodDiaryEntry.update({
-          where: { id: entry.id },
-          data: {
-            calories: macros.calories,
-            protein: macros.protein,
-            carbs: macros.carbs,
-            fat: macros.fat,
-            fiber: macros.fiber
-          },
-          include: {
-            food: true,
-            recipe: true,
-            client: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true
-                  }
-                }
-              }
-            }
-          }
-        });
-
-        // 3. INVALIDAR cache Redis
-        await this.invalidateDiaryCache(entry.clientId, entry.consumedAt);
-
-        logger.info(`✅ Food diary entry updated: ${updatedEntry.name} (${updatedEntry.id})`);
-        return updatedEntry;
-      }
-
-      // 3. INVALIDAR cache Redis
+      // 2. INVALIDAR cache Redis
       await this.invalidateDiaryCache(entry.clientId, entry.consumedAt);
 
-      logger.info(`✅ Food diary entry updated: ${entry.name} (${entry.id})`);
+      logger.info(`✅ Food diary entry updated: ${entry.food} (${entry.id})`);
       return entry;
     } catch (error) {
       logger.error('Error updating food diary entry:', error);
       throw error;
     }
+  }
+
+  /**
+   * Alias for updateEntry - updates a food diary entry
+   */
+  async updateFoodDiaryEntry(data: FoodDiaryEntryUpdateInput) {
+    return this.updateEntry(data);
   }
 
   /**
@@ -425,12 +318,19 @@ export class FoodDiaryService {
       // 2. INVALIDAR cache Redis
       await this.invalidateDiaryCache(entry.clientId, entry.consumedAt);
 
-      logger.info(`✅ Food diary entry deleted: ${entry.name} (${entry.id})`);
+      logger.info(`✅ Food diary entry deleted: ${entry.food} (${entry.id})`);
       return entry;
     } catch (error) {
       logger.error('Error deleting food diary entry:', error);
       throw error;
     }
+  }
+
+  /**
+   * Alias for deleteEntry - deletes a food diary entry
+   */
+  async deleteFoodDiaryEntry(id: string) {
+    return this.deleteEntry(id);
   }
 
   /**
@@ -465,10 +365,6 @@ export class FoodDiaryService {
             gte: startDate,
             lte: endDate
           }
-        },
-        include: {
-          food: true,
-          recipe: true
         }
       });
 
@@ -484,12 +380,8 @@ export class FoodDiaryService {
 
       entries.forEach(entry => {
         if (entry.calories) totalCalories += entry.calories;
-        if (entry.protein) totalProtein += entry.protein;
-        if (entry.carbs) totalCarbs += entry.carbs;
-        if (entry.fat) totalFat += entry.fat;
-        if (entry.fiber) totalFiber += entry.fiber;
         
-        if (entry.foodId) uniqueFoods.add(entry.foodId);
+        if (entry.food) uniqueFoods.add(entry.food);
         
         mealTypeCounts[entry.mealType] = (mealTypeCounts[entry.mealType] || 0) + 1;
       });
@@ -527,6 +419,47 @@ export class FoodDiaryService {
       return stats;
     } catch (error) {
       logger.error('Error getting client food diary stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calcula estatísticas gerais do diário alimentar
+   */
+  async getFoodDiaryStats(tenantId: string) {
+    try {
+      const entries = await this.prisma.foodDiaryEntry.findMany({
+        where: { tenantId },
+        select: {
+          calories: true,
+          mealType: true,
+          consumedAt: true
+        }
+      });
+
+      const total = entries.length;
+      const totalCalories = entries.reduce((sum, e) => sum + (e.calories || 0), 0);
+      
+      const mealTypeCounts = entries.reduce((acc, e) => {
+        acc[e.mealType] = (acc[e.mealType] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const recentDays = new Set(
+        entries
+          .filter(e => e.consumedAt)
+          .map(e => e.consumedAt!.toISOString().split('T')[0])
+      ).size;
+
+      return {
+        total,
+        totalCalories: Math.round(totalCalories),
+        mealTypeCounts,
+        activeDays: recentDays,
+        averageCaloriesPerEntry: Math.round(totalCalories / total) || 0
+      };
+    } catch (error) {
+      logger.error('Error getting food diary stats:', error);
       throw error;
     }
   }

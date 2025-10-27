@@ -1,0 +1,214 @@
+---
+alwaysApply: true
+description: Análise de roadmap e planejamento de sprints para o FitOS
+---
+
+# Análise de Roadmap e Planejamento de Sprints
+
+## 📋 Propósito
+
+Esta regra estabelece que **SEMPRE** ao iniciar qualquer task relacionada a implementação ou planejamento, o AI deve:
+
+1. **Analisar o arquivo [ROADMAP_FITOS_DEFINITIVO.md](mdc:docs/ROADMAP_FITOS_DEFINITIVO.md)**
+2. **Verificar o status atual do projeto** (qual sprint está)
+3. **Identificar tarefas pendentes** da sprint atual
+4. **Planejar próximos passos** baseados no roadmap
+5. **Gerar funcionalidades específicas** alinhadas com o roadmap
+
+## 🎯 Roadmap Definitivo
+
+O arquivo `docs/ROADMAP_FITOS_DEFINITIVO.md` contém todo o plano de implementação do FitOS, incluindo:
+
+### **Ciclo 1: MVP SaaS + CI/CD (Semanas 1-12)**
+
+#### **Sprint 1: Setup CI/CD + Multi-Tenancy (Semanas 1-3)**
+- Git workflow e GitHub Actions
+- Arquitetura multi-tenant
+- Setup de testes automatizados
+
+#### **Sprint 2: Billing + Deploy Automático (Semanas 4-6)**
+- Integrar Stripe para assinaturas recorrentes
+- Integrar Mercado Pago para PIX e pagamentos BR
+- Implementar self-service onboarding
+- Configurar deploy automático para produção
+
+#### **Sprint 3: IA Multiagente + Limites (Semanas 7-9)**
+- Implementar agentes de IA especializados (Coach, Nutrition, Business)
+- Sistema de limites por plano
+- Integração com wearables
+
+#### **Sprint 4: Integração Nutricional + Marketplace + Bioimpedância + Agendamento + CRM (Semanas 10-12)**
+- Dashboard para nutricionistas
+- Marketplace de serviços nutricionais
+- Sistema de agendamento completo
+- Integração com Google Agenda
+- Histórico e relatórios de agendamentos
+- Sistema de Bioimpedância com CRUD completo
+- AI Analysis Agent para composição corporal
+- Integração com equipamentos de bioimpedância
+- **Implementar CRM integrado para profissionais**
+- **Dashboard de pipeline de clientes**
+- **Sistema de automação de follow-ups**
+- **Campanhas automáticas personalizáveis**
+- **AI CRM Analytics Agent**
+
+#### **Sprint 5: Admin Dashboard + Deploy Final (Semanas 13-15)**
+- Dashboard administrativo completo
+- Deploy final para produção
+- Monitoramento e observabilidade
+- Documentação final
+
+## ✅ SEMPRE Fazer
+
+### Ao Iniciar Qualquer Task de Implementação:
+
+1. **Ler o roadmap completo** do arquivo `docs/ROADMAP_FITOS_DEFINITIVO.md`
+2. **Identificar a sprint atual** verificando o que já foi implementado
+3. **Listar tarefas pendentes** da sprint atual
+4. **Priorizar tarefas** baseado nas dependências e importância
+5. **Gerar plano específico** com sub-tarefas técnicas
+6. **Verificar integração** com funcionalidades já existentes
+7. **Seguir padrões de código** definidos nas regras existentes
+8. **Implementar testando** cada componente individualmente
+
+### Ao Implementar Funcionalidades:
+
+1. **Verificar documento de roadmap** antes de começar
+2. **Identificar na qual sprint a funcionalidade se encaixa**
+3. **Checar dependências** (funcionalidades que devem ser implementadas antes)
+4. **Seguir a estrutura** definida no roadmap (services, routes, componentes)
+5. **Manter consistência** com funcionalidades já implementadas
+6. **Documentar o progresso** após cada milestone
+
+### Ao Criar Novas Funcionalidades:
+
+1. **Consultar o roadmap** para entender o contexto
+2. **Verificar se a funcionalidade está planejada** em alguma sprint
+3. **Se não estiver planejada**, avaliar impacto no roadmap existente
+4. **Seguir os padrões arquiteturais** definidos (multi-tenant, AI agents, etc)
+5. **Implementar testes** automáticos (Jest + Playwright)
+6. **Documentar a funcionalidade** seguindo padrões JSDoc
+
+## 📊 Exemplo de Análise de Roadmap
+
+```typescript
+// ✅ Ao iniciar uma task, o AI deve:
+
+// 1. Verificar status atual
+const currentStatus = checkRoadmapStatus();
+console.log(`Sprint atual: ${currentStatus.sprint}`);
+console.log(`Semana: ${currentStatus.week}`);
+console.log(`Tarefas concluídas: ${currentStatus.completed}`);
+console.log(`Tarefas pendentes: ${currentStatus.pending}`);
+
+// 2. Identificar próximas tarefas
+const nextTasks = getNextTasksFromRoadmap(currentStatus.sprint);
+nextTasks.forEach(task => {
+  console.log(`- [ ] ${task.name}`);
+  console.log(`  Dependências: ${task.dependencies}`);
+  console.log(`  Escopo: ${task.scope}`);
+});
+
+// 3. Criar plano de implementação
+const implementationPlan = createImplementationPlan(nextTasks);
+```
+
+## 🔍 Checklist de Análise de Roadmap
+
+Ao iniciar qualquer implementação, verificar:
+
+- [ ] ✅ Li o roadmap completo (`docs/ROADMAP_FITOS_DEFINITIVO.md`)
+- [ ] ✅ Identifiquei a sprint atual do projeto
+- [ ] ✅ Liste todas as tarefas da sprint atual
+- [ ] ✅ Marquei tarefas já implementadas
+- [ ] ✅ Identifiquei tarefas pendentes prioritárias
+- [ ] ✅ Verifiquei dependências entre tarefas
+- [ ] ✅ Criei plano de implementação específico
+- [ ] ✅ Consultei padrões de código nas regras existentes
+- [ ] ✅ Verifiquei integração com funcionalidades existentes
+
+## 📝 Estrutura de Análise de Sprint
+
+```markdown
+## Sprint X: [Nome da Sprint]
+
+### Tarefas Implementadas ✅
+- Tarefa 1
+- Tarefa 2
+
+### Tarefas Pendentes 🔄
+- Tarefa 3 (Prioridade Alta)
+- Tarefa 4 (Prioridade Média)
+
+### Próximos Passos 🎯
+1. Implementar Tarefa 3
+2. Testar integração
+3. Implementar Tarefa 4
+```
+
+## 🚀 Geração de Funcionalidades
+
+### Processo de Geração:
+
+1. **Identificar funcionalidade** no roadmap
+2. **Verificar escopo** (backend, frontend, ambos)
+3. **Criar estrutura** seguindo padrões:
+   - Backend: `services`, `routes`, `models`, `middleware`
+   - Frontend: `components`, `pages`, `hooks`, `store`
+4. **Implementar testes** (unitários + E2E)
+5. **Documentar** (JSDoc + README)
+6. **Integrar** com funcionalidades existentes
+
+### Exemplo de Geração:
+
+```typescript
+// ✅ AI deve gerar estrutura completa
+
+// 1. Criar service
+// src/backend/src/services/nova-funcionalidade.service.ts
+export class NovaFuncionalidadeService {
+  async criar(data: Dados, tenantId: string) {
+    // Implementar lógica
+  }
+}
+
+// 2. Criar routes
+// src/backend/src/routes/nova-funcionalidade.routes.ts
+router.post('/nova-funcionalidade', async (req, res) => {
+  const result = await service.criar(req.body, req.tenantId);
+  res.json(result);
+});
+
+// 3. Criar componente frontend
+// src/frontend/components/nova-funcionalidade.tsx
+export function NovaFuncionalidade() {
+  // UI
+}
+```
+
+## 🔗 Integração com Outras Regras
+
+Esta regra deve ser consultada **junto** com:
+
+- [database.mdc](mdc:.cursor/rules/database.mdc) - Para operações de banco
+- [backend-patterns.mdc](mdc:.cursor/rules/backend-patterns.mdc) - Para padrões backend
+- [frontend-patterns.mdc](mdc:.cursor/rules/frontend-patterns.mdc) - Para padrões frontend
+- [api-design.mdc](mdc:.cursor/rules/api-design.mdc) - Para design de APIs
+- [multi-tenant.mdc](mdc:.cursor/rules/multi-tenant.mdc) - Para multi-tenancy
+- [security.mdc](mdc:.cursor/rules/security.mdc) - Para segurança
+
+## 📚 Recursos
+
+- [Roadmap Completo](docs/ROADMAP_FITOS_DEFINITIVO.md)
+- [Arquitetura](docs/ARQUITETURA_REFATORADA.md)
+- [Diretrizes do Projeto](docs/DIRETRIZES_PROJETO.md)
+
+## ⚠️ Importante
+
+**NUNCA inicie uma implementação sem consultar o roadmap!**
+
+Sempre verifique:
+1. Se a funcionalidade está planejada
+2. Quais dependências existem
+3. Qual sprint pertence
+4. Padrões a seguir

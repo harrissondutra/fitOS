@@ -1,0 +1,337 @@
+---
+alwaysApply: true
+description: Padrões de deploy, ambientes, processos de produção e rollback
+---
+
+# Deploy e Produção
+
+## Propósito
+
+Estabelecer padrões rigorosos para deploy em produção, garantindo segurança, estabilidade e facilidade de rollback.
+
+## Regras Obrigatórias
+
+### ✅ SEMPRE Fazer
+
+- **SEMPRE** usar `env.prod` antes de fazer push (deploy automático)
+- Executar `npm run setup:dev` para desenvolvimento local
+- Usar `npm run env:prod` antes de push para produção
+- Git push → produção automática (Dockploy/Coolify)
+- Pre-push hook valida configurações automaticamente
+- Health checks obrigatórios após deploy
+- Backup antes de cada deploy
+- Rollback automático em caso de falha
+- Migrações apenas com `npm run migrate:prod` em produção
+- Monitorar logs após deploy
+- Verificar se ambiente está correto antes de operações
+
+### ❌ NUNCA Fazer
+
+- NUNCA editar `.env` diretamente durante desenvolvimento (usar `env.development`)
+- NUNCA fazer push sem validar configurações
+- NUNCA fazer deploy direto sem testes
+- NUNCA omitir backup antes de mudanças
+- NUNCA fazer deploy em horários de pico sem comunicação
+- NUNCA ignorar health checks falhos
+- NUNCA fazer force push em `main` ou `develop`
+
+## Padrões e Exemplos
+
+### Fluxo de Desenvolvimento
+
+```bash
+# ✅ Fluxo seguro de desenvolvimento
+
+# 1. Configurar ambiente de desenvolvimento
+npm run setup:dev
+
+# 2. Desenvolver localmente
+npm run dev
+
+# 3. Fazer alterações no código
+# ... desenvolver ...
+
+# 4. Testar localmente
+npm run test
+
+# 5. Voltar para produção ANTES do push
+npm run env:prod
+
+# 6. Verificar configurações
+npm run env:show
+
+# 7. Commit e push (deploy automático)
+git add .
+git commit -m "feat: nova funcionalidade"
+git push origin main
+```
+
+### Scripts de Ambiente
+
+```json
+// ✅ package.json scripts
+{
+  "scripts": {
+    "setup:dev": "node scripts/setup-dev.js",
+    "env:prod": "node scripts/generate-dockploy-env.js",
+    "env:dev": "node scripts/set-env.js development",
+    "env:show": "echo 'Current environment:' && head -5 .env",
+    "pre-push": "node scripts/pre-push.js"
+  }
+}
+```
+
+### Pre-Push Hook (Automático)
+
+```typescript
+// ✅ scripts/pre-push.js
+const fs = require('fs');
+const path = require('path');
+
+function checkEnvironment() {
+  const envPath = path.join(__dirname, '../.env');
+  
+  if (!fs.existsSync(envPath)) {
+    console.error('❌ .env file not found');
+    process.exit(1);
+  }
+
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  
+  // Verificar se NODE_ENV=production
+  if (!envContent.includes('NODE_ENV=production')) {
+    console.error('❌ NODE_ENV is not set to production');
+    console.log('🔧 Running env:prod to fix...');
+    // Executar env:prod
+    require('child_process').execSync('npm run env:prod', { stdio: 'inherit' });
+  }
+
+  // Verificar se URLs apontam para produção
+  const dbUrl = envContent.match(/DATABASE_URL=([^\n]+)/)?.[1];
+  if (!dbUrl || !dbUrl.includes('production')) {
+    console.error('❌ Database URL does not point to production');
+    process.exit(1);
+  }
+
+  console.log('✅ Environment check passed');
+}
+
+checkEnvironment();
+```
+
+### Deploy Automático (Dockploy)
+
+```yaml
+# ✅ .github/workflows/deploy.yml
+name: Deploy to Dockploy
+
+on:
+  push:
+    branches: [main, develop]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run test
+      - run: npm run lint
+  
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      # Build
+      - name: Build
+        run: |
+          npm install
+          npm run build
+      
+      # Deploy to Dockploy
+      - name: Deploy to Production
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DOCKPLOY_HOST }}
+          username: ${{ secrets.DOCKPLOY_USER }}
+          key: ${{ secrets.DOCKPLOY_SSH_KEY }}
+          script: |
+            cd /opt/fitos
+            git pull origin main
+            npm run migrate:prod
+            docker-compose up -d --build
+```
+
+### Health Checks
+
+```typescript
+// ✅ Health check endpoint
+// routes/health.routes.ts
+import { Router, Request, Response } from 'express';
+
+const router = Router();
+
+router.get('/health', async (req: Request, res: Response) => {
+  try {
+    // Verificar conexão com banco
+    await prisma.$queryRaw`SELECT 1`;
+    
+    // Verificar Redis
+    await redis.ping();
+    
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: 'connected',
+      cache: 'connected'
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      error: error.message
+    });
+  }
+});
+
+export default router;
+
+// ✅ Verificação após deploy
+// Deve retornar 200
+curl https://api.fitos.com/api/health
+```
+
+### Migrações em Produção
+
+```bash
+# ✅ Processo seguro de migração em produção
+
+# 1. Backup obrigatório
+npm run db:backup
+
+# 2. Verificar migração pendente
+npx prisma migrate status
+
+# 3. Aplicar migração (usa migrate deploy, não dev)
+npm run migrate:prod
+
+# 4. Verificar se aplicou corretamente
+npx prisma migrate status
+
+# 5. Health check
+curl https://api.fitos.com/api/health
+```
+
+### Rollback Automático
+
+```typescript
+// ✅ Script de rollback
+// scripts/rollback.js
+const { execSync } = require('child_process');
+
+function rollback() {
+  try {
+    console.log('🔄 Starting rollback...');
+    
+    // 1. Parar aplicação
+    execSync('docker-compose down', { stdio: 'inherit' });
+    
+    // 2. Reverter código
+    execSync('git revert HEAD', { stdio: 'inherit' });
+    execSync('git push origin main', { stdio: 'inherit' });
+    
+    // 3. Restaurar backup do banco
+    const backups = execSync('ls -t backups/ | head -1', { encoding: 'utf-8' });
+    execSync(`npm run db:restore backups/${backups.trim()}`, { stdio: 'inherit' });
+    
+    // 4. Iniciar aplicação
+    execSync('docker-compose up -d', { stdio: 'inherit' });
+    
+    console.log('✅ Rollback completed successfully');
+  } catch (error) {
+    console.error('❌ Rollback failed:', error);
+    process.exit(1);
+  }
+}
+
+rollback();
+```
+
+### Monitoramento Pós-Deploy
+
+```bash
+# ✅ Verificar logs após deploy
+docker-compose logs -f
+
+# ✅ Verificar health check
+curl https://api.fitos.com/api/health
+
+# ✅ Verificar métricas
+# - Response time
+# - Error rate
+# - Memory usage
+# - CPU usage
+
+# ✅ Monitorar por 5-10 minutos após deploy
+```
+
+## Comandos de Ambiente
+
+```bash
+# ✅ Desenvolvimento
+npm run setup:dev    # Configurar ambiente dev
+npm run dev          # Iniciar desenvolvimento
+npm run env:show     # Ver ambiente atual
+
+# ✅ Antes do Push (Obrigatório)
+npm run env:prod     # Configurar para produção
+npm run pre-push      # Verificar configurações
+
+# ✅ Produção
+git push origin main  # Deploy automático
+
+# ✅ Pós-Deploy
+curl https://api.fitos.com/api/health
+docker-compose logs -f
+```
+
+## Checklist de Deploy
+
+```bash
+# ✅ Checklist OBRIGATÓRIO antes de push
+
+- [ ] Código testado localmente
+- [ ] Testes passando (npm run test)
+- [ ] Lint sem erros (npm run lint)
+- [ ] Ambiente de produção configurado (npm run env:prod)
+- [ ] Backup do banco criado (se houver migrações)
+- [ ] Health check funcionando
+- [ ] Comunicação com equipe sobre deploy
+- [ ] Horário apropriado (evitar horário de pico)
+```
+
+## Exceções
+
+- Hotfixes urgentes podem pular alguns testes, mas devem ser monitorados de perto
+- Deploys em staging podem ter processos mais flexíveis
+
+## Verificação
+
+- ✅ Pre-push hook validando ambiente
+- ✅ Health checks pós-deploy
+- ✅ Backup antes de mudanças
+- ✅ Rollback automático configurado
+- ✅ Monitoramento ativo
+
+## Recursos Relacionados
+
+- [Fluxo de Trabalho](docs/FLUXO_TRABALHO.md)
+- [Diretrizes Projeto](docs/DIRETRIZES_PROJETO.md)
+- [Proteção Dados Produção](docs/PROTECAO_DADOS_PRODUCAO.md)
+- [CI/CD Pipeline](docs/CI_CD_PIPELINE.md)
+- [Database](./database.mdc)

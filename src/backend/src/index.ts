@@ -84,9 +84,6 @@ import crmApiRoutes from './routes/crm.routes';
 // AI Agents routes (Sprint 4)
 import aiAgentsRoutes from './routes/ai-agents.routes';
 
-// WhatsApp routes (Sprint 4)
-import whatsappApiRoutes from './routes/whatsapp.routes';
-
 // Upload routes
 import uploadRoutes from './routes/upload';
 
@@ -133,6 +130,8 @@ class FitOSServer {
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'x-user-role'],
+      preflightContinue: false,
+      optionsSuccessStatus: 204
     }));
 
     // Compression
@@ -229,9 +228,6 @@ class FitOSServer {
 
     // AI Agents API routes (Sprint 4) - com autenticação obrigatória
     this.app.use('/api/ai', authMiddleware.requireAuth, aiAgentsRoutes);
-
-    // WhatsApp API routes (Sprint 4) - com autenticação obrigatória
-    this.app.use('/api/whatsapp', authMiddleware.requireAuth, whatsappApiRoutes);
 
     // Sprint 5 - Admin Business Routes (com autenticação obrigatória)
     this.app.use('/api/admin/tenants', authMiddleware.requireAuth, tenantAdminRoutes);

@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 const authMiddleware = getAuthMiddleware(prisma);
 
 // Middleware de autenticação para todas as rotas
-router.use(authMiddleware.requireAuth);
+router.use(authMiddleware.authenticateToken);
 
 /**
  * @route GET /api/appointment-reminders

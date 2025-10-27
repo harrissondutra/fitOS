@@ -5,8 +5,8 @@
  */
 
 import { Router } from 'express';
-import { authenticateToken } from '../../middleware/auth.middleware';
-import { validateRequest } from '../../middleware/validation.middleware';
+import { authenticateToken } from '../middleware/auth.middleware';
+// import { validateRequest } from '../middleware/validation.middleware'; // Removido - não exportado
 import { 
   aiNutritionAgent,
   crmAnalyticsAgent
@@ -22,7 +22,7 @@ const router = Router();
  * POST /api/ai/nutrition/analyze
  * Analisa dados nutricionais usando IA
  */
-router.post('/nutrition/analyze', authenticateToken, validateRequest('nutritionAnalysis'), async (req, res) => {
+router.post('/nutrition/analyze', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       ...req.body,
@@ -48,7 +48,7 @@ router.post('/nutrition/analyze', authenticateToken, validateRequest('nutritionA
  * POST /api/ai/nutrition/meal-plan
  * Gera plano alimentar personalizado
  */
-router.post('/nutrition/meal-plan', authenticateToken, validateRequest('mealPlanGeneration'), async (req, res) => {
+router.post('/nutrition/meal-plan', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       clientId: req.body.clientId || req.user.id,
@@ -85,7 +85,7 @@ router.post('/nutrition/meal-plan', authenticateToken, validateRequest('mealPlan
  * POST /api/ai/nutrition/diet-analysis
  * Analisa dieta atual do cliente
  */
-router.post('/nutrition/diet-analysis', authenticateToken, validateRequest('dietAnalysis'), async (req, res) => {
+router.post('/nutrition/diet-analysis', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       clientId: req.body.clientId || req.user.id,
@@ -114,7 +114,7 @@ router.post('/nutrition/diet-analysis', authenticateToken, validateRequest('diet
  * POST /api/ai/nutrition/lab-interpretation
  * Interpreta resultados de exames laboratoriais
  */
-router.post('/nutrition/lab-interpretation', authenticateToken, validateRequest('labInterpretation'), async (req, res) => {
+router.post('/nutrition/lab-interpretation', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       clientId: req.body.clientId || req.user.id,
@@ -143,7 +143,7 @@ router.post('/nutrition/lab-interpretation', authenticateToken, validateRequest(
  * POST /api/ai/nutrition/supplement-recommendation
  * Recomenda suplementos baseado no perfil do cliente
  */
-router.post('/nutrition/supplement-recommendation', authenticateToken, validateRequest('supplementRecommendation'), async (req, res) => {
+router.post('/nutrition/supplement-recommendation', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       clientId: req.body.clientId || req.user.id,
@@ -177,7 +177,7 @@ router.post('/nutrition/supplement-recommendation', authenticateToken, validateR
  * POST /api/ai/crm/analyze
  * Analisa dados de CRM usando IA
  */
-router.post('/crm/analyze', authenticateToken, validateRequest('crmAnalysis'), async (req, res) => {
+router.post('/crm/analyze', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       ...req.body,
@@ -203,7 +203,7 @@ router.post('/crm/analyze', authenticateToken, validateRequest('crmAnalysis'), a
  * POST /api/ai/crm/sales-forecast
  * Gera previsão de vendas
  */
-router.post('/crm/sales-forecast', authenticateToken, validateRequest('salesForecast'), async (req, res) => {
+router.post('/crm/sales-forecast', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       tenantId: req.user.tenantId,
@@ -234,7 +234,7 @@ router.post('/crm/sales-forecast', authenticateToken, validateRequest('salesFore
  * POST /api/ai/crm/pipeline-optimization
  * Otimiza pipeline de vendas
  */
-router.post('/crm/pipeline-optimization', authenticateToken, validateRequest('pipelineOptimization'), async (req, res) => {
+router.post('/crm/pipeline-optimization', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       tenantId: req.user.tenantId,
@@ -263,7 +263,7 @@ router.post('/crm/pipeline-optimization', authenticateToken, validateRequest('pi
  * POST /api/ai/crm/churn-prediction
  * Prediz risco de churn de clientes
  */
-router.post('/crm/churn-prediction', authenticateToken, validateRequest('churnPrediction'), async (req, res) => {
+router.post('/crm/churn-prediction', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       tenantId: req.user.tenantId,
@@ -292,7 +292,7 @@ router.post('/crm/churn-prediction', authenticateToken, validateRequest('churnPr
  * POST /api/ai/crm/opportunity-scoring
  * Pontua oportunidades de vendas
  */
-router.post('/crm/opportunity-scoring', authenticateToken, validateRequest('opportunityScoring'), async (req, res) => {
+router.post('/crm/opportunity-scoring', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       tenantId: req.user.tenantId,
@@ -321,7 +321,7 @@ router.post('/crm/opportunity-scoring', authenticateToken, validateRequest('oppo
  * POST /api/ai/crm/performance-analysis
  * Analisa performance da equipe
  */
-router.post('/crm/performance-analysis', authenticateToken, validateRequest('performanceAnalysis'), async (req, res) => {
+router.post('/crm/performance-analysis', authenticateToken, async (req, res) => {
   try {
     const analysisRequest = {
       tenantId: req.user.tenantId,

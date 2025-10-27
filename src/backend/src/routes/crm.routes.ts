@@ -5,8 +5,7 @@
  */
 
 import { Router } from 'express';
-import { authenticateToken } from '../../middleware/auth.middleware';
-import { validateRequest } from '../../middleware/validation.middleware';
+import { authenticateToken } from '../middleware/auth.middleware';
 import { 
   crmPipelineService,
   dealService,
@@ -23,7 +22,7 @@ const router = Router();
  * POST /api/crm/pipelines
  * Cria novo pipeline de CRM
  */
-router.post('/pipelines', authenticateToken, validateRequest('crmPipelineCreate'), async (req, res) => {
+router.post('/pipelines', authenticateToken, async (req, res) => {
   try {
     const pipelineData = {
       ...req.body,
@@ -136,7 +135,7 @@ router.get('/pipelines/default', authenticateToken, async (req, res) => {
  * PUT /api/crm/pipelines/:id
  * Atualiza pipeline
  */
-router.put('/pipelines/:id', authenticateToken, validateRequest('crmPipelineUpdate'), async (req, res) => {
+router.put('/pipelines/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const pipeline = await crmPipelineService.updatePipeline({ id, ...req.body });
@@ -180,7 +179,7 @@ router.delete('/pipelines/:id', authenticateToken, async (req, res) => {
  * POST /api/crm/pipelines/:id/duplicate
  * Duplica pipeline existente
  */
-router.post('/pipelines/:id/duplicate', authenticateToken, validateRequest('crmPipelineDuplicate'), async (req, res) => {
+router.post('/pipelines/:id/duplicate', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
@@ -230,7 +229,7 @@ router.get('/pipelines/:id/stats', authenticateToken, async (req, res) => {
  * POST /api/crm/deals
  * Cria novo negócio
  */
-router.post('/deals', authenticateToken, validateRequest('dealCreate'), async (req, res) => {
+router.post('/deals', authenticateToken, async (req, res) => {
   try {
     const dealData = {
       ...req.body,
@@ -333,7 +332,7 @@ router.get('/deals/:id', authenticateToken, async (req, res) => {
  * PUT /api/crm/deals/:id
  * Atualiza negócio
  */
-router.put('/deals/:id', authenticateToken, validateRequest('dealUpdate'), async (req, res) => {
+router.put('/deals/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const deal = await dealService.updateDeal({ id, ...req.body });
@@ -377,7 +376,7 @@ router.delete('/deals/:id', authenticateToken, async (req, res) => {
  * POST /api/crm/deals/:id/advance
  * Move negócio para próximo estágio
  */
-router.post('/deals/:id/advance', authenticateToken, validateRequest('dealAdvance'), async (req, res) => {
+router.post('/deals/:id/advance', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { stage, notes } = req.body;
@@ -401,7 +400,7 @@ router.post('/deals/:id/advance', authenticateToken, validateRequest('dealAdvanc
  * POST /api/crm/deals/:id/close
  * Fecha negócio (won/lost)
  */
-router.post('/deals/:id/close', authenticateToken, validateRequest('dealClose'), async (req, res) => {
+router.post('/deals/:id/close', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, notes } = req.body;
@@ -495,7 +494,7 @@ router.get('/deals/upcoming', authenticateToken, async (req, res) => {
  * POST /api/crm/automations
  * Cria novo workflow de automação
  */
-router.post('/automations', authenticateToken, validateRequest('automationWorkflowCreate'), async (req, res) => {
+router.post('/automations', authenticateToken, async (req, res) => {
   try {
     const workflowData = {
       ...req.body,
@@ -581,7 +580,7 @@ router.get('/automations/:id', authenticateToken, async (req, res) => {
  * PUT /api/crm/automations/:id
  * Atualiza workflow
  */
-router.put('/automations/:id', authenticateToken, validateRequest('automationWorkflowUpdate'), async (req, res) => {
+router.put('/automations/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const workflow = await automationWorkflowService.updateWorkflow({ id, ...req.body });
@@ -625,7 +624,7 @@ router.delete('/automations/:id', authenticateToken, async (req, res) => {
  * POST /api/crm/automations/:id/execute
  * Executa workflow manualmente
  */
-router.post('/automations/:id/execute', authenticateToken, validateRequest('automationExecute'), async (req, res) => {
+router.post('/automations/:id/execute', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { triggerData } = req.body;

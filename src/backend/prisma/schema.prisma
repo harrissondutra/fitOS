@@ -65,6 +65,14 @@ model Tenant {
   users                     User[]
   whatsappConfigs           WhatsAppConfig?
   workouts                  Workout[]
+  nutritionClients          NutritionClient[]
+  mealPlans                 MealPlan[]
+  nutritionConsultations    NutritionConsultation[]
+  nutritionGoals            NutritionGoal[]
+  foodDiaryEntries          FoodDiaryEntry[]
+  progressPhotos            ProgressPhoto[]
+  bodyMeasurements          BodyMeasurement[]
+  supplementPrescriptions   SupplementPrescription[]
 
   @@map("tenants")
   @@schema("fitos")
@@ -118,6 +126,8 @@ model User {
   sessions                 Session[]
   tenant                   Tenant?                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   workouts                 Workout[]
+  nutritionClient          NutritionClient?
+  supplementPrescriptions  SupplementPrescription[]
 
   @@map("users")
   @@schema("fitos")
@@ -2126,6 +2136,385 @@ model ScheduledReport {
   @@schema("fitos")
 }
 
+// ============================================================================
+// NUTRITION MODELS
+// ============================================================================
+
+model NutritionClient {
+  id                      String                   @id @default(cuid())
+  tenantId                String                   @map("tenant_id")
+  userId                  String                   @unique @map("user_id")
+  nutritionistId          String                   @map("nutritionist_id")
+  height                  Float?
+  weight                  Float?
+  age                     Int?
+  gender                  String?
+  activityLevel           String?                  @map("activity_level")
+  medicalConditions       Json                     @default("[]") @map("medical_conditions")
+  allergies               Json                     @default("[]")
+  dietaryRestrictions     Json                     @default("[]") @map("dietary_restrictions")
+  goals                   Json                     @default("[]")
+  createdAt               DateTime                 @default(now()) @map("created_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealPlans               MealPlan[]
+  diaryEntries            FoodDiaryEntry[]
+  consultations           NutritionConsultation[]
+  nutritionGoals          NutritionGoal[]
+  progressPhotos          ProgressPhoto[]
+  bodyMeasurements        BodyMeasurement[]
+  supplementPrescriptions SupplementPrescription[]
+
+  @@index([tenantId])
+  @@index([nutritionistId])
+  @@map("nutrition_clients")
+  @@schema("fitos")
+}
+
+model MealPlan {
+  id             String           @id @default(cuid())
+  tenantId       String           @map("tenant_id")
+  clientId       String           @map("client_id")
+  nutritionistId String           @map("nutritionist_id")
+  name           String
+  description    String?
+  startDate      DateTime         @map("start_date")
+  endDate        DateTime?        @map("end_date")
+  isActive       Boolean          @default(true) @map("is_active")
+  totalCalories  Float?
+  totalProtein  Float?
+  totalCarbs     Float?
+  totalFat       Float?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client         NutritionClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  meals          Meal[]
+
+  @@index([tenantId, clientId])
+  @@map("meal_plans")
+  @@schema("fitos")
+}
+
+model Meal {
+  id         String    @id @default(cuid())
+  mealPlanId String    @map("meal_plan_id")
+  name       String
+  mealType   String    @map("meal_type")
+  order      Int
+  createdAt  DateTime  @default(now()) @map("created_at")
+  mealPlan   MealPlan  @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  mealItems  MealItem[]
+
+  @@index([mealPlanId])
+  @@map("meals")
+  @@schema("fitos")
+}
+
+model MealItem {
+  id        String   @id @default(cuid())
+  mealId    String   @map("meal_id")
+  foodId    String?  @map("food_id")
+  recipeId  String?  @map("recipe_id")
+  quantity  Float
+  unit      String
+  createdAt DateTime @default(now()) @map("created_at")
+  meal      Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+
+  @@index([mealId])
+  @@map("meal_items")
+  @@schema("fitos")
+}
+
+model Recipe {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  createdById   String   @map("created_by_id")
+  name          String
+  description   String?
+  instructions  Json     @default("[]")
+  ingredients   Json     @default("[]")
+  prepTime      Int?     @map("prep_time")
+  cookTime      Int?     @map("cook_time")
+  servings      Int?
+  difficulty    String?  @default("easy") // easy, medium, hard
+  calories      Float?
+  protein       Float?
+  carbs         Float?
+  fat           Float?
+  fiber         Float?
+  tags          Json?    @default("[]")
+  imageUrl      String?  @map("image_url")
+  isPublic      Boolean  @default(false) @map("is_public")
+  nutritionInfo Json?    @default("{}") @map("nutrition_info")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@map("recipes")
+  @@schema("fitos")
+}
+
+model NutritionConsultation {
+  id              String          @id @default(cuid())
+  tenantId        String          @map("tenant_id")
+  clientId        String          @map("client_id")
+  nutritionistId  String          @map("nutritionist_id")
+  scheduledAt     DateTime        @map("scheduled_at")
+  duration        Int             @default(60)
+  status          String          @default("scheduled")
+  notes           String?
+  recommendations String?         @map("recommendations")
+  followUpDate    DateTime?       @map("follow_up_date")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client          NutritionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, clientId])
+  @@map("nutrition_consultations")
+  @@schema("fitos")
+}
+
+model NutritionGoal {
+  id          String          @id @default(cuid())
+  tenantId    String          @map("tenant_id")
+  clientId    String          @map("client_id")
+  type        String
+  targetValue Float?          @map("target_value")
+  currentValue Float?         @map("current_value")
+  unit        String
+  targetDate  DateTime?       @map("target_date")
+  isActive    Boolean         @default(true) @map("is_active")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client      NutritionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, clientId])
+  @@map("nutrition_goals")
+  @@schema("fitos")
+}
+
+model Food {
+  id          String           @id @default(cuid())
+  name        String
+  brand       String?
+  category    String?
+  source      String?
+  barcode     String?          @unique
+  calories    Float
+  protein     Float
+  carbs       Float
+  fat         Float
+  fiber       Float
+  sugar       Float?
+  sodium      Float?
+  servingSize Float            @default(100) @map("serving_size")
+  servingUnit String           @default("g") @map("serving_unit")
+  isVerified  Boolean          @default(false) @map("is_verified")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  @@index([name])
+  @@index([category])
+  @@index([brand])
+  @@map("foods")
+  @@schema("fitos")
+}
+
+model FoodDiaryEntry {
+  id         String          @id @default(cuid())
+  tenantId   String          @map("tenant_id")
+  clientId   String          @map("client_id")
+  food       String
+  quantity   Float
+  unit       String
+  mealType   String          @map("meal_type")
+  consumedAt DateTime        @map("consumed_at")
+  calories   Float?
+  createdAt  DateTime        @default(now()) @map("created_at")
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client     NutritionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, clientId, consumedAt])
+  @@map("food_diary_entries")
+  @@schema("fitos")
+}
+
+model ProgressPhoto {
+  id        String          @id @default(cuid())
+  tenantId  String          @map("tenant_id")
+  clientId  String          @map("client_id")
+  photoUrl  String          @map("photo_url")
+  takenAt   DateTime        @map("taken_at")
+  notes     String?
+  createdAt DateTime        @default(now()) @map("created_at")
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client    NutritionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, clientId, takenAt])
+  @@map("progress_photos")
+  @@schema("fitos")
+}
+
+model BodyMeasurement {
+  id         String          @id @default(cuid())
+  tenantId   String          @map("tenant_id")
+  clientId   String          @map("client_id")
+  waist      Float?
+  chest      Float?
+  hips       Float?
+  thigh      Float?
+  arm        Float?
+  measuredAt DateTime        @map("measured_at")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client     NutritionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, clientId, measuredAt])
+  @@map("body_measurements")
+  @@schema("fitos")
+}
+
+model SupplementPrescription {
+  id             String          @id @default(cuid())
+  tenantId       String          @map("tenant_id")
+  clientId       String          @map("client_id")
+  nutritionistId String          @map("nutritionist_id")
+  supplement     String
+  dosage         String
+  frequency      String
+  duration       String
+  startDate      DateTime        @map("start_date")
+  endDate        DateTime?       @map("end_date")
+  status         String          @default("active")
+  isActive       Boolean         @default(true) @map("is_active")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client         NutritionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  nutritionist   User            @relation(fields: [nutritionistId], references: [id])
+
+  @@index([tenantId, clientId])
+  @@index([nutritionistId])
+  @@map("supplement_prescriptions")
+  @@schema("fitos")
+}
+
+model LaboratoryExam {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  clientId  String   @map("client_id")
+  name      String
+  examDate  DateTime @map("exam_date")
+  results   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, clientId])
+  @@map("laboratory_exams")
+  @@schema("fitos")
+}
+
+model WhatsAppMessage {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  phone     String
+  message   String
+  status    String
+  sentAt    DateTime? @map("sent_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, phone])
+  @@map("whatsapp_messages")
+  @@schema("fitos")
+}
+
+model WhatsAppTemplate {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  content   String
+  variables Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@map("whatsapp_templates")
+  @@schema("fitos")
+}
+
+model WhatsAppScheduledMessage {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  templateId   String   @map("template_id")
+  phone        String
+  scheduledFor DateTime @map("scheduled_for")
+  status       String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, scheduledFor])
+  @@map("whatsapp_scheduled_messages")
+  @@schema("fitos")
+}
+
+model AIGenerationLog {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  type      String
+  prompt    String
+  response  String?
+  status    String
+  cost      Float?
+  tokens    Int?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, userId])
+  @@map("ai_generation_logs")
+  @@schema("fitos")
+}
+
+model Deal {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  clientProfileId String    @map("client_profile_id")
+  pipelineId      String?   @map("pipeline_id")
+  title           String
+  description     String?
+  stage           String
+  status          String    @default("open")
+  value           Float
+  probability     Float
+  expectedCloseDate DateTime @map("expected_close_date")
+  actualCloseDate DateTime? @map("actual_close_date")
+  closedAt        DateTime? @map("closed_at")
+  assignedUserId  String?   @map("assigned_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([tenantId, stage])
+  @@index([pipelineId])
+  @@index([assignedUserId])
+  @@map("deals")
+  @@schema("fitos")
+}
+
+model CRMPipeline {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  name        String
+  description String?
+  stages      Json      @default("[]")
+  settings    Json?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@map("crm_pipelines")
+  @@schema("fitos")
+}
+
 enum AiProviderType {
   OPENAI
   GEMINI
@@ -2187,5 +2576,40 @@ enum AiServiceType {
   RAG_MEDICAL
   CUSTOM
 
+  @@schema("fitos")
+}
+
+model AutomationWorkflow {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  trigger     Json
+  actions     Json
+  isActive    Boolean  @default(true)
+  settings    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  executions  AutomationWorkflowExecution[]
+
+  @@index([tenantId])
+  @@map("automation_workflows")
+  @@schema("fitos")
+}
+
+model AutomationWorkflowExecution {
+  id            String   @id @default(cuid())
+  workflowId    String   @map("workflow_id")
+  status        String
+  result        Json?
+  errorMessage  String?
+  executionTime Int?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  workflow      AutomationWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@map("automation_workflow_executions")
   @@schema("fitos")
 }

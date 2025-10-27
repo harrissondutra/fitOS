@@ -1,6 +1,6 @@
 import { PrismaClient, Exercise } from '@prisma/client';
 // Tipos temporários para evitar erros de compilação após remoção da autenticação
-type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
+type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
 import { logger } from '../utils/logger';
 import { redisService } from './redis.service';
 import { generateExerciseCacheKey, generateExerciseListCacheKey, calculateTTL, hashParams } from '../utils/cache-utils';

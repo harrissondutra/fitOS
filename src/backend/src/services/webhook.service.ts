@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { logger } from '@/utils/logger';
+import { logger } from '../utils/logger';
 import { getPrismaClient } from '../config/database';
 import { cloudinaryCostTracker } from '../services/cloudinary-cost-tracker.service';
 import { awsCostTracker } from '../services/aws-cost-tracker.service';

@@ -1,0 +1,244 @@
+---
+alwaysApply: true
+description: Padrões de Git, branches, commits semânticos e code review
+---
+
+# Git Workflow
+
+## Propósito
+
+Estabelecer padrões de Git para garantir histórico limpo, colaboração eficiente e deploys seguros.
+
+## Regras Obrigatórias
+
+### ✅ SEMPRE Fazer
+
+- Usar branch `main` para produção
+- Usar branch `develop` para staging
+- Usar `feature/*` para novas features
+- Usar commits semânticos: `feat:`, `fix:`, `docs:`, `refactor:`
+- Pull Request obrigatório para `main`
+- Code review antes de merge
+- CI/CD valida antes de merge
+- Verificar que CI/CD passou antes de merge
+- Limpar branches após merge
+
+### ❌ NUNCA Fazer
+
+- NÃO fazer force push para `main` ou `develop`
+- NÃO commitar diretamente em `main` (via branch)
+- NÃO ignorar feedback de code review
+- NÃO fazer push de código quebra o build
+- NÃO commit com mensagens vagas
+- NÃO deixar console.log no código
+- NÃO commitar secrets ou `.env`
+
+## Padrões e Exemplos
+
+### Estrutura de Branches
+
+```bash
+# ✅ Branch structure
+main          # Produção (deploy automático)
+develop       # Staging (deploy automático)
+feature/*     # Features em desenvolvimento
+bugfix/*      # Correções urgentes
+hotfix/*      # Hotfixes para produção
+```
+
+### Commits Semânticos
+
+```bash
+# ✅ Formato: tipo(escopo): mensagem
+
+# Tipos principais
+feat: nova funcionalidade
+fix: correção de bug
+docs: documentação
+refactor: refatoração de código
+perf: melhoria de performance
+test: adicionar testes
+chore: tarefas de manutenção
+style: formatação de código (prettier, etc.)
+
+# Exemplos
+git commit -m "feat(users): adiciona CRUD de usuários"
+git commit -m "fix(auth): corrige validação de JWT expirado"
+git commit -m "docs(api): atualiza documentação Swagger"
+git commit -m "refactor(backend): simplifica lógica de serviços"
+git commit -m "perf(database): adiciona index em queries frequentes"
+git commit -m "test(users): adiciona testes unitários"
+git commit -m "chore(deps): atualiza dependências"
+git commit -m "style(components): formata com prettier"
+
+# ❌ Mensagens ruins
+git commit -m "update"
+git commit -m "fix bug"
+git commit -m "changes"
+git commit -m "wip"
+```
+
+### Fluxo de Desenvolvimento
+
+```bash
+# ✅ Fluxo completo
+
+# 1. Criar branch para feature
+git checkout develop
+git pull origin develop
+git checkout -b feature/add-user-management
+
+# 2. Desenvolver
+# ... fazer alterações ...
+
+# 3. Commits frequentes
+git add .
+git commit -m "feat(users): adiciona modelo User"
+git push origin feature/add-user-management
+
+git add .
+git commit -m "feat(users): adiciona rotas CRUD"
+git push origin feature/add-user-management
+
+# 4. Abrir Pull Request
+# Visitar GitHub/GitLab e criar PR para develop
+
+# 5. Code Review
+# Aguardar aprovação e validação do CI/CD
+
+# 6. Merge após aprovação
+# Code review + CI/CD passa
+
+# 7. Limpar branch local
+git checkout develop
+git pull origin develop
+git branch -d feature/add-user-management
+```
+
+### Pull Request Template
+
+```markdown
+# ✅ Template de PR
+
+## Tipo de mudança
+- [ ] Bugfix
+- [ ] Nova feature
+- [ ] Breaking change
+- [ ] Refatoração
+- [ ] Documentação
+
+## Descrição
+Breve descrição do que foi implementado.
+
+## Como testar
+Passos para testar as mudanças:
+1. Acessar /users
+2. Clicar em "Criar usuário"
+3. Preencher formulário
+4. Verificar se salvou corretamente
+
+## Screenshots
+Se aplicável, adicionar screenshots.
+
+## Checklist
+- [ ] Código testado localmente
+- [ ] Testes passando (npm run test)
+- [ ] Lint sem erros (npm run lint)
+- [ ] Documentação atualizada
+- [ ] Migrações de banco (se aplicável)
+- [ ] Secrets não expostos
+```
+
+### Code Review Guidelines
+
+```bash
+# ✅ Guidelines de code review
+
+# Foco em:
+- Corretude do código
+- Performance e otimizações
+- Segurança
+- Testes
+- Documentação
+- Seguir padrões do projeto
+
+# Comentários construtivos
+"Considerar usar Prisma ao invés de SQL raw para segurança"
+
+"Adicionar teste unitário para este caso edge"
+
+"Esta lógica pode ser extraída para um service"
+
+# Aprovar quando:
+- Código correto e testado
+- Segue padrões do projeto
+- Performance adequada
+- Seguro
+- Documentado
+```
+
+### Pre-Commit Hooks
+
+```bash
+# ✅ .husky/pre-commit
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Run linter
+npm run lint
+
+# Run tests
+npm run test
+
+# Check for secrets
+grep -r "TODO_SECRET" src/ || true
+
+# ✅ .husky/pre-push
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Validate environment
+npm run pre-push
+
+# Run type check
+npm run type-check
+```
+
+### Troubleshooting
+
+```bash
+# ✅ Resolver conflitos
+
+# 1. Atualizar branch atual
+git checkout feature/my-feature
+git pull origin develop
+
+# 2. Resolver conflitos manualmente
+# Editar arquivos com conflito
+
+# 3. Marcar como resolvido
+git add .
+git commit -m "fix(merge): resolve conflitos com develop"
+
+# 4. Push
+git push origin feature/my-feature
+```
+
+## Exceções
+
+- Hotfixes urgentes podem seguir processo acelerado
+- Commits de documentação podem ter processo diferente
+
+## Verificação
+
+- ✅ Commits semânticos
+- ✅ PR para mudanças
+- ✅ Code review feito
+- ✅ CI/CD passou
+- ✅ Sem código quebrado
+
+## Recursos Relacionados
+
+- [Deployment](./deployment.mdc)
+- [Testing](./testing.mdc)
+- [Code Style](./code-style.mdc)

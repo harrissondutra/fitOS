@@ -1,0 +1,380 @@
+---
+alwaysApply: true
+description: Padrões de segurança, autenticação, validação de entrada e proteção contra vulnerabilidades
+---
+
+# Segurança
+
+## Propósito
+
+Estabelecer padrões rigorosos de segurança para proteger o sistema contra vulnerabilidades comuns, garantir autenticação segura e proteger dados sensíveis.
+
+## Regras Obrigatórias
+
+### ✅ SEMPRE Fazer
+
+- Usar JWT com Better Auth para autenticação
+- Validar e sanitizar TODOS os inputs de usuário
+- Implementar rate limiting em endpoints críticos (20 req/2min para auth)
+- Usar Helmet para headers de segurança
+- Logar tentativas de ataque para auditoria
+- Usar HTTPS em produção
+- Hash de senhas com bcrypt (salt rounds: 10)
+- JWT validation rigorosa (formato, payload, expiração)
+- Proteção contra XSS, SQL Injection, CSRF
+- Secrets nunca no código (sempre .env)
+- CORS configurado corretamente
+- Logs de auditoria para operações sensíveis
+- Rate limiting por IP e usuário
+
+### ❌ NUNCA Fazer
+
+- NUNCA armazenar senhas em texto claro
+- NUNCA confiar em validação apenas no frontend
+- NUNCA logar senhas, tokens ou dados sensíveis
+- NUNCA permitir SQL injection (sempre usar Prisma)
+- NUNCA esquecer de validar JWT em todas as rotas protegidas
+- NUNCA fazer debug com dados de produção
+- NUNCA expor secrets no código ou repositório
+- NUNCA permitir upload de arquivos sem validação de tipo/tamanho
+
+## Padrões e Exemplos
+
+### Validação de Entrada Robusta
+
+```typescript
+// ✅ Validação completa com express-validator
+import { body, validationResult } from 'express-validator';
+
+export const validateEmail = body('email')
+  .isEmail()
+  .withMessage('Invalid email format')
+  .normalizeEmail()
+  .isLength({ min: 5, max: 255 })
+  .withMessage('Email must be between 5 and 255 characters')
+  .custom((value) => {
+    // Proteção XSS
+    const xssPattern = /[<>'"&]|script|javascript|on\w+\s*=/i;
+    if (xssPattern.test(value)) {
+      throw new Error('Email contains invalid characters');
+    }
+    return true;
+  });
+
+export const validatePassword = body('password')
+  .isLength({ min: 8, max: 100 })
+  .withMessage('Password must be between 8 and 100 characters')
+  .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+  .withMessage('Password must contain uppercase, lowercase and number')
+  .custom((value) => {
+    // Proteção contra SQL Injection
+    const sqlPattern = /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|SCRIPT)\b)|(\b(OR|AND)\s+\d+\s*=\s*\d+)/i;
+    if (sqlPattern.test(value)) {
+      throw new Error('Password contains invalid characters');
+    }
+    return true;
+  });
+
+// ❌ ERRADO - Validação insuficiente
+export const badValidateEmail = body('email')
+  .isEmail();  // Muito básico, não protege contra ataques
+```
+
+### Rate Limiting
+
+```typescript
+// ✅ Rate limiting balanceado (20 req/2min para auth)
+import rateLimit from 'express-rate-limit';
+
+export const authLimiter = rateLimit({
+  windowMs: 2 * 60 * 1000, // 2 minutos
+  max: 20,                 // 20 requisições
+  message: 'Too many login attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Log tentativas de rate limit
+  handler: (req, res) => {
+    logger.warn('Rate limit exceeded', {
+      ip: req.ip,
+      endpoint: req.path,
+      method: req.method
+    });
+    res.status(429).json({
+      success: false,
+      error: 'Too many requests, please try again later'
+    });
+  }
+});
+
+// Aplicar em rotas sensíveis
+router.post('/login', authLimiter, async (req, res) => {
+  // ...
+});
+```
+
+### JWT Validation
+
+```typescript
+// ✅ Validação rigorosa de JWT
+import { verify } from 'jsonwebtoken';
+import { auth } from '../../../auth';
+
+export async function validateJWT(token: string): Promise<DecodedToken> {
+  // 1. Verificar formato
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    throw new Error('Invalid token format');
+  }
+
+  // 2. Verificar comprimento
+  if (token.length > 2000) {
+    throw new Error('Token too long');
+  }
+
+  // 3. Verificar token via Better Auth
+  const session = await auth.api.getSession({
+    headers: { authorization: `Bearer ${token}` }
+  });
+
+  if (!session || !session.user) {
+    throw new Error('Invalid session');
+  }
+
+  // 4. Verificar payload
+  if (!session.user.id || !session.user.tenantId) {
+    throw new Error('Invalid token payload');
+  }
+
+  // 5. Verificar expiração
+  if (session.session.expiresAt < new Date()) {
+    throw new Error('Token expired');
+  }
+
+  return {
+    userId: session.user.id,
+    tenantId: session.user.tenantId,
+    role: session.user.role
+  };
+}
+```
+
+### Proteção contra SQL Injection
+
+```typescript
+// ✅ SEMPRE usar Prisma (proteção automática)
+async function getUserByEmail(email: string, tenantId: string) {
+  return await prisma.user.findFirst({
+    where: {
+      email,        // Prisma sanitiza automaticamente
+      tenantId
+    }
+  });
+}
+
+// ❌ PERIGOSO - NUNCA fazer isso
+async function getUserByEmailBad(email: string) {
+  const query = `SELECT * FROM users WHERE email = '${email}'`;  // VULNERÁVEL!
+  return await prisma.$queryRawUnsafe(query);
+}
+
+// ✅ Se precisar SQL raw, usar parametrização
+async function getUserByEmailRaw(email: string) {
+  return await prisma.$queryRaw`
+    SELECT * FROM users WHERE email = ${email}
+  `;
+}
+```
+
+### Proteção contra XSS
+
+```typescript
+// ✅ Sanitizar inputs HTML
+import DOMPurify from 'isomorphic-dompurify';
+
+function sanitizeInput(input: string): string {
+  return DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: [],
+    ALLOWED_ATTR: []
+  });
+}
+
+// Uso em validação
+export const validateDescription = body('description')
+  .trim()
+  .isLength({ max: 1000 })
+  .custom((value) => {
+    const sanitized = sanitizeInput(value);
+    if (sanitized !== value) {
+      throw new Error('Description contains unsafe content');
+    }
+    return true;
+  });
+
+// ✅ Escape em templates (se usar HTML)
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, m => map[m]);
+}
+```
+
+### Headers de Segurança
+
+```typescript
+// ✅ Helmet para headers de segurança
+import helmet from 'helmet';
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "https:", "data:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
+// ✅ CORS configurado adequadamente
+import cors from 'cors';
+
+app.use(cors({
+  origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+```
+
+### Hash de Senhas Seguro
+
+```typescript
+// ✅ Usar bcrypt com salt
+import bcrypt from 'bcryptjs';
+
+const SALT_ROUNDS = 10;
+
+async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, SALT_ROUNDS);
+}
+
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return await bcrypt.compare(password, hash);
+}
+
+// Uso em criação de usuário
+const hashedPassword = await hashPassword(userData.password);
+
+// ✅ NUNCA armazenar senha em texto claro
+// ❌ ERRADO
+const user = await prisma.user.create({
+  data: {
+    ...userData,
+    password: userData.password  // PERIGOSO!
+  }
+});
+
+// ✅ CORRETO
+const user = await prisma.user.create({
+  data: {
+    ...userData,
+    password: await hashPassword(userData.password)
+  }
+});
+```
+
+### Logs de Auditoria
+
+```typescript
+// ✅ Logar tentativas de ataque e operações sensíveis
+logger.warn('Failed login attempt', {
+  email: req.body.email,
+  ip: req.ip,
+  userAgent: req.headers['user-agent'],
+  timestamp: new Date()
+});
+
+logger.error('SQL injection attempt detected', {
+  input: req.body.email,
+  sqlPattern: detectedPattern,
+  ip: req.ip,
+  endpoint: req.path
+});
+
+logger.info('Admin operation executed', {
+  userId: req.userId,
+  action: 'delete_user',
+  targetUserId: targetId,
+  tenantId: req.tenantId,
+  timestamp: new Date()
+});
+
+// ❌ NUNCA logar dados sensíveis
+logger.info('Login successful', {
+  email: user.email,
+  password: user.password  // ERRADO! NUNCA fazer isso
+});
+```
+
+### Middleware de Autenticação
+
+```typescript
+// ✅ Auth middleware completo
+export async function authMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+
+    const decoded = await validateJWT(token);
+    
+    req.userId = decoded.userId;
+    req.userRole = decoded.role;
+    req.tenantId = decoded.tenantId;
+    
+    next();
+  } catch (error) {
+    logger.error('Auth middleware error:', error);
+    res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+}
+```
+
+## Exceções
+
+- Desenvolvimento local pode ter validações menos rigorosas, mas devem ser fortalecidas antes do commit
+- Logs em desenvolvimento podem ter mais detalhes para debugging
+
+## Verificação
+
+- ✅ Todos os inputs validados
+- ✅ Rate limiting em endpoints críticos
+- ✅ Headers de segurança configurados
+- ✅ JWT validation rigorosa
+- ✅ Proteção contra XSS e SQL Injection
+- ✅ Senhas com hash seguro
+- ✅ Sem dados sensíveis em logs
+- ✅ CORS configurado corretamente
+
+## Recursos Relacionados
+
+- [Security Audit Report](docs/SECURITY_AUDIT_REPORT.md)
+- [Backend Patterns](./backend-patterns.mdc)
+- [Database](./database.mdc)
+- [Error Handling](./error-handling.mdc)

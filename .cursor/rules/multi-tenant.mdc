@@ -1,0 +1,316 @@
+---
+alwaysApply: true
+description: Padrões de multi-tenancy, isolamento de dados, validação e limites por plano
+---
+
+# Multi-Tenancy
+
+## Propósito
+
+Estabelecer padrões rigorosos para arquitetura multi-tenant, garantindo isolamento completo de dados, segurança e escalabilidade.
+
+## Regras Obrigatórias
+
+### ✅ SEMPRE Fazer
+
+- Incluir `tenantId` em TODAS as queries de banco de dados
+- Usar middleware de tenant em todas as rotas protegidas
+- Validar acesso cross-tenant em todas as operações
+- Identificar tenant via subdomain ou header `X-Tenant-Id`
+- Implementar limites por plano de assinatura
+- Logging de todas as operações com `tenantId`
+- Validar tenant ativo antes de operações
+- Isolamento completo entre tenants (nunca vazar dados)
+
+### ❌ NUNCA Fazer
+
+- NUNCA fazer queries sem filtrar por `tenantId`
+- NUNCA permitir acesso a dados de outro tenant
+- NUNCA omitir validação de tenant em rotas públicas
+- NUNCA assumir que tenant existe sem verificar
+- NUNCA vazar dados entre tenants nos logs
+- NUNCA fazer operações em massa sem verificar tenant
+
+## Padrões e Exemplos
+
+### Middleware de Tenant
+
+```typescript
+// ✅ middleware/tenant.middleware.ts
+import { Request, Response, NextFunction } from 'express';
+import { prisma } from '../config/prisma';
+import { logger } from '../utils/logger';
+
+export async function tenantMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    // 1. Identificar tenant (subdomain ou header)
+    const subdomain = req.hostname.split('.')[0];
+    const headerTenantId = req.headers['x-tenant-id'] as string;
+    const tenantId = headerTenantId || subdomain;
+    
+    if (!tenantId || tenantId === 'www') {
+      res.status(400).json({
+        success: false,
+        error: 'Tenant ID required'
+      });
+      return;
+    }
+
+    // 2. Verificar se tenant existe e está ativo
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId, active: true }
+    });
+
+    if (!tenant) {
+      res.status(404).json({
+        success: false,
+        error: 'Tenant not found or inactive'
+      });
+      return;
+    }
+
+    // 3. Adicionar tenantId ao request
+    req.tenantId = tenant.id;
+    req.tenant = tenant;
+    
+    // 4. Log da operação
+    logger.info('Request with tenant', {
+      tenantId: tenant.id,
+      endpoint: req.path,
+      method: req.method
+    });
+
+    next();
+  } catch (error) {
+    logger.error('Tenant middleware error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+}
+```
+
+### Queries com Isolamento
+
+```typescript
+// ✅ SEMPRE incluir tenantId em queries
+// services/user.service.ts
+
+export class UserService {
+  async getUserById(userId: string, tenantId: string): Promise<User | null> {
+    // ✅ CORRETO - Filtro por tenantId OBRIGATÓRIO
+    return await prisma.user.findFirst({
+      where: {
+        id: userId,
+        tenantId: tenantId  // OBRIGATÓRIO
+      }
+    });
+  }
+
+  async getUsers(tenantId: string, options: PaginationOptions): Promise<User[]> {
+    // ✅ CORRETO - tenantId em WHERE
+    return await prisma.user.findMany({
+      where: {
+        tenantId,
+        deletedAt: null
+      },
+      skip: (options.page - 1) * options.limit,
+      take: options.limit,
+      orderBy: { createdAt: 'desc' }
+    });
+  }
+
+  // ❌ ERRADO - Query sem tenantId (PERIGOSO!)
+  async getUserByIdWrong(userId: string) {
+    return await prisma.user.findUnique({
+      where: { id: userId }  // SEM tenantId - vaza dados entre tenants!
+    });
+  }
+}
+```
+
+### Validação Cross-Tenant
+
+```typescript
+// ✅ Validar acesso cross-tenant
+export async function validateTenantAccess(
+  userId: string,
+  tenantId: string
+): Promise<boolean> {
+  const user = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      tenantId: tenantId
+    }
+  });
+
+  if (!user) {
+    throw new Error('Access denied: User does not belong to this tenant');
+  }
+
+  return true;
+}
+
+// Uso em rotas
+router.get('/users/:id', authMiddleware, tenantMiddleware, async (req, res) => {
+  // ✅ Validar acesso
+  await validateTenantAccess(req.params.id, req.tenantId);
+  
+  const user = await userService.getUserById(req.params.id, req.tenantId);
+  res.json({ success: true, data: user });
+});
+```
+
+### Limites por Plano
+
+```typescript
+// ✅ Validar limites do plano
+import { PlansConfig } from '../config/plans.config';
+
+export async function checkPlanLimit(
+  tenantId: string,
+  resource: 'users' | 'clients' | 'storage',
+  operation: 'create' | 'update'
+): Promise<void> {
+  // 1. Obter tenant
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    include: { plan: true }
+  });
+
+  if (!tenant) {
+    throw new Error('Tenant not found');
+  }
+
+  // 2. Obter limites do plano
+  const plansConfig = new PlansConfig();
+  const plan = await plansConfig.getPlanById(tenant.planId);
+  
+  if (!plan) {
+    throw new Error('Plan not found');
+  }
+
+  // 3. Verificar limite atual
+  const currentCount = await getResourceCount(tenantId, resource);
+  const limit = plan.limits[resource];
+
+  // 4. Validar
+  if (limit !== -1 && currentCount >= limit) {
+    throw new Error(`Plan limit reached for ${resource}`);
+  }
+}
+
+// Uso ao criar usuário
+router.post('/users', authMiddleware, tenantMiddleware, async (req, res) => {
+  try {
+    // ✅ Verificar limite do plano
+    await checkPlanLimit(req.tenantId, 'users', 'create');
+    
+    const user = await userService.createUser(req.body, req.tenantId);
+    res.json({ success: true, data: user });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+```
+
+### Identificação de Tenant
+
+```typescript
+// ✅ Identificar tenant por subdomain
+// middleware/tenant-identifier.ts
+
+export function identifyTenant(req: Request): string {
+  // Opção 1: Subdomain
+  const subdomain = req.hostname.split('.')[0];
+  
+  // Opção 2: Header
+  const headerTenantId = req.headers['x-tenant-id'];
+  
+  // Opção 3: JWT payload (se necessário)
+  const jwtTenantId = req.user?.tenantId;
+  
+  return headerTenantId || jwtTenantId || subdomain;
+}
+
+// ✅ Configuração por subdomain
+// Pronto para: tenant1.fitos.com, tenant2.fitos.com
+const subdomain = req.hostname.split('.')[0];
+// tenant1.fitos.com → tenantId: 'tenant1'
+```
+
+### Logging com Tenant
+
+```typescript
+// ✅ Sempre incluir tenantId em logs
+logger.info('User created', {
+  userId: user.id,
+  tenantId: tenantId,  // OBRIGATÓRIO
+  email: user.email,
+  timestamp: new Date()
+});
+
+logger.error('Failed to create user', {
+  error: err.message,
+  tenantId: tenantId,  // OBRIGATÓRIO
+  endpoint: '/users',
+  method: 'POST'
+});
+```
+
+### Schema Multi-Tenant
+
+```prisma
+// ✅ Schema com tenantId em todas as tabelas
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  tenantId  String   // OBRIGATÓRIO
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  @@index([tenantId])  // Index para performance
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String   @unique
+  planId    String
+  active    Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  users     User[]  // Relação
+  
+  @@index([domain])
+}
+```
+
+## Exceções
+
+- Super admin pode acessar dados de todos os tenants (com auditoria)
+- Operações de sistema interno podem pular validação de tenant
+
+## Verificação
+
+- ✅ Todas as queries têm filtro por tenantId
+- ✅ Middleware de tenant em rotas protegidas
+- ✅ Validação de limites de plano
+- ✅ Sem vazamento de dados entre tenants
+- ✅ Logs incluem tenantId
+
+## Recursos Relacionados
+
+- [Architecture](./architecture.mdc)
+- [Database](./database.mdc)
+- [Security](./security.mdc)
+- [Backend Patterns](./backend-patterns.mdc)

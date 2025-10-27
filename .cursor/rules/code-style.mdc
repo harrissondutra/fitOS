@@ -1,0 +1,291 @@
+---
+alwaysApply: true
+description: Padrões de código, convenções de nomenclatura e boas práticas TypeScript
+---
+
+# Padrões de Código e Convenções
+
+## Propósito
+
+Estabelecer padrões de código consistentes para garantir legibilidade, manutenibilidade e qualidade do código TypeScript no projeto FitOS.
+
+## Regras Obrigatórias
+
+### ✅ SEMPRE Fazer
+
+- Usar TypeScript strict mode (`"strict": true`)
+- Nomenclatura PascalCase para componentes, classes e interfaces
+- Nomenclatura camelCase para funções, variáveis e propriedades
+- Nomenclatura UPPER_CASE para constantes e enums
+- Prefixar arquivos por tipo: `.routes.ts`, `.service.ts`, `.model.ts`, `.middleware.ts`
+- Separar imports: externos → internos → relativos
+- Documentar funções públicas com JSDoc
+- Usar tipos específicos ao invés de `any` (preferir `unknown` quando necessário)
+- Exportar apenas o necessário (evitar export *)
+- Usar `const` para variáveis imutáveis, `let` para mutáveis
+
+### ❌ NUNCA Fazer
+
+- NÃO usar `any` (usar tipos específicos ou `unknown`)
+- NÃO usar var (usar const/let)
+- NÃO omitir tipos em funções públicas
+- NÃO criar funções muito grandes (max 50 linhas)
+- NÃO misturar espaços e tabs (usar 2 espaços)
+- NÃO deixar código comentado
+- NÃO usar console.log em produção (usar logger)
+- NÃO criar variáveis não utilizadas
+
+## Padrões e Exemplos
+
+### Nomenclatura
+
+```typescript
+// ✅ Componentes e Classes - PascalCase
+export class UserService {}
+export interface UserData {}
+export const UserCard = () => {}
+
+// ✅ Funções e Variáveis - camelCase
+function getUserById(id: string) {}
+const currentUser = await getUserById('123');
+const isAuthenticated = true;
+
+// ✅ Constantes e Enums - UPPER_CASE
+const MAX_RETRIES = 3;
+enum UserRole {
+  ADMIN = 'admin',
+  USER = 'user'
+}
+
+// ✅ Arquivos por tipo
+user.routes.ts        # Rotas
+user.service.ts       # Lógica de negócio
+user.model.ts         # Modelos
+user.middleware.ts    # Middlewares
+user.types.ts         # Tipos
+user.test.ts          # Testes
+```
+
+### Organização de Imports
+
+```typescript
+// ✅ Correto - Ordem: externos → internos → relativos
+import { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { UserService } from '@/backend/services/user.service';
+import { authMiddleware } from '@/backend/middleware/auth.middleware';
+import { validateCreateUser } from './user.validation';
+import { logger } from '../utils/logger';
+
+// ❌ Incorreto - Imports desorganizados
+import { validateCreateUser } from './user.validation';
+import { UserService } from '@/backend/services/user.service';
+import { Request, Response } from 'express';
+```
+
+### TypeScript Types
+
+```typescript
+// ✅ Usar tipos específicos
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+}
+
+async function getUser(id: string): Promise<User | null> {
+  // ...
+}
+
+// ✅ Usar unknown quando o tipo é desconhecido
+function parseData(data: unknown): User {
+  if (isUser(data)) {
+    return data;
+  }
+  throw new Error('Invalid user data');
+}
+
+// ❌ NUNCA usar any
+function processData(data: any) {  // ERRADO
+  return data.something;
+}
+
+// ✅ Usar tipos específicos ou unknown
+function processData(data: User | unknown) {
+  if (isUser(data)) {
+    return data.email;
+  }
+}
+```
+
+### JSDoc para Documentação
+
+```typescript
+/**
+ * Cria um novo usuário no sistema
+ * @param data - Dados do usuário a ser criado
+ * @param tenantId - ID do tenant para isolamento multi-tenant
+ * @returns Promise com o usuário criado
+ * @throws {ValidationError} Se os dados forem inválidos
+ * @throws {ConflictError} Se o email já existir
+ * 
+ * @example
+ * ```typescript
+ * const user = await createUser({
+ *   email: 'user@example.com',
+ *   name: 'John Doe'
+ * }, 'tenant-123');
+ * ```
+ */
+async function createUser(data: CreateUserDto, tenantId: string): Promise<User> {
+  // ...
+}
+```
+
+### Estrutura de Arquivos por Funcionalidade
+
+```typescript
+// user.routes.ts
+import { Router } from 'express';
+import { UserService } from './user.service';
+import { createUserValidation } from './user.validation';
+import { authMiddleware } from '@/backend/middleware/auth.middleware';
+
+const router = Router();
+const userService = new UserService();
+
+router.post('/users',
+  authMiddleware,
+  createUserValidation,
+  async (req, res) => {
+    const user = await userService.createUser(req.body, req.tenantId);
+    res.json(user);
+  }
+);
+
+export default router;
+
+// user.service.ts
+export class UserService {
+  async createUser(data: CreateUserDto, tenantId: string): Promise<User> {
+    // Lógica de negócio
+  }
+
+  async getUserById(id: string, tenantId: string): Promise<User | null> {
+    // Lógica de negócio
+  }
+}
+
+// user.types.ts
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  tenantId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateUserDto {
+  email: string;
+  name: string;
+  password: string;
+}
+```
+
+### Destructuring e Spread
+
+```typescript
+// ✅ Usar destructuring para objetos
+const user = await getUserById(id);
+const { email, name } = user;
+
+// ✅ Usar spread para criar novos objetos
+const updatedUser = {
+  ...user,
+  name: 'New Name',
+  updatedAt: new Date()
+};
+
+// ✅ Usar default parameters
+function greetUser(name: string, greeting: string = 'Hello'): string {
+  return `${greeting}, ${name}!`;
+}
+```
+
+### Async/Await vs Promises
+
+```typescript
+// ✅ Preferir async/await
+async function fetchUser(id: string): Promise<User> {
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) {
+    throw new Error('User not found');
+  }
+  return user;
+}
+
+// ❌ Evitar .then().catch()
+function fetchUser(id: string) {
+  return prisma.user.findUnique({ where: { id } })
+    .then(user => {
+      if (!user) throw new Error('User not found');
+      return user;
+    });
+}
+
+// ✅ Tratar erros com try-catch
+try {
+  const user = await fetchUser(id);
+  console.log(user);
+} catch (error) {
+  logger.error('Error fetching user:', error);
+  throw error;
+}
+```
+
+### Type Guards
+
+```typescript
+// ✅ Criar type guards para validação de tipos
+function isUser(data: unknown): data is User {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'id' in data &&
+    'email' in data &&
+    'name' in data
+  );
+}
+
+// ✅ Usar type guards
+function processUserData(data: unknown): User | null {
+  if (isUser(data)) {
+    return data;
+  }
+  return null;
+}
+```
+
+## Exceções
+
+- Tipos temporários durante desenvolvimento podem usar `any`, mas devem ser refatorados antes do commit
+- Em casos excepcionais, aceitar `// eslint-disable-next-line @typescript-eslint/no-explicit-any`
+- Funções muito simples (1-2 linhas) podem omitir JSDoc
+
+## Verificação
+
+- ✅ Todos os arquivos .ts usam strict mode
+- ✅ Não há uso de `any` sem justificativa
+- ✅ Imports estão organizados
+- ✅ Funções públicas têm JSDoc
+- ✅ Nomenclatura segue padrões
+- ✅ Código não excede 50 linhas por função
+
+## Recursos Relacionados
+
+- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+- [Backend Patterns](./backend-patterns.mdc)
+- [Frontend Patterns](./frontend-patterns.mdc)
+- [Error Handling](./error-handling.mdc)

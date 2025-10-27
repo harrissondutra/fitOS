@@ -81,40 +81,17 @@ export class SupplementPrescriptionService {
           tenantId: data.tenantId,
           clientId: data.clientId,
           nutritionistId: data.nutritionistId,
-          supplementName: data.supplementName,
-          brand: data.brand,
+          supplement: data.supplementName, // Mapear supplementName para supplement
           dosage: data.dosage,
           frequency: data.frequency,
           duration: data.duration,
-          instructions: data.instructions,
           startDate: data.startDate,
           endDate: data.endDate,
-          isActive: data.isActive,
-          notes: data.notes
+          status: data.isActive ? 'active' : 'inactive'
         },
         include: {
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
+          client: true,
+          nutritionist: true,
           tenant: {
             select: {
               id: true,
@@ -127,7 +104,7 @@ export class SupplementPrescriptionService {
       // 2. INVALIDAR cache Redis
       await this.invalidatePrescriptionCache(data.clientId, data.nutritionistId);
 
-      logger.info(`✅ Supplement prescription created: ${prescription.supplementName} for ${prescription.client.user.name} (${prescription.id})`);
+      logger.info(`✅ Supplement prescription created: ${prescription.supplement} for client ${prescription.clientId} (${prescription.id})`);
       return prescription;
     } catch (error) {
       logger.error('Error creating supplement prescription:', error);
@@ -158,28 +135,8 @@ export class SupplementPrescriptionService {
       const prescription = await this.prisma.supplementPrescription.findUnique({
         where: { id },
         include: {
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
+          client: true,
+          nutritionist: true,
           tenant: {
             select: {
               id: true,
@@ -229,28 +186,8 @@ export class SupplementPrescriptionService {
       const prescriptions = await this.prisma.supplementPrescription.findMany({
         where: whereClause,
         include: {
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
+          client: true,
+          nutritionist: true,
           tenant: {
             select: {
               id: true,
@@ -306,17 +243,7 @@ export class SupplementPrescriptionService {
           ]
         },
         include: {
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          }
+          nutritionist: true
         },
         orderBy: { startDate: 'desc' }
       });
@@ -358,28 +285,8 @@ export class SupplementPrescriptionService {
         where: { id: data.id },
         data: updateData,
         include: {
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
+          client: true,
+          nutritionist: true,
           tenant: {
             select: {
               id: true,
@@ -392,7 +299,7 @@ export class SupplementPrescriptionService {
       // 2. INVALIDAR cache Redis
       await this.invalidatePrescriptionCache(prescription.clientId, prescription.nutritionistId);
 
-      logger.info(`✅ Supplement prescription updated: ${prescription.supplementName} (${prescription.id})`);
+      logger.info(`✅ Supplement prescription updated: ${prescription.supplement} (${prescription.id})`);
       return prescription;
     } catch (error) {
       logger.error('Error updating supplement prescription:', error);
@@ -414,7 +321,7 @@ export class SupplementPrescriptionService {
       // 2. INVALIDAR cache Redis
       await this.invalidatePrescriptionCache(prescription.clientId, prescription.nutritionistId);
 
-      logger.info(`✅ Supplement prescription deleted: ${prescription.supplementName} (${prescription.id})`);
+      logger.info(`✅ Supplement prescription deleted: ${prescription.supplement} (${prescription.id})`);
       return prescription;
     } catch (error) {
       logger.error('Error deleting supplement prescription:', error);
@@ -427,34 +334,29 @@ export class SupplementPrescriptionService {
    */
   async completePrescription(id: string, notes?: string) {
     try {
+      // 1. Buscar prescrição atual primeiro
+      const existing = await this.prisma.supplementPrescription.findUnique({
+        where: { id }
+      });
+
+      if (!existing) {
+        throw new Error('Prescription not found');
+      }
+
+      // 2. Atualizar prescrição
       const prescription = await this.prisma.supplementPrescription.update({
         where: { id },
         data: {
           isActive: false,
-          endDate: new Date(),
-          notes: notes ? `${prescription.notes || ''}\n\nFinalizada: ${notes}`.trim() : prescription.notes
+          endDate: new Date()
         },
         include: {
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
+          client: true,
+          nutritionist: true,
+          tenant: {
+            select: {
+              id: true,
+              name: true
             }
           }
         }
@@ -463,7 +365,7 @@ export class SupplementPrescriptionService {
       // Invalidar cache
       await this.invalidatePrescriptionCache(prescription.clientId, prescription.nutritionistId);
 
-      logger.info(`✅ Supplement prescription completed: ${prescription.supplementName} (${prescription.id})`);
+      logger.info(`✅ Supplement prescription completed: ${prescription.supplement} (${prescription.id})`);
       return prescription;
     } catch (error) {
       logger.error('Error completing supplement prescription:', error);
@@ -500,45 +402,27 @@ export class SupplementPrescriptionService {
         totalPrescriptions,
         activePrescriptions,
         completedPrescriptions,
-        expiredPrescriptions,
-        supplementsCount,
-        mostPrescribed,
-        averageDuration
+        expiredPrescriptions
       ] = await Promise.all([
         this.prisma.supplementPrescription.count({ where: whereClause }),
         this.prisma.supplementPrescription.count({
-          where: { ...whereClause, isActive: true }
+          where: { ...whereClause, status: 'active' }
         }),
         this.prisma.supplementPrescription.count({
-          where: { ...whereClause, isActive: false }
+          where: { ...whereClause, status: 'inactive' }
         }),
         this.prisma.supplementPrescription.count({
           where: {
             ...whereClause,
             endDate: { lt: new Date() },
-            isActive: true
-          }
-        }),
-        this.prisma.supplementPrescription.groupBy({
-          by: ['supplementName'],
-          where: whereClause,
-          _count: { supplementName: true }
-        }),
-        this.prisma.supplementPrescription.groupBy({
-          by: ['supplementName'],
-          where: whereClause,
-          _count: { supplementName: true },
-          orderBy: { _count: { supplementName: 'desc' } },
-          take: 5
-        }),
-        this.prisma.supplementPrescription.aggregate({
-          where: whereClause,
-          _avg: {
-            // Assumindo que duration é em dias
-            // Seria necessário converter duration string para número
+            status: 'active'
           }
         })
       ]);
+
+      // TODO: Adicionar groupBy quando field supplementName for adicionado ao schema
+      const supplementsCount: any[] = [];
+      const mostPrescribed: any[] = [];
 
       const stats: SupplementStats = {
         prescriptions: {
@@ -548,14 +432,11 @@ export class SupplementPrescriptionService {
           expired: expiredPrescriptions
         },
         supplements: {
-          total: supplementsCount.length,
-          mostPrescribed: mostPrescribed.map(item => ({
-            name: item.supplementName,
-            count: item._count.supplementName
-          }))
+          total: 0, // TODO: Calcular quando groupBy estiver disponível
+          mostPrescribed: [] // TODO: Popular quando groupBy estiver disponível
         },
         compliance: {
-          averageDuration: 0, // Seria calculado baseado na duration
+          averageDuration: 0,
           completionRate: totalPrescriptions > 0 ? Math.round((completedPrescriptions / totalPrescriptions) * 100) : 0
         }
       };
@@ -606,28 +487,8 @@ export class SupplementPrescriptionService {
           }
         },
         include: {
-          client: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          }
+          // TODO: client.user não existe - client é String, não relacionamento
+          // TODO: nutritionist.user não existe - nutritionist é String, não relacionamento
         },
         orderBy: { endDate: 'asc' }
       });
@@ -744,3 +605,4 @@ export class SupplementPrescriptionService {
 
 // Instância singleton
 export const supplementPrescriptionService = new SupplementPrescriptionService();
+

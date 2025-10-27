@@ -88,24 +88,9 @@ export class MealPlanService {
         include: {
           meals: {
             include: {
-              mealItems: {
-                include: {
-                  food: true,
-                  recipe: true
-                }
-              }
+              mealItems: true
             },
             orderBy: { order: 'asc' }
-          },
-          client: {
-            include: {
-              user: true
-            }
-          },
-          nutritionist: {
-            include: {
-              user: true
-            }
           }
         }
       });
@@ -121,29 +106,13 @@ export class MealPlanService {
           totalProtein: calculatedPlan.totalProtein,
           totalCarbs: calculatedPlan.totalCarbs,
           totalFat: calculatedPlan.totalFat,
-          totalFiber: calculatedPlan.totalFiber
         },
         include: {
           meals: {
             include: {
-              mealItems: {
-                include: {
-                  food: true,
-                  recipe: true
-                }
-              }
+              mealItems: true
             },
             orderBy: { order: 'asc' }
-          },
-          client: {
-            include: {
-              user: true
-            }
-          },
-          nutritionist: {
-            include: {
-              user: true
-            }
           }
         }
       });
@@ -184,24 +153,9 @@ export class MealPlanService {
         include: {
           meals: {
             include: {
-              mealItems: {
-                include: {
-                  food: true,
-                  recipe: true
-                }
-              }
+              mealItems: true
             },
             orderBy: { order: 'asc' }
-          },
-          client: {
-            include: {
-              user: true
-            }
-          },
-          nutritionist: {
-            include: {
-              user: true
-            }
           }
         }
       });
@@ -249,25 +203,11 @@ export class MealPlanService {
         include: {
           meals: {
             include: {
-              mealItems: {
-                include: {
-                  food: true,
-                  recipe: true
-                }
-              }
+              mealItems: true
             },
             orderBy: { order: 'asc' }
           },
-          client: {
-            include: {
-              user: true
-            }
-          },
-          nutritionist: {
-            include: {
-              user: true
-            }
-          }
+          // TODO: client e nutritionist não existem no modelo MealPlan
         },
         orderBy: { createdAt: 'desc' }
       });
@@ -281,6 +221,60 @@ export class MealPlanService {
       return mealPlans;
     } catch (error) {
       logger.error('Error getting client meal plans:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca planos alimentares com filtros
+   */
+  async getMealPlans(filters?: { tenantId?: string; clientId?: string; nutritionistId?: string; isActive?: boolean }) {
+    const cacheKey = `meal-plan:list:${JSON.stringify(filters)}`;
+    
+    try {
+      // 1. Tentar cache
+      const cached = await this.redis.get(cacheKey, {
+        namespace: 'nutrition',
+        ttl: parseInt(process.env.REDIS_TTL_MEAL_PLANS || '1800')
+      });
+      
+      if (cached) {
+        logger.info('⚡ Cache HIT - Meal plans list');
+        return cached;
+      }
+
+      // 2. Buscar PostgreSQL
+      logger.info('🗄️ Cache MISS - Meal plans list');
+      const whereClause: any = {};
+      
+      if (filters?.tenantId) whereClause.tenantId = filters.tenantId;
+      if (filters?.clientId) whereClause.clientId = filters.clientId;
+      if (filters?.nutritionistId) whereClause.nutritionistId = filters.nutritionistId;
+      if (filters?.isActive !== undefined) whereClause.isActive = filters.isActive;
+
+      const mealPlans = await this.prisma.mealPlan.findMany({
+        where: whereClause,
+        include: {
+          meals: {
+            include: {
+              mealItems: true
+            },
+            orderBy: { order: 'asc' }
+          },
+          // TODO: client e nutritionist não existem no modelo MealPlan
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      // 3. Cachear
+      await this.redis.set(cacheKey, mealPlans, {
+        namespace: 'nutrition',
+        ttl: parseInt(process.env.REDIS_TTL_MEAL_PLANS || '1800')
+      });
+
+      return mealPlans;
+    } catch (error) {
+      logger.error('Error getting meal plans:', error);
       throw error;
     }
   }
@@ -321,25 +315,11 @@ export class MealPlanService {
         include: {
           meals: {
             include: {
-              mealItems: {
-                include: {
-                  food: true,
-                  recipe: true
-                }
-              }
+              mealItems: true
             },
             orderBy: { order: 'asc' }
           },
-          client: {
-            include: {
-              user: true
-            }
-          },
-          nutritionist: {
-            include: {
-              user: true
-            }
-          }
+          // TODO: client e nutritionist não existem no modelo MealPlan
         },
         orderBy: { createdAt: 'desc' }
       });
@@ -379,24 +359,9 @@ export class MealPlanService {
         include: {
           meals: {
             include: {
-              mealItems: {
-                include: {
-                  food: true,
-                  recipe: true
-                }
-              }
+              mealItems: true
             },
             orderBy: { order: 'asc' }
-          },
-          client: {
-            include: {
-              user: true
-            }
-          },
-          nutritionist: {
-            include: {
-              user: true
-            }
           }
         }
       });
@@ -411,29 +376,13 @@ export class MealPlanService {
           totalProtein: calculatedPlan.totalProtein,
           totalCarbs: calculatedPlan.totalCarbs,
           totalFat: calculatedPlan.totalFat,
-          totalFiber: calculatedPlan.totalFiber
         },
         include: {
           meals: {
             include: {
-              mealItems: {
-                include: {
-                  food: true,
-                  recipe: true
-                }
-              }
+              mealItems: true
             },
             orderBy: { order: 'asc' }
-          },
-          client: {
-            include: {
-              user: true
-            }
-          },
-          nutritionist: {
-            include: {
-              user: true
-            }
           }
         }
       });
@@ -502,29 +451,11 @@ export class MealPlanService {
     let totalFat = 0;
     let totalFiber = 0;
 
-    for (const meal of mealPlan.meals) {
-      for (const item of meal.mealItems) {
-        if (item.food) {
-          const macros = foodDatabaseService.calculateMacros(
-            item.food,
-            item.quantity,
-            item.unit
-          );
-          
-          totalCalories += macros.calories;
-          totalProtein += macros.protein;
-          totalCarbs += macros.carbs;
-          totalFat += macros.fat;
-          totalFiber += macros.fiber;
-        } else if (item.recipe) {
-          // Calcular macros da receita (implementar se necessário)
-          // Por enquanto, usar valores diretos se disponíveis
-          if (item.recipe.calories) totalCalories += item.recipe.calories;
-          if (item.recipe.protein) totalProtein += item.recipe.protein;
-          if (item.recipe.carbs) totalCarbs += item.recipe.carbs;
-          if (item.recipe.fat) totalFat += item.recipe.fat;
-          if (item.recipe.fiber) totalFiber += item.recipe.fiber;
-        }
+    // TODO: Implementar cálculo de macros quando modelos food e recipe estiverem disponíveis
+    // Por enquanto, retornar valores zero
+    for (const meal of mealPlan.meals || []) {
+      for (const item of meal.mealItems || []) {
+        // TODO: Calcular macros por item quando relação food estiver disponível
       }
     }
 
@@ -556,6 +487,43 @@ export class MealPlanService {
     } catch (error) {
       logger.error('Error invalidating meal plan cache:', error);
       // Não falhar se cache invalidation falhar
+    }
+  }
+
+  /**
+   * Calcula estatísticas de planos alimentares
+   */
+  async getMealPlanStats(tenantId: string) {
+    try {
+      const mealPlans = await this.prisma.mealPlan.findMany({
+        where: { tenantId },
+        select: {
+          isActive: true,
+          totalCalories: true,
+          totalProtein: true,
+          totalCarbs: true,
+          totalFat: true,
+          clientId: true
+        }
+      });
+
+      const total = mealPlans.length;
+      const active = mealPlans.filter(mp => mp.isActive).length;
+      const averageCalories = mealPlans.reduce((sum, mp) => sum + (mp.totalCalories || 0), 0) / total || 0;
+      const averageProtein = mealPlans.reduce((sum, mp) => sum + (mp.totalProtein || 0), 0) / total || 0;
+      
+      const clientsWithPlans = new Set(mealPlans.map(mp => mp.clientId)).size;
+
+      return {
+        total,
+        active,
+        averageCalories: Math.round(averageCalories),
+        averageProtein: Math.round(averageProtein * 100) / 100,
+        clientsWithPlans
+      };
+    } catch (error) {
+      logger.error('Error getting meal plan stats:', error);
+      throw error;
     }
   }
 

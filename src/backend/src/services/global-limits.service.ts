@@ -50,7 +50,7 @@ export class GlobalLimitsService {
       where: { plan }
     });
 
-    return limits as GlobalLimitsConfig | null;
+    return limits as unknown as GlobalLimitsConfig | null;
   }
 
   /**

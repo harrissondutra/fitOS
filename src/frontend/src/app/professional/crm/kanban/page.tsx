@@ -281,23 +281,25 @@ export default function CRMKanbanPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">CRM - Kanban Board</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">CRM - Kanban Board</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Gerencie seus leads e oportunidades de negócio
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline">
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Relatórios
-          </Button>
-          <Button variant="outline">
-            <Settings className="w-4 h-4 mr-2" />
-            Configurar
-          </Button>
-          <Button>
+        <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
+          <div className="flex space-x-2">
+            <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+              <BarChart3 className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Relatórios</span>
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+              <Settings className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Configurar</span>
+            </Button>
+          </div>
+          <Button size="sm" className="w-full sm:w-auto">
             <Plus className="w-4 h-4 mr-2" />
             Novo Lead
           </Button>
@@ -305,7 +307,7 @@ export default function CRMKanbanPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
@@ -362,7 +364,7 @@ export default function CRMKanbanPage() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -391,9 +393,9 @@ export default function CRMKanbanPage() {
 
       {/* Kanban Board */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="flex space-x-4 overflow-x-auto pb-4">
+        <div className="flex space-x-2 sm:space-x-4 overflow-x-auto pb-4">
           {filteredPipelines.map((pipeline) => (
-            <div key={pipeline.id} className="flex-shrink-0 w-80">
+            <div key={pipeline.id} className="flex-shrink-0 w-72 sm:w-80">
               <Card>
                 <CardHeader className={`${pipeline.color} rounded-t-lg`}>
                   <div className="flex items-center justify-between">
@@ -419,7 +421,7 @@ export default function CRMKanbanPage() {
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className={`min-h-[400px] p-4 space-y-3 ${
+                        className={`min-h-[300px] sm:min-h-[400px] p-2 sm:p-4 space-y-2 sm:space-y-3 ${
                           snapshot.isDraggingOver ? 'bg-blue-50' : ''
                         }`}
                       >
@@ -430,7 +432,7 @@ export default function CRMKanbanPage() {
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
-                                className={`p-4 bg-white border rounded-lg shadow-sm cursor-move hover:shadow-md transition-shadow ${
+                                className={`p-3 sm:p-4 bg-white border rounded-lg shadow-sm cursor-move hover:shadow-md transition-shadow ${
                                   snapshot.isDragging ? 'shadow-lg rotate-2' : ''
                                 }`}
                               >

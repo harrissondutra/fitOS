@@ -152,23 +152,24 @@ export default function NutritionistDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard Nutricional</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard Nutricional</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Visão geral da sua prática nutricional
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Badge variant="outline" className="text-sm">
+          <Badge variant="outline" className="text-xs sm:text-sm">
             <Clock className="w-3 h-3 mr-1" />
-            Última atualização: há 5 min
+            <span className="hidden sm:inline">Última atualização: há 5 min</span>
+            <span className="sm:hidden">há 5 min</span>
           </Badge>
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -364,3 +365,4 @@ export default function NutritionistDashboard() {
     </div>
   );
 }
+

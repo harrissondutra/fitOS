@@ -75,17 +75,6 @@ export class NutritionConsultationService {
               }
             }
           },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
           tenant: {
             select: {
               id: true,
@@ -104,6 +93,13 @@ export class NutritionConsultationService {
       logger.error('Error scheduling nutrition consultation:', error);
       throw error;
     }
+  }
+
+  /**
+   * Alias for scheduleConsultation - creates a consultation
+   */
+  async createConsultation(data: NutritionConsultationCreateInput) {
+    return this.scheduleConsultation(data);
   }
 
   /**
@@ -137,17 +133,6 @@ export class NutritionConsultationService {
                   name: true,
                   email: true,
                   phone: true
-                }
-              }
-            }
-          },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
                 }
               }
             }
@@ -209,17 +194,6 @@ export class NutritionConsultationService {
                   name: true,
                   email: true,
                   phone: true
-                }
-              }
-            }
-          },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
                 }
               }
             }
@@ -317,17 +291,6 @@ export class NutritionConsultationService {
               }
             }
           },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
           tenant: {
             select: {
               id: true,
@@ -373,17 +336,6 @@ export class NutritionConsultationService {
               }
             }
           },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
-                }
-              }
-            }
-          },
           tenant: {
             select: {
               id: true,
@@ -409,11 +361,16 @@ export class NutritionConsultationService {
    */
   async cancelConsultation(id: string, reason?: string) {
     try {
+      // Buscar consulta existente primeiro
+      const existingConsultation = await this.prisma.nutritionConsultation.findUnique({
+        where: { id }
+      });
+
       const consultation = await this.prisma.nutritionConsultation.update({
         where: { id },
         data: {
           status: 'cancelled',
-          notes: reason ? `${consultation.notes || ''}\nCancelada: ${reason}`.trim() : consultation.notes
+          notes: reason ? `${existingConsultation?.notes || ''}\nCancelada: ${reason}`.trim() : existingConsultation?.notes
         },
         include: {
           client: {
@@ -424,17 +381,6 @@ export class NutritionConsultationService {
                   name: true,
                   email: true,
                   phone: true
-                }
-              }
-            }
-          },
-          nutritionist: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true
                 }
               }
             }

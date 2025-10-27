@@ -34,25 +34,23 @@ export { supplementPrescriptionService } from './supplement-prescription.service
 
 // Types
 export type {
-  FoodSearchResult,
   FoodCreateInput,
   FoodUpdateInput,
-  FoodFilters
+  FoodSearchFilters
 } from './food-database.service';
 
 export type {
   MealPlanCreateInput,
   MealPlanUpdateInput,
-  MealPlanFilters,
-  MealCreateInput,
-  MealItemCreateInput
+  MealInput,
+  MealItemInput
 } from './meal-plan.service';
 
 export type {
   RecipeCreateInput,
   RecipeUpdateInput,
-  RecipeFilters,
-  RecipeIngredientCreateInput
+  RecipeSearchFilters,
+  RecipeIngredientInput
 } from './recipe.service';
 
 export type {
@@ -62,15 +60,15 @@ export type {
 } from './food-diary.service';
 
 export type {
-  NutritionProfessionalProfileCreateInput,
-  NutritionProfessionalProfileUpdateInput,
-  NutritionProfessionalProfileFilters
+  NutritionProfessionalCreateInput,
+  NutritionProfessionalUpdateInput,
+  NutritionProfessionalSearchFilters
 } from './nutrition-professional.service';
 
 export type {
   NutritionClientCreateInput,
   NutritionClientUpdateInput,
-  NutritionClientFilters
+  NutritionClientSearchFilters
 } from './nutrition-client.service';
 
 export type {

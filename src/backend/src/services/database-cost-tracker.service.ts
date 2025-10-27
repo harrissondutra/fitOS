@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
-import { logger } from '@/utils/logger';
-import { cache } from '@/config/redis';
+import { logger } from '../utils/logger';
+import { cache } from '../config/redis';
 
 interface TableSize {
   schemaname: string;

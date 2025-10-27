@@ -1,8 +1,8 @@
 import { getPrismaClient } from '../config/database';
 import { calculateCost, getModelPricing, isDiscountTime } from '../config/ai-pricing';
 import { Prisma } from '@prisma/client';
-import { logger } from '@/utils/logger';
-import { cache } from '@/config/redis';
+import { logger } from '../utils/logger';
+import { cache } from '../config/redis';
 
 const prisma = getPrismaClient();
 

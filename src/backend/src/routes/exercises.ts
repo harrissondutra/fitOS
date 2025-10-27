@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import { ExerciseService, ExerciseFilters, ExerciseFormData } from '../services/exercise.service';
 import { body, validationResult, query } from 'express-validator';
 
-import { UserRole } from '../../../shared/types/auth.types';
+type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
 
 // PrismaClient global compartilhado
 const prisma = new PrismaClient();

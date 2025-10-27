@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { UserRole } from '../../../shared/types';
+import { useState, useCallback, useEffect } from 'react';
+import { UserRole } from '@/shared/types/auth.types';
 
 interface UsePermissionsReturn {
   canAccess: (resource: string, action?: string) => boolean;
@@ -11,6 +11,13 @@ interface UsePermissionsReturn {
   canViewGlobalAnalytics: boolean;
   canManagePlanLimits: boolean;
   canExportData: boolean;
+  // Permissões nutricionais
+  canManageNutrition: boolean;
+  canCreateMealPlans: boolean;
+  canViewFoodDiary: boolean;
+  canAccessCRM: boolean;
+  canAccessWhatsApp: boolean;
+  canAccessMarketing: boolean;
 }
 
 export function usePermissions(userRole?: UserRole): UsePermissionsReturn {
@@ -24,6 +31,12 @@ export function usePermissions(userRole?: UserRole): UsePermissionsReturn {
     canViewGlobalAnalytics: false,
     canManagePlanLimits: false,
     canExportData: false,
+    canManageNutrition: false,
+    canCreateMealPlans: false,
+    canViewFoodDiary: false,
+    canAccessCRM: false,
+    canAccessWhatsApp: false,
+    canAccessMarketing: false,
   });
 
   const updatePermissions = useCallback((role: UserRole) => {
@@ -62,6 +75,13 @@ export function usePermissions(userRole?: UserRole): UsePermissionsReturn {
       canViewGlobalAnalytics: role === 'SUPER_ADMIN',
       canManagePlanLimits: role === 'SUPER_ADMIN' || ['OWNER'].includes(role),
       canExportData: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN'].includes(role),
+      // Permissões nutricionais
+      canManageNutrition: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'NUTRITIONIST'].includes(role),
+      canCreateMealPlans: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'NUTRITIONIST'].includes(role),
+      canViewFoodDiary: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'NUTRITIONIST', 'CLIENT'].includes(role),
+      canAccessCRM: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'NUTRITIONIST'].includes(role),
+      canAccessWhatsApp: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'NUTRITIONIST'].includes(role),
+      canAccessMarketing: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN'].includes(role),
     };
 
     setPermissions(newPermissions);

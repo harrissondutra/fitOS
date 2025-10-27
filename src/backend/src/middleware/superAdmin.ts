@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { getPrismaClient } from '../config/database';
 // Tipos temporários para evitar erros de compilação após remoção da autenticação
-type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
+type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
 
 // Extend Request interface to include user information
 declare global {

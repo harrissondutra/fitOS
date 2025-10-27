@@ -23,7 +23,8 @@ import {
   ChevronDown,
   ChevronRight,
   Menu,
-  X
+  X,
+  Activity
 } from 'lucide-react';
 
 const navigation = [
@@ -31,6 +32,14 @@ const navigation = [
     name: 'Dashboard', 
     href: '/admin/dashboard', 
     icon: LayoutDashboard,
+    current: false
+  },
+  
+  // System Health
+  { 
+    name: 'System Health', 
+    href: '/admin/system-health', 
+    icon: Activity,
     current: false
   },
   

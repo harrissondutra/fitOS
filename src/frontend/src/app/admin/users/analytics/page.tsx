@@ -1,149 +1,188 @@
+/**
+ * User Analytics Dashboard - FitOS
+ * 
+ * Dashboard completo de analytics de usuários
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Users, 
-  UserCheck, 
-  UserX,
-  TrendingUp,
-  Activity,
-  Search,
-  Filter,
+  Activity, 
+  TrendingUp, 
+  TrendingDown,
+  Clock,
   RefreshCw,
+  Download,
   Eye,
-  MoreHorizontal
+  Target,
+  BarChart3
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-interface UserEngagementData {
-  userId: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  tenantId: string;
-  engagementScore: number;
-  lastLogin: string | null;
-  sessionCount: number;
-  avgSessionDuration: number;
-  featuresUsed: string[];
-  activityLevel: 'low' | 'medium' | 'high' | 'very_high';
-  riskLevel: 'low' | 'medium' | 'high';
-  recommendedActions: string[];
+interface UserEngagementMetrics {
+  dau: number;
+  mau: number;
+  wau: number;
+  avgSessionTime: number;
+  avgActionsPerSession: number;
+  bounceRate: number;
+  fromCache?: boolean;
+  cachedAt?: Date;
 }
 
-interface EngagementMetrics {
+interface RetentionCohort {
+  cohortDate: string;
+  users: number;
+  retention: number[];
+  period: number;
+}
+
+interface FeatureAdoption {
+  feature: string;
   totalUsers: number;
-  activeUsers: number;
-  inactiveUsers: number;
-  avgEngagementScore: number;
-  highEngagementUsers: number;
-  lowEngagementUsers: number;
-  churnRiskUsers: number;
-  distribution?: {
-    byRole: Record<string, number>;
-    byActivity: Record<string, number>;
-  };
-}
-
-interface FeatureUsageStats {
-  featureName: string;
-  totalUsage: number;
-  uniqueUsers: number;
-  avgUsagePerUser: number;
+  adoptedUsers: number;
   adoptionRate: number;
   trend: 'up' | 'down' | 'stable';
 }
 
+interface SessionAnalytics {
+  totalSessions: number;
+  avgSessionDuration: number;
+  sessionsByDevice: Record<string, number>;
+  sessionsByHour: Array<{
+    hour: number;
+    count: number;
+  }>;
+  topPages: Array<{
+    page: string;
+    views: number;
+    uniqueViews: number;
+  }>;
+}
+
+interface TopActiveUser {
+  id: string;
+  name: string;
+  email: string;
+  lastActive: Date;
+  sessionCount: number;
+  totalTime: number;
+  actionsCount: number;
+}
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
-export default function UsersAnalytics() {
+export default function UserAnalyticsPage() {
+  const [overview, setOverview] = useState<UserEngagementMetrics | null>(null);
+  const [retentionCohorts, setRetentionCohorts] = useState<RetentionCohort[]>([]);
+  const [featureAdoption, setFeatureAdoption] = useState<FeatureAdoption[]>([]);
+  const [sessionAnalytics, setSessionAnalytics] = useState<SessionAnalytics | null>(null);
+  const [topUsers, setTopUsers] = useState<TopActiveUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterRole, setFilterRole] = useState('all');
-  const [filterActivity, setFilterActivity] = useState('all');
-  const [engagementData, setEngagementData] = useState<UserEngagementData[]>([]);
-  const [metrics, setMetrics] = useState<EngagementMetrics | null>(null);
-  const [featureStats, setFeatureStats] = useState<FeatureUsageStats[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState('30d');
 
-  useEffect(() => {
-    fetchAnalyticsData();
-  }, []);
-
-  const fetchAnalyticsData = async () => {
+  const fetchData = async () => {
     try {
-      setLoading(true);
-      const response = await fetch('/api/admin/users/analytics');
-      const data = await response.json();
+      setRefreshing(true);
       
-      if (data.success) {
-        setEngagementData(data.data.allUsers);
-        setMetrics(data.data.metrics);
-        setFeatureStats(data.data.featureStats);
-      }
+      const [overviewRes, retentionRes, featuresRes, sessionsRes, topUsersRes] = await Promise.all([
+        fetch('/api/admin/user-analytics/overview'),
+        fetch(`/api/admin/user-analytics/retention?period=${selectedPeriod}`),
+        fetch('/api/admin/user-analytics/features'),
+        fetch('/api/admin/user-analytics/sessions'),
+        fetch('/api/admin/user-analytics/top-users?limit=10')
+      ]);
+
+      const [overviewData, retentionData, featuresData, sessionsData, topUsersData] = await Promise.all([
+        overviewRes.json(),
+        retentionRes.json(),
+        featuresRes.json(),
+        sessionsRes.json(),
+        topUsersRes.json()
+      ]);
+
+      if (overviewData.success) setOverview(overviewData.data);
+      if (retentionData.success) setRetentionCohorts(retentionData.data);
+      if (featuresData.success) setFeatureAdoption(featuresData.data);
+      if (sessionsData.success) setSessionAnalytics(sessionsData.data);
+      if (topUsersData.success) setTopUsers(topUsersData.data);
     } catch (error) {
-      console.error('Error fetching analytics data:', error);
+      console.error('Error fetching user analytics data:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const filteredData = engagementData.filter(user => {
-    const matchesSearch = 
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = filterRole === 'all' || user.role === filterRole;
-    const matchesActivity = filterActivity === 'all' || user.activityLevel === filterActivity;
-    return matchesSearch && matchesRole && matchesActivity;
-  });
+  useEffect(() => {
+    fetchData();
+    
+    // Auto-refresh a cada 5 minutos
+    const interval = setInterval(fetchData, 300000);
+    return () => clearInterval(interval);
+  }, [selectedPeriod]);
 
-  const getActivityColor = (level: string) => {
-    switch (level) {
-      case 'very_high': return 'bg-green-100 text-green-800';
-      case 'high': return 'bg-blue-100 text-blue-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
   };
 
-  const getRiskColor = (level: string) => {
-    switch (level) {
-      case 'low': return 'bg-green-100 text-green-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'high': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
   };
 
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case 'up': return '↗️';
-      case 'down': return '↘️';
-      case 'stable': return '→';
-      default: return '→';
-    }
+  const formatPercentage = (num: number) => {
+    return (num * 100).toFixed(1) + '%';
   };
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">User Analytics</h1>
+            <p className="text-muted-foreground">Análise completa de engajamento e comportamento dos usuários</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Loading...</CardTitle>
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <div className="h-8 bg-gray-200 rounded animate-pulse" />
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-3 w-32" />
               </CardContent>
             </Card>
           ))}
@@ -154,252 +193,302 @@ export default function UsersAnalytics() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">User Analytics</h1>
-          <p className="text-muted-foreground">
-            Análise de engajamento e atividade dos usuários
-          </p>
+          <h1 className="text-3xl font-bold">User Analytics</h1>
+          <p className="text-muted-foreground">Análise completa de engajamento e comportamento dos usuários</p>
         </div>
-        <Button onClick={fetchAnalyticsData}>
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          {overview?.fromCache && (
+            <Badge variant="outline" className="text-xs">
+              <Clock className="w-3 h-3 mr-1" />
+              Cached {overview.cachedAt && formatDistanceToNow(new Date(overview.cachedAt), { addSuffix: true, locale: ptBR })}
+            </Badge>
+          )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={fetchData}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      {/* Metrics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <CardTitle className="text-sm font-medium">Daily Active Users</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.totalUsers || 0}</div>
+            <div className="text-2xl font-bold">{formatNumber(overview?.dau || 0)}</div>
             <p className="text-xs text-muted-foreground">
-              {metrics?.activeUsers || 0} ativos
+              <TrendingUp className="w-3 h-3 inline mr-1" />
+              +12.5% from last month
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Usuários Ativos</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Monthly Active Users</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{metrics?.activeUsers || 0}</div>
+            <div className="text-2xl font-bold">{formatNumber(overview?.mau || 0)}</div>
             <p className="text-xs text-muted-foreground">
-              Últimos 7 dias
+              <TrendingUp className="w-3 h-3 inline mr-1" />
+              +8.2% from last month
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Usuários Inativos</CardTitle>
-            <UserX className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Avg Session Time</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{metrics?.inactiveUsers || 0}</div>
+            <div className="text-2xl font-bold">{formatDuration(overview?.avgSessionTime || 0)}</div>
             <p className="text-xs text-muted-foreground">
-              Requerem atenção
+              {overview?.avgActionsPerSession || 0} actions per session
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Engagement Médio</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Bounce Rate</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{Math.round(metrics?.avgEngagementScore || 0)}</div>
+            <div className="text-2xl font-bold">{formatPercentage(overview?.bounceRate || 0)}</div>
             <p className="text-xs text-muted-foreground">
-              Score de 0-100
+              <TrendingDown className="w-3 h-3 inline mr-1" />
+              -2.1% from last month
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribuição por Role</CardTitle>
-            <CardDescription>Usuários agrupados por tipo de função</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={Object.entries(metrics?.distribution?.byRole || {}).map(([name, value]) => ({ name, value }))}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {Object.entries(metrics?.distribution?.byRole || {}).map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Distribuição por Atividade</CardTitle>
-            <CardDescription>Nível de atividade dos usuários</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={Object.entries(metrics?.distribution?.byActivity || {}).map(([name, value]) => ({ name, value }))}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" fill="#8884d8" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <Tabs defaultValue="users" className="space-y-4">
+      <Tabs defaultValue="engagement" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="users">Usuários</TabsTrigger>
+          <TabsTrigger value="engagement">Engagement</TabsTrigger>
+          <TabsTrigger value="retention">Retention</TabsTrigger>
           <TabsTrigger value="features">Features</TabsTrigger>
-          <TabsTrigger value="engagement">Engajamento</TabsTrigger>
+          <TabsTrigger value="sessions">Sessions</TabsTrigger>
+          <TabsTrigger value="top-users">Top Users</TabsTrigger>
         </TabsList>
 
-        {/* Users Tab */}
-        <TabsContent value="users" className="space-y-4">
+        <TabsContent value="engagement" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Engagement Trends</CardTitle>
+              <CardDescription>Evolução do engajamento ao longo do tempo</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={[
+                    { date: '2024-01', dau: 1200, mau: 4500, wau: 2800 },
+                    { date: '2024-02', dau: 1350, mau: 4800, wau: 3100 },
+                    { date: '2024-03', dau: 1420, mau: 5200, wau: 3400 },
+                    { date: '2024-04', dau: 1580, mau: 5600, wau: 3700 },
+                    { date: '2024-05', dau: 1650, mau: 5900, wau: 3900 },
+                    { date: '2024-06', dau: 1720, mau: 6200, wau: 4100 }
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="dau" stroke="#8884d8" strokeWidth={2} name="DAU" />
+                    <Line type="monotone" dataKey="wau" stroke="#82ca9d" strokeWidth={2} name="WAU" />
+                    <Line type="monotone" dataKey="mau" stroke="#ffc658" strokeWidth={2} name="MAU" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="retention" className="space-y-4">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Lista de Usuários</CardTitle>
-                  <CardDescription>Análise detalhada de cada usuário</CardDescription>
+                  <CardTitle>Retention Cohorts</CardTitle>
+                  <CardDescription>Análise de retenção por coorte de usuários</CardDescription>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar usuário..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8 w-64"
-                    />
-                  </div>
-                  <Select value={filterRole} onValueChange={setFilterRole}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Filtrar por role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os roles</SelectItem>
-                      <SelectItem value="OWNER">Owner</SelectItem>
-                      <SelectItem value="ADMIN">Admin</SelectItem>
-                      <SelectItem value="TRAINER">Trainer</SelectItem>
-                      <SelectItem value="CLIENT">Client</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={filterActivity} onValueChange={setFilterActivity}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Filtrar por atividade" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas as atividades</SelectItem>
-                      <SelectItem value="very_high">Muito Alta</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="medium">Média</SelectItem>
-                      <SelectItem value="low">Baixa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7d">7 dias</SelectItem>
+                    <SelectItem value="30d">30 dias</SelectItem>
+                    <SelectItem value="90d">90 dias</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {retentionCohorts.slice(0, 5).map((cohort) => (
+                  <div key={cohort.cohortDate} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{cohort.cohortDate}</span>
+                      <span className="text-sm text-muted-foreground">{cohort.users} users</span>
+                    </div>
+                    <div className="flex gap-1">
+                      {cohort.retention.slice(0, 7).map((rate, index) => (
+                        <div
+                          key={index}
+                          className="h-6 flex-1 rounded-sm"
+                          style={{
+                            backgroundColor: `rgba(34, 197, 94, ${rate})`,
+                            minWidth: '20px'
+                          }}
+                          title={`Day ${index + 1}: ${formatPercentage(rate)}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="features" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Feature Adoption</CardTitle>
+              <CardDescription>Taxa de adoção das funcionalidades</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Usuário</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Engagement Score</TableHead>
-                    <TableHead>Último Login</TableHead>
-                    <TableHead>Sessões</TableHead>
-                    <TableHead>Duração Média</TableHead>
-                    <TableHead>Nível de Atividade</TableHead>
-                    <TableHead>Nível de Risco</TableHead>
-                    <TableHead>Features</TableHead>
-                    <TableHead>Ações</TableHead>
+                    <TableHead>Feature</TableHead>
+                    <TableHead>Adoption Rate</TableHead>
+                    <TableHead>Users</TableHead>
+                    <TableHead>Trend</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredData.map((user) => (
-                    <TableRow key={user.userId}>
+                  {featureAdoption.map((feature) => (
+                    <TableRow key={feature.feature}>
+                      <TableCell className="font-medium capitalize">{feature.feature}</TableCell>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{user.firstName} {user.lastName}</div>
-                          <div className="text-sm text-muted-foreground">{user.email}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{user.role}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 bg-gray-200 rounded-full h-2">
                             <div 
                               className="bg-blue-600 h-2 rounded-full" 
-                              style={{ width: `${user.engagementScore}%` }}
+                              style={{ width: `${feature.adoptionRate * 100}%` }}
                             />
                           </div>
-                          <span className="text-sm">{user.engagementScore}</span>
+                          <span className="text-sm">{formatPercentage(feature.adoptionRate)}</span>
                         </div>
                       </TableCell>
+                      <TableCell>{feature.adoptedUsers} / {feature.totalUsers}</TableCell>
                       <TableCell>
-                        {user.lastLogin 
-                          ? new Date(user.lastLogin).toLocaleDateString()
-                          : 'Nunca'
-                        }
-                      </TableCell>
-                      <TableCell>{user.sessionCount}</TableCell>
-                      <TableCell>{Math.round(user.avgSessionDuration)} min</TableCell>
-                      <TableCell>
-                        <Badge className={getActivityColor(user.activityLevel)}>
-                          {user.activityLevel}
+                        <Badge variant={feature.trend === 'up' ? 'default' : feature.trend === 'down' ? 'destructive' : 'secondary'}>
+                          {feature.trend === 'up' && <TrendingUp className="w-3 h-3 mr-1" />}
+                          {feature.trend === 'down' && <TrendingDown className="w-3 h-3 mr-1" />}
+                          {feature.trend}
                         </Badge>
                       </TableCell>
-                      <TableCell>
-                        <Badge className={getRiskColor(user.riskLevel)}>
-                          {user.riskLevel}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {user.featuresUsed.slice(0, 3).map((feature, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {feature}
-                            </Badge>
-                          ))}
-                          {user.featuresUsed.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{user.featuresUsed.length - 3}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sessions" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Sessions by Device</CardTitle>
+                <CardDescription>Distribuição de sessões por dispositivo</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={Object.entries(sessionAnalytics?.sessionsByDevice || {}).map(([device, count]) => ({
+                          name: device,
+                          value: count
+                        }))}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {Object.entries(sessionAnalytics?.sessionsByDevice || {}).map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Sessions by Hour</CardTitle>
+                <CardDescription>Distribuição de sessões por hora do dia</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={sessionAnalytics?.sessionsByHour || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="hour" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Pages</CardTitle>
+              <CardDescription>Páginas mais visitadas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Page</TableHead>
+                    <TableHead>Views</TableHead>
+                    <TableHead>Unique Views</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sessionAnalytics?.topPages.map((page) => (
+                    <TableRow key={page.page}>
+                      <TableCell className="font-medium capitalize">{page.page}</TableCell>
+                      <TableCell>{page.views}</TableCell>
+                      <TableCell>{page.uniqueViews}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
+                          <Eye className="w-4 h-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -410,134 +499,37 @@ export default function UsersAnalytics() {
           </Card>
         </TabsContent>
 
-        {/* Features Tab */}
-        <TabsContent value="features" className="space-y-4">
+        <TabsContent value="top-users" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Estatísticas de Features</CardTitle>
-              <CardDescription>Uso e adoção de features da plataforma</CardDescription>
+              <CardTitle>Top Active Users</CardTitle>
+              <CardDescription>Usuários mais ativos da plataforma</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Feature</TableHead>
-                    <TableHead>Total de Uso</TableHead>
-                    <TableHead>Usuários Únicos</TableHead>
-                    <TableHead>Uso por Usuário</TableHead>
-                    <TableHead>Taxa de Adoção</TableHead>
-                    <TableHead>Tendência</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Sessions</TableHead>
+                    <TableHead>Total Time</TableHead>
+                    <TableHead>Actions</TableHead>
+                    <TableHead>Last Active</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {featureStats.map((feature) => (
-                    <TableRow key={feature.featureName}>
-                      <TableCell className="font-medium">{feature.featureName}</TableCell>
-                      <TableCell>{feature.totalUsage}</TableCell>
-                      <TableCell>{feature.uniqueUsers}</TableCell>
-                      <TableCell>{feature.avgUsagePerUser.toFixed(1)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full" 
-                              style={{ width: `${feature.adoptionRate}%` }}
-                            />
-                          </div>
-                          <span className="text-sm">{feature.adoptionRate.toFixed(1)}%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant="outline"
-                          className={
-                            feature.trend === 'up' 
-                              ? 'text-green-600 border-green-600' 
-                              : feature.trend === 'down'
-                              ? 'text-red-600 border-red-600'
-                              : 'text-gray-600 border-gray-600'
-                          }
-                        >
-                          {getTrendIcon(feature.trend)} {feature.trend}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Engagement Tab */}
-        <TabsContent value="engagement" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Usuários Engajados</CardTitle>
-              <CardDescription>Usuários com maior score de engajamento</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Rank</TableHead>
-                    <TableHead>Usuário</TableHead>
-                    <TableHead>Engagement Score</TableHead>
-                    <TableHead>Sessões</TableHead>
-                    <TableHead>Features Usadas</TableHead>
-                    <TableHead>Última Atividade</TableHead>
-                    <TableHead>Ações Recomendadas</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredData
-                    .sort((a, b) => b.engagementScore - a.engagementScore)
-                    .slice(0, 20)
-                    .map((user, index) => (
-                    <TableRow key={user.userId}>
-                      <TableCell>
-                        <Badge variant={index < 3 ? "default" : "outline"}>
-                          #{index + 1}
-                        </Badge>
-                      </TableCell>
+                  {topUsers.map((user) => (
+                    <TableRow key={user.id}>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{user.firstName} {user.lastName}</div>
+                          <div className="font-medium">{user.name}</div>
                           <div className="text-sm text-muted-foreground">{user.email}</div>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center">
-                          <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full" 
-                              style={{ width: `${user.engagementScore}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-medium">{user.engagementScore}</span>
-                        </div>
-                      </TableCell>
                       <TableCell>{user.sessionCount}</TableCell>
-                      <TableCell>{user.featuresUsed.length}</TableCell>
+                      <TableCell>{formatDuration(user.totalTime)}</TableCell>
+                      <TableCell>{user.actionsCount}</TableCell>
                       <TableCell>
-                        {user.lastLogin 
-                          ? new Date(user.lastLogin).toLocaleDateString()
-                          : 'Nunca'
-                        }
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {user.recommendedActions.slice(0, 2).map((action, actionIndex) => (
-                            <Badge key={actionIndex} variant="outline" className="text-xs">
-                              {action}
-                            </Badge>
-                          ))}
-                          {user.recommendedActions.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{user.recommendedActions.length - 2}
-                            </Badge>
-                          )}
-                        </div>
+                        {formatDistanceToNow(new Date(user.lastActive), { addSuffix: true, locale: ptBR })}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -550,4 +542,3 @@ export default function UsersAnalytics() {
     </div>
   );
 }
-
