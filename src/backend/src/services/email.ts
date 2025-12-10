@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { config } from '../config/config-simple';
 import { logger } from '../utils/logger';
 import { costTrackerService } from './cost-tracker.service';
@@ -23,13 +24,22 @@ export interface EmailTemplate {
 
 class EmailService {
   private transporter: nodemailer.Transporter | null = null;
+  private resend: Resend | null = null;
 
   constructor() {
-    this.initializeTransporter();
+    this.initializeService();
   }
 
-  private initializeTransporter(): void {
+  private initializeService(): void {
     try {
+      // Prioridade: Resend API (HTTP, não bloqueia em cloud)
+      if (config.email.resendApiKey) {
+        this.resend = new Resend(config.email.resendApiKey);
+        logger.info('📧 Email service initialized via Resend API (HTTP)');
+        return;
+      }
+
+      // Fallback: SMTP (Nodemailer)
       // Verificar se as credenciais de email estão configuradas
       if (!config.email.host || !config.email.auth?.user || !config.email.auth?.pass) {
         logger.warn('Email configuration incomplete. Email service will not be available.');
@@ -68,18 +78,47 @@ class EmailService {
           if (error) {
             logger.error('Email transporter verification failed:', error);
           } else {
-            logger.info('✅ Email service ready');
+            logger.info('✅ Email service (SMTP) ready');
           }
         });
       } else {
-        logger.info('📧 Email service initialized (verification skipped in development)');
+        logger.info('📧 Email service (SMTP) initialized (verification skipped in development)');
       }
     } catch (error) {
-      logger.error('Failed to initialize email transporter:', error);
+      logger.error('Failed to initialize email service:', error);
     }
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
+    // 1. Tentar via Resend API se disponível
+    if (this.resend) {
+      try {
+        const { data, error } = await this.resend.emails.send({
+          from: config.email.from || 'onboarding@resend.dev',
+          to: options.to,
+          subject: options.subject,
+          html: options.html || options.text || '',
+          text: options.text,
+          attachments: options.attachments?.map(att => ({
+            filename: att.filename,
+            content: att.content // Resend supports Buffer
+          }))
+        });
+
+        if (error) {
+          logger.error('Resend API Error:', error);
+          return false;
+        }
+
+        logger.info('Email sent successfully via Resend API', { id: data?.id });
+        return true;
+      } catch (err) {
+        logger.error('Failed to send email via Resend API:', err);
+        return false;
+      }
+    }
+
+    // 2. Fallback para SMTP
     if (!this.transporter) {
       logger.error('Email transporter not initialized');
       return false;
@@ -96,9 +135,9 @@ class EmailService {
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      logger.info('Email sent successfully', { messageId: result.messageId });
+      logger.info('Email sent successfully via SMTP', { messageId: result.messageId });
 
-      // Rastrear custo do email
+      // Rastrear custo do email (mantido)
       try {
         const recipientCount = Array.isArray(options.to) ? options.to.length : 1;
         await costTrackerService.trackEmailUsage({

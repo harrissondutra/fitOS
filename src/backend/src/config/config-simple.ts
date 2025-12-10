@@ -106,6 +106,7 @@ export const config = {
     tls: {
       rejectUnauthorized: false,
     },
+    resendApiKey: process.env.RESEND_API_KEY,
   },
 
   // Monitoring
