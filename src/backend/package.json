@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch --clear-screen=false --ignore node_modules --ignore dist src/index.ts",
     "build": "tsc || true",
-    "start": "npx prisma generate && node dist/src/backend/src/index.js",
+    "start": "find dist -name index.js && npx prisma generate && node dist/src/backend/src/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
