@@ -481,8 +481,14 @@ class FitOSServer {
       logger.info('🌐 Creating HTTP server...');
       this.server = createServer(this.app);
 
-      // VERCEL SPECIFIC: Skip persistent services
-      if (!process.env.VERCEL) {
+      // SERVICE INITIALIZATION STRATEGY
+      // 1. Vercel (Serverless): Disable persistent services (Socket.io, Cron, Queues)
+      // 2. Railway/Local (Long-running): Enable all services
+      const isServerless = process.env.VERCEL === '1';
+
+      if (!isServerless) {
+        logger.info('🚀 Initializing persistent services (Railway/Local mode)...');
+
         // Socket.IO com Redis
         await this.setupSocketIO();
 
