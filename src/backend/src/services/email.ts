@@ -37,10 +37,10 @@ class EmailService {
       }
 
       this.transporter = nodemailer.createTransport({
-        service: 'gmail',
+        // service: 'gmail', // Removido para respeitar host/port explicitamente
         host: config.email.host,
         port: config.email.port,
-        secure: false, // Gmail usa STARTTLS na porta 587
+        secure: config.email.secure,
         auth: {
           user: config.email.auth.user,
           pass: config.email.auth.pass,
