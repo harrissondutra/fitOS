@@ -155,10 +155,14 @@ const nextConfig = {
 
   // Configurações de rewrites
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+    // Remove /api suffix if present in env var to avoid dubbing it in destination
+    const destinationBase = apiUrl.replace(/\/api$/, '');
+
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3001/api/:path*',
+        destination: `${destinationBase}/api/:path*`,
       },
     ];
   },
