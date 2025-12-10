@@ -1,0 +1,59 @@
+
+> fitos-backend@1.0.0 seed:dev
+> tsx prisma/seeds/index.ts
+
+🌱 Starting database seeding...
+🏢 Seeding tenants...
+🏢 Starting Tenants seed...
+🏢 Starting Tenants seed...
+📝 Creating default tenant...
+❌ Error during Tenants seed: PrismaClientValidationError: 
+Invalid `prisma.tenant.create()` invocation in
+D:\Documentos\Desenvolvimento\Sistudo\fitOS\src\backend\prisma\seeds\tenants.seed.ts:21:45
+
+  18 console.log('📝 Creating default tenant...');
+  19 
+  20 // Criar tenant padrão
+→ 21 const defaultTenant = await prisma.tenant.create({
+       data: {
+         name: "FitOS Default",
+         slug: "fitos-default",
+         description: "Tenant padrão do FitOS para desenvolvimento e testes",
+         isActive: true,
+         settings: {
+           timezone: "America/Sao_Paulo",
+           currency: "BRL",
+           language: "pt-BR",
+           features: {
+             aiEnabled: true,
+             analyticsEnabled: true,
+             notificationsEnabled: true
+           }
+         },
+         subscription: {
+           planId: "free",
+           status: "active",
+           startDate: new Date("2025-12-09T21:04:20.111Z"),
+           endDate: new Date("2026-12-09T21:04:20.111Z")
+         },
+     +   billingEmail: String
+       }
+     })
+
+Argument `billingEmail` is missing.
+    at Ua (D:\Documentos\Desenvolvimento\Sistudo\fitOS\node_modules\@prisma\client\runtime\binary.js:80:1375)
+    at Vg.handleRequestError (D:\Documentos\Desenvolvimento\Sistudo\fitOS\node_modules\@prisma\client\runtime\binary.js:182:6960)
+    at Vg.handleAndLogRequestError (D:\Documentos\Desenvolvimento\Sistudo\fitOS\node_modules\@prisma\client\runtime\binary.js:182:6624)
+    at Vg.request (D:\Documentos\Desenvolvimento\Sistudo\fitOS\node_modules\@prisma\client\runtime\binary.js:182:6308)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async a (D:\Documentos\Desenvolvimento\Sistudo\fitOS\node_modules\@prisma\client\runtime\binary.js:191:9642)
+    at async main (D:\Documentos\Desenvolvimento\Sistudo\fitOS\src\backend\prisma\seeds\tenants.seed.ts:21:25) {
+  clientVersion: '5.22.0'
+}
+npm error Lifecycle script `seed:dev` failed with error:
+npm error code 1
+npm error path D:\Documentos\Desenvolvimento\Sistudo\fitOS\src\backend
+npm error workspace fitos-backend@1.0.0
+npm error location D:\Documentos\Desenvolvimento\Sistudo\fitOS\src\backend
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c tsx prisma/seeds/index.ts

@@ -9,6 +9,7 @@ import { CheckCircle, SkipForward, Play, Pause, RotateCcw } from 'lucide-react';
 import { ProgressBar } from '@/components/workouts/progress-bar';
 import { Timer } from '@/components/workouts/timer';
 import { VideoPlayer } from '@/components/workouts/video-player';
+import { WorkoutCompletion } from '@/components/workouts/workout-completion';
 import { api } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 
@@ -38,6 +39,8 @@ export default function ExecuteWorkoutPage() {
   const [isResting, setIsResting] = useState(false);
   const [restSeconds, setRestSeconds] = useState(0);
   const [workoutStarted, setWorkoutStarted] = useState(false);
+  const [workoutCompleted, setWorkoutCompleted] = useState(false);
+  const [startTime, setStartTime] = useState<Date | null>(null);
   const [exerciseVideos, setExerciseVideos] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -124,6 +127,7 @@ export default function ExecuteWorkoutPage() {
 
   const startWorkout = () => {
     setWorkoutStarted(true);
+    setStartTime(new Date());
   };
 
   const completeSet = () => {
@@ -154,12 +158,30 @@ export default function ExecuteWorkoutPage() {
         completedAt: new Date()
       });
       
-      toast.success('Treino concluído com sucesso!');
-      router.push('/client/workouts');
+      setWorkoutCompleted(true);
     } catch (error) {
       toast.error('Erro ao concluir treino');
     }
   };
+
+  const getWorkoutDuration = () => {
+    if (!startTime) return 0;
+    const endTime = new Date();
+    const diff = endTime.getTime() - startTime.getTime();
+    return Math.floor(diff / (1000 * 60)); // em minutos
+  };
+
+  if (workoutCompleted) {
+    return (
+      <WorkoutCompletion
+        workoutName={workout?.name || 'Treino'}
+        totalExercises={exercises.length}
+        duration={getWorkoutDuration()}
+        onContinue={() => router.push('/client/workouts')}
+        onGoHome={() => router.push('/client/workouts')}
+      />
+    );
+  }
 
   if (!workoutStarted) {
     return (

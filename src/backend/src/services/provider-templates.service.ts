@@ -1,4 +1,4 @@
-import { AiProviderType } from '../../../shared/types/ai.types'
+import { AiProviderType, AI_PROVIDER_DISPLAY_NAMES } from '../../../shared/types/ai.types'
 
 export interface ProviderTemplate {
   id: string
@@ -6,7 +6,9 @@ export interface ProviderTemplate {
   displayName: string
   provider: AiProviderType
   description: string
-  icon: string
+  icon: string // Emoji fallback
+  iconUrl?: string // URL pública do SVG (opcional)
+  documentationUrl?: string
   color: string
   models: string[]
   features: string[]
@@ -53,6 +55,7 @@ export class ProviderTemplatesService {
       provider: AiProviderType.OPENAI,
       description: 'Modelos GPT-4, GPT-3.5 e DALL-E para conversação, análise de imagens e geração de conteúdo',
       icon: '🤖',
+      iconUrl: 'https://cdn.svgrepo.com/show/364167/openai.svg',
       color: 'bg-green-100 text-green-800',
       models: [
         'gpt-4o',
@@ -122,6 +125,7 @@ export class ProviderTemplatesService {
       provider: AiProviderType.GEMINI,
       description: 'Modelos Gemini Pro e Gemini Pro Vision para conversação multimodal e análise de imagens',
       icon: '💎',
+      iconUrl: 'https://cdn.svgrepo.com/show/303108/google-icon-logo.svg',
       color: 'bg-blue-100 text-blue-800',
       models: [
         'gemini-1.5-pro',
@@ -173,6 +177,7 @@ export class ProviderTemplatesService {
       provider: AiProviderType.GROQ,
       description: 'Modelos Llama 3, Mixtral e Whisper com inferência ultra-rápida para aplicações em tempo real',
       icon: '⚡',
+      iconUrl: 'https://cdn.simpleicons.org/groq',
       color: 'bg-purple-100 text-purple-800',
       models: [
         'llama-3.1-70b-versatile',
@@ -226,6 +231,7 @@ export class ProviderTemplatesService {
       provider: AiProviderType.CLAUDE,
       description: 'Modelos Claude 3 Opus, Sonnet e Haiku para conversação avançada e análise de documentos',
       icon: '🧠',
+      iconUrl: 'https://cdn.simpleicons.org/anthropic',
       color: 'bg-orange-100 text-orange-800',
       models: [
         'claude-3-5-sonnet-20241022',
@@ -278,6 +284,7 @@ export class ProviderTemplatesService {
       provider: AiProviderType.MISTRAL,
       description: 'Modelos Mistral 7B, Mixtral 8x7B e Codestral para conversação e geração de código',
       icon: '🌪️',
+      iconUrl: 'https://cdn.simpleicons.org/mistral',
       color: 'bg-cyan-100 text-cyan-800',
       models: [
         'mistral-large-latest',
@@ -328,6 +335,7 @@ export class ProviderTemplatesService {
       provider: AiProviderType.COHERE,
       description: 'Modelos Command e Embed para conversação, análise de texto e embeddings',
       icon: '🔮',
+      iconUrl: 'https://cdn.simpleicons.org/cohere',
       color: 'bg-pink-100 text-pink-800',
       models: [
         'command',
@@ -379,6 +387,7 @@ export class ProviderTemplatesService {
       provider: AiProviderType.OLLAMA,
       description: 'Modelos locais Llama, Mistral e CodeLlama para uso privado e desenvolvimento',
       icon: '🏠',
+      iconUrl: 'https://cdn.simpleicons.org/ollama',
       color: 'bg-gray-100 text-gray-800',
       models: [
         'llama3.1:70b',
@@ -440,6 +449,7 @@ export class ProviderTemplatesService {
       provider: AiProviderType.HUGGINGFACE,
       description: 'Milhares de modelos open-source para conversação, análise de texto e embeddings',
       icon: '🤗',
+      iconUrl: 'https://cdn.simpleicons.org/huggingface',
       color: 'bg-yellow-100 text-yellow-800',
       models: [
         'microsoft/DialoGPT-medium',
@@ -491,6 +501,7 @@ export class ProviderTemplatesService {
       provider: AiProviderType.DEEPSEEK,
       description: 'Modelos DeepSeek para conversação, análise de código e raciocínio avançado',
       icon: '🧠',
+      iconUrl: 'https://cdn.simpleicons.org/deepseek',
       color: 'bg-purple-100 text-purple-800',
       models: [
         'deepseek-chat',
@@ -544,7 +555,15 @@ export class ProviderTemplatesService {
    * Lista todos os templates disponíveis
    */
   static getAllTemplates(): ProviderTemplate[] {
-    return this.templates
+    // Gerar placeholders para provedores que ainda não possuem template dedicado
+    const existingProviders = new Set(this.templates.map(t => t.provider))
+    const allProviders = Object.values(AiProviderType) as AiProviderType[]
+
+    const placeholders: ProviderTemplate[] = allProviders
+      .filter((prov) => !existingProviders.has(prov))
+      .map((prov) => this.createPlaceholderTemplate(prov))
+
+    return [...this.templates, ...placeholders]
   }
 
   /**
@@ -665,6 +684,58 @@ export class ProviderTemplatesService {
         acc.output += avgOutput
         return acc
       }, { input: 0, output: 0 })
+    }
+  }
+
+  /**
+   * Cria um template placeholder para um provedor ainda não detalhado
+   */
+  private static createPlaceholderTemplate(provider: AiProviderType): ProviderTemplate {
+    const id = String(provider).toLowerCase()
+    const display = (AI_PROVIDER_DISPLAY_NAMES as any)?.[provider] || provider
+
+    return {
+      id,
+      name: display,
+      displayName: display,
+      provider,
+      description: 'Template genérico pronto para configuração rápida. Insira a API Key e a Base URL para ativar.',
+      icon: '🤖',
+      iconUrl: undefined,
+      documentationUrl: undefined,
+      color: 'bg-muted text-foreground',
+      models: [],
+      features: ['Configuração rápida', 'Compatível com múltiplos serviços'],
+      pricing: [],
+      capabilities: {
+        chat: true,
+        vision: false,
+        audio: false,
+        embeddings: false,
+        functionCalling: false,
+        streaming: false
+      },
+      config: {
+        timeout: 30000,
+        maxRetries: 3,
+        headers: { 'Content-Type': 'application/json' }
+      },
+      setup: {
+        requiresApiKey: true,
+        apiKeyPlaceholder: 'sk-...'
+        ,
+        apiKeyHelp: 'Insira sua API Key deste provedor para ativar. Consulte a documentação oficial.',
+        additionalConfig: [
+          {
+            key: 'baseUrl',
+            label: 'Base URL',
+            type: 'url',
+            placeholder: 'https://api.exemplo.com/v1',
+            help: 'Endpoint base da API oficial',
+            required: true
+          }
+        ]
+      }
     }
   }
 }

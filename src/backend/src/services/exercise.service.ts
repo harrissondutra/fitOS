@@ -1,4 +1,5 @@
 import { PrismaClient, Exercise } from '@prisma/client';
+import { PrismaTenantWrapper } from './prisma-tenant-wrapper.service';
 import { logger } from '../utils/logger';
 
 export interface ExerciseFilters {
@@ -9,6 +10,10 @@ export interface ExerciseFilters {
   equipment?: string;
   isPublic?: boolean;
   createdBy?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface ExerciseFormData {
@@ -27,12 +32,12 @@ export interface ExerciseFormData {
 }
 
 export class ExerciseService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: PrismaClient | PrismaTenantWrapper) {} // Aceita PrismaClient ou PrismaTenantWrapper
 
   /**
    * Listar exercícios com filtros
    */
-  async getExercises(filters: ExerciseFilters, tenantId: string) {
+  async getExercises(filters: ExerciseFilters, tenantId: string, role?: string) {
     const where: any = { tenantId };
     
     if (filters.search) {
@@ -50,15 +55,26 @@ export class ExerciseService {
     if (filters.muscleGroups && filters.muscleGroups.length > 0) {
       where.muscleGroups = { hasSome: filters.muscleGroups };
     }
-    
+
+    // Paginação
+    const page = filters.page || 1;
+    const limit = filters.limit || 10;
+    const skip = (page - 1) * limit;
+
+    // Ordenação
+    const sortBy = filters.sortBy || 'createdAt';
+    const sortOrder = filters.sortOrder || 'desc';
+
     return await this.prisma.exercise.findMany({
       where,
+      skip,
+      take: limit,
       include: {
         creator: {
           select: { id: true, firstName: true, lastName: true }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { [sortBy]: sortOrder }
     });
   }
 
@@ -117,5 +133,43 @@ export class ExerciseService {
     });
 
     logger.info(`Exercise deleted: ${id} in tenant ${tenantId}`);
+  }
+
+  /**
+   * Métodos stub - TODO: Implementar funcionalidades completas
+   */
+  async cloneExercise(id: string, tenantId: string): Promise<Exercise> {
+    logger.info('Clone exercise called - not implemented yet', { id, tenantId });
+    throw new Error('Method not implemented');
+  }
+
+  async getCategories(tenantId: string): Promise<string[]> {
+    logger.info('Get categories called - not implemented yet', { tenantId });
+    return [];
+  }
+
+  async getMuscleGroups(tenantId: string): Promise<string[]> {
+    logger.info('Get muscle groups called - not implemented yet', { tenantId });
+    return [];
+  }
+
+  async getEquipment(tenantId: string): Promise<string[]> {
+    logger.info('Get equipment called - not implemented yet', { tenantId });
+    return [];
+  }
+
+  async getExercisesByCategory(category: string, tenantId: string): Promise<Exercise[]> {
+    logger.info('Get exercises by category called - not implemented yet', { category, tenantId });
+    return [];
+  }
+
+  async getExercisesByMuscleGroup(muscleGroup: string, tenantId: string): Promise<Exercise[]> {
+    logger.info('Get exercises by muscle group called - not implemented yet', { muscleGroup, tenantId });
+    return [];
+  }
+
+  async exportExercisesToCSV(tenantId: string): Promise<string> {
+    logger.info('Export exercises to CSV called - not implemented yet', { tenantId });
+    return '';
   }
 }

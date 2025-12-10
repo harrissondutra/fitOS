@@ -1,8 +1,9 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { config } from '../config/config-simple';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export interface UsageData {
   quantity: number;
@@ -420,7 +421,7 @@ export class CostTrackerService {
     });
   }
 
-  /**
+    /**
    * Rastrear uso de WhatsApp
    */
   async trackWhatsAppUsage(data: {
@@ -431,7 +432,7 @@ export class CostTrackerService {
     clientId?: string;
     createdBy?: string;
   }): Promise<void> {
-    const { messageCount, metadata, tenantId, clientId, createdBy } = data;
+    const { messageCount, metadata, tenantId, clientId, createdBy } = data;     
 
     await this.trackUsage({
       categoryName: 'communication',
@@ -445,6 +446,69 @@ export class CostTrackerService {
       clientId,
       createdBy,
     });
+  }
+
+  /**
+   * Rastrear uso com custo já calculado
+   * Útil para serviços onde o custo já foi calculado externamente (ex: taxas de pagamento)
+   */
+  async trackUsageWithCost(input: {
+    categoryName: string;
+    serviceName: string;
+    cost: number;
+    currency?: string;
+    usage: UsageData;
+    tenantId?: string;
+    clientId?: string;
+    createdBy?: string;
+  }): Promise<void> {
+    try {
+      const { categoryName, serviceName, cost, currency, usage, tenantId, clientId, createdBy } = input;
+
+      // Buscar categoria e serviço
+      const category = await prisma.costCategory.findUnique({
+        where: { name: categoryName },
+      });
+
+      if (!category) {
+        logger.warn(`Category not found: ${categoryName}`);
+        return;
+      }
+
+      const service = await prisma.costService.findFirst({
+        where: {
+          categoryId: category.id,
+          name: serviceName,
+        },
+      });
+
+      if (!service) {
+        logger.warn(`Service not found: ${serviceName} in category ${categoryName}`);
+        return;
+      }
+
+      if (cost <= 0) {
+        logger.debug(`Cost is zero or negative for ${serviceName}, skipping entry`);
+        return;
+      }
+
+      // Criar entrada automática com custo já calculado
+      await this.createAutomaticEntry({
+        categoryId: category.id,
+        serviceId: service.id,
+        amount: cost,
+        currency: currency || config.costs.defaultCurrency,
+        description: `Uso automático: ${usage.quantity} ${usage.unit}`,
+        metadata: usage.metadata,
+        tenantId,
+        clientId,
+        createdBy,
+      });
+
+      logger.info(`Tracked usage with cost for ${serviceName}: ${usage.quantity} ${usage.unit} = ${currency || config.costs.defaultCurrency} ${cost.toFixed(4)}`);
+    } catch (error) {
+      logger.error('Error tracking usage with cost:', error);
+    }
   }
 }
 

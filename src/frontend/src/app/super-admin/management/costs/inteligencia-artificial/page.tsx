@@ -21,92 +21,239 @@ import { CostServiceCard } from '../_components/cost-service-card';
 import { CostTrendsChart } from '../_components/cost-trends-chart';
 import { CostEntryForm } from '../_components/cost-entry-form';
 import { useToast } from '@/hooks/use-toast';
+import { useAiProviders } from '@/app/super-admin/management/ai-agents/_hooks/use-ai-providers';
+import { useServiceConfigs } from '@/app/super-admin/ai/services/_hooks/use-service-configs';
+import { useAiConsumptionLogs } from '@/app/super-admin/management/ai-agents/_hooks/use-ai-consumption-logs';
 
 export default function InteligenciaArtificialPage() {
   const [dashboard, setDashboard] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [filters, setFilters] = useState<CostFilters>({
     categoryId: 'ai', // Filtrar apenas IA
   });
   
-  const { getDashboard, getServices } = useCosts();
+  // Usar os mesmos hooks que as outras telas de IA
+  const { providers, listProviders, loading: providersLoading } = useAiProviders();
+  const { serviceConfigs, listServiceConfigs, loading: servicesLoading } = useServiceConfigs();
+  const { 
+    logs: consumptionLogs, 
+    stats: consumptionStats, 
+    loadStats: getAiConsumptionStats, 
+    loadLogs: listAiConsumptionLogs,
+    loading: logsLoading 
+  } = useAiConsumptionLogs();
+  
+  const { getDashboard } = useCosts();
   const { toast } = useToast();
 
-  // Carregar dados
+  // Carregar dados usando os mesmos hooks que as outras telas
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [dashboardData, servicesData] = await Promise.all([
-        getDashboard(filters),
-        getServices('ai'), // Buscar apenas serviços de IA
+      setError(null);
+      
+      // Carregar provedores e serviços usando os mesmos hooks
+      await Promise.all([
+        listProviders({}, { page: 1, limit: 1000 }), // Buscar todos
+        listServiceConfigs({}, { page: 1, limit: 1000 }), // Buscar todos
+        listAiConsumptionLogs({}, { page: 1, limit: 10000 }), // Buscar todos os logs
+        getAiConsumptionStats(), // Buscar estatísticas de custos
       ]);
-      
-      setDashboard(dashboardData);
-      setServices(servicesData);
     } catch (error) {
-      console.log('API falhou, usando dados mockados:', error);
-      
-      // Usar dados mockados quando a API falhar
-      const mockDashboard = {
-        totalCost: 320.80,
-        monthlyTrend: 14.6,
-        services: [
-          {
-            id: 'openai-gpt4',
-            name: 'OpenAI GPT-4',
-            cost: 180.50,
-            trend: 12.3,
-            status: 'active',
-            icon: Brain,
-            description: 'Modelo de linguagem GPT-4'
-          },
-          {
-            id: 'openai-gpt35',
-            name: 'OpenAI GPT-3.5',
-            cost: 95.30,
-            trend: -5.2,
-            status: 'active',
-            icon: Brain,
-            description: 'Modelo de linguagem GPT-3.5'
-          },
-          {
-            id: 'claude',
-            name: 'Anthropic Claude',
-            cost: 45.00,
-            trend: 8.7,
-            status: 'active',
-            icon: Brain,
-            description: 'Modelo de linguagem Claude'
-          }
-        ],
-        trends: [
-          { date: '2024-01-01', totalCost: 200, categories: { ai: 200 } },
-          { date: '2024-02-01', totalCost: 250, categories: { ai: 250 } },
-          { date: '2024-03-01', totalCost: 300, categories: { ai: 300 } },
-          { date: '2024-04-01', totalCost: 280, categories: { ai: 280 } },
-          { date: '2024-05-01', totalCost: 320, categories: { ai: 320 } },
-          { date: '2024-06-01', totalCost: 320, categories: { ai: 320 } }
-        ]
-      };
-      
-      setDashboard(mockDashboard);
-      setServices(mockDashboard.services);
+      console.error('Erro ao carregar dados de custos de IA:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      setError(errorMessage);
       
       toast({
-        title: 'Modo Demonstração',
-        description: 'Usando dados de exemplo para IA',
-        variant: 'default',
+        title: 'Erro',
+        description: `Não foi possível carregar os custos de IA: ${errorMessage}`,
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
-  }, [getDashboard, getServices, filters, toast]);
+  }, [listProviders, listServiceConfigs, listAiConsumptionLogs, getAiConsumptionStats, toast]);
+
+  // Processar dados quando carregarem
+  useEffect(() => {
+    if (providersLoading || servicesLoading || logsLoading) {
+      setLoading(true);
+      return;
+    }
+
+    setLoading(false);
+
+    // Combinar dados de provedores, serviços e custos
+    const servicesMap = new Map<string, any>();
+
+    // Adicionar todos os serviços configurados
+    serviceConfigs.forEach(config => {
+      const provider = providers.find(p => p.id === config.providerId);
+      if (!provider) return;
+
+      const key = `${provider.provider}-${config.model}`;
+      
+      if (!servicesMap.has(key)) {
+        servicesMap.set(key, {
+          id: key,
+          name: key,
+          displayName: `${provider.displayName || provider.name} - ${config.model}`,
+          categoryId: 'ai',
+          category: {
+            id: 'ai',
+            name: 'ai',
+            displayName: 'Inteligência Artificial',
+            icon: 'Brain',
+            color: '#8B5CF6',
+          },
+          costType: 'variable',
+          captureType: 'usage_tracking',
+          isActive: config.isActive,
+          provider: provider.provider,
+          providerId: provider.id,
+          providerName: provider.displayName || provider.name,
+          model: config.model,
+          serviceType: config.serviceType,
+          serviceName: config.serviceName,
+          totalCost: 0,
+          requestCount: 0,
+          averageCost: 0,
+          trend: 'stable' as const,
+          metadata: {
+            provider: provider.provider,
+            providerId: provider.id,
+            model: config.model,
+            serviceType: config.serviceType,
+            serviceName: config.serviceName,
+          },
+        });
+      }
+    });
+
+    // Adicionar custos reais dos logs de consumo
+    if (consumptionStats) {
+      // Processar custos por provedor/modelo
+      const costByProviderModel = new Map<string, { cost: number; count: number }>();
+      
+      consumptionLogs.forEach(log => {
+        const key = `${log.provider}-${log.model}`;
+        const existing = costByProviderModel.get(key) || { cost: 0, count: 0 };
+        costByProviderModel.set(key, {
+          cost: existing.cost + (log.cost || 0),
+          count: existing.count + 1,
+        });
+      });
+
+      // Atualizar serviços com custos reais
+      costByProviderModel.forEach((costData, key) => {
+        const service = servicesMap.get(key);
+        if (service) {
+          service.totalCost = costData.cost;
+          service.requestCount = costData.count;
+          service.averageCost = costData.count > 0 ? costData.cost / costData.count : 0;
+        } else {
+          // Adicionar serviço que tem custo mas pode não estar configurado
+          const [providerName, model] = key.split('-');
+          const provider = providers.find(p => p.provider === providerName);
+          
+          servicesMap.set(key, {
+            id: key,
+            name: key,
+            displayName: `${provider?.displayName || providerName} - ${model}`,
+            categoryId: 'ai',
+            category: {
+              id: 'ai',
+              name: 'ai',
+              displayName: 'Inteligência Artificial',
+              icon: 'Brain',
+              color: '#8B5CF6',
+            },
+            costType: 'variable',
+            captureType: 'usage_tracking',
+            isActive: true,
+            provider: providerName,
+            providerId: provider?.id,
+            providerName: provider?.displayName || providerName,
+            model: model,
+            totalCost: costData.cost,
+            requestCount: costData.count,
+            averageCost: costData.count > 0 ? costData.cost / costData.count : 0,
+            trend: 'stable' as const,
+            metadata: {
+              provider: providerName,
+              model: model,
+            },
+          });
+        }
+      });
+    }
+
+    // Converter para array e ordenar por custo
+    const servicesArray = Array.from(servicesMap.values())
+      .sort((a, b) => b.totalCost - a.totalCost);
+
+    setServices(servicesArray);
+
+    // Calcular total de custos
+    const totalCost = servicesArray.reduce((sum, s) => sum + (s.totalCost || 0), 0);
+    const totalCostPreviousMonth = 0; // TODO: calcular mês anterior
+    const costVariation = totalCostPreviousMonth > 0 
+      ? ((totalCost - totalCostPreviousMonth) / totalCostPreviousMonth) * 100 
+      : 0;
+
+    // Criar dashboard
+    setDashboard({
+      totalCost,
+      totalCostPreviousMonth,
+      costVariation,
+      projectedCost: totalCost, // TODO: calcular projeção
+      categories: [{
+        id: 'ai',
+        name: 'ai',
+        displayName: 'Inteligência Artificial',
+        icon: 'Brain',
+        color: '#8B5CF6',
+        totalCost,
+        percentage: 100,
+        previousMonthCost: totalCostPreviousMonth,
+        variation: costVariation,
+        trend: costVariation > 0 ? 'up' as const : costVariation < 0 ? 'down' as const : 'stable' as const,
+      }],
+      topServices: servicesArray.slice(0, 5),
+      alerts: [],
+      trends: [],
+      fixedVsVariable: {
+        fixed: 0,
+        variable: totalCost,
+        fixedPercentage: 0,
+        variablePercentage: 100,
+      },
+    });
+
+    // Log para debug
+    if (servicesArray.length > 0) {
+      console.log('✅ Serviços de IA carregados:', servicesArray.length);
+      console.log('Provedores:', providers.length);
+      console.log('Configurações:', serviceConfigs.length);
+      console.log('Custos totais:', consumptionStats?.total?.cost || totalCost);
+      console.log('Logs de consumo:', consumptionLogs.length);
+    } else {
+      console.warn('⚠️ Nenhum serviço de IA encontrado');
+      if (providers.length === 0) {
+        console.warn('⚠️ Nenhum provedor cadastrado');
+      }
+      if (serviceConfigs.length === 0) {
+        console.warn('⚠️ Nenhuma configuração de serviço cadastrada');
+      }
+    }
+  }, [providers, serviceConfigs, consumptionLogs, consumptionStats, providersLoading, servicesLoading, logsLoading]);
 
   useEffect(() => {
     loadData();
-  }, [filters, loadData]);
+  }, [loadData]);
 
   const formatCurrency = (amount: number | undefined) => {
     if (amount === undefined || amount === null || isNaN(amount)) {
@@ -244,6 +391,21 @@ export default function InteligenciaArtificialPage() {
         </div>
       </div>
 
+      {/* Mensagem de erro */}
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-destructive">
+              <Activity className="h-5 w-5" />
+              <div>
+                <p className="font-semibold">Erro ao carregar dados</p>
+                <p className="text-sm text-muted-foreground">{error}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Métricas principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -319,21 +481,51 @@ export default function InteligenciaArtificialPage() {
         </TabsList>
 
         <TabsContent value="services" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {services.map((service) => (
-              <CostServiceCard
-                key={service.id}
-                service={{
-                  ...service,
-                  categoryName: 'Inteligência Artificial',
-                }}
-                onClick={() => {
-                  // TODO: Navegar para página do serviço
-                  console.log('Navigate to service:', service.name);
-                }}
-              />
-            ))}
-          </div>
+          {services.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Brain className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">
+                    Nenhum serviço de IA encontrado
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Configure provedores e modelos de IA em{' '}
+                    <a 
+                      href="/super-admin/ai/providers" 
+                      className="text-primary hover:underline"
+                    >
+                      Provedores de IA
+                    </a>
+                    {' '}e{' '}
+                    <a 
+                      href="/super-admin/ai/services" 
+                      className="text-primary hover:underline"
+                    >
+                      Serviços de IA
+                    </a>
+                    {' '}para ver os custos aqui.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {services.map((service) => (
+                <CostServiceCard
+                  key={service.id}
+                  service={{
+                    ...service,
+                    categoryName: 'Inteligência Artificial',
+                  }}
+                  onClick={() => {
+                    // TODO: Navegar para página do serviço
+                    console.log('Navigate to service:', service.name);
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="trends" className="space-y-4">

@@ -1,10 +1,11 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { logger } from '../utils/logger';
 import { revenueAnalyticsService } from './revenue-analytics.service';
 import { customerHealthService } from './customer-health.service';
 import { userEngagementService } from './user-engagement.service';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export interface ReportConfig {
   type: 'revenue' | 'users' | 'tenants' | 'health' | 'custom';

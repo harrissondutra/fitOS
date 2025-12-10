@@ -119,7 +119,7 @@ export default function AIAgentsPage() {
               </Link>
             </Button>
             <Button asChild variant="outline" className="h-20 flex-col">
-              <Link href="/super-admin/ai/costs">
+              <Link href="/super-admin/management/costs/inteligencia-artificial">
                 <DollarSign className="h-6 w-6 mb-2" />
                 <span>Custos</span>
                 <ArrowRight className="h-4 w-4 mt-1" />

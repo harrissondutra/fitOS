@@ -1,4 +1,5 @@
 import { PrismaClient, Client } from '@prisma/client';
+import { PrismaTenantWrapper } from './prisma-tenant-wrapper.service';
 // Tipos temporários para evitar erros de compilação após remoção da autenticação
 type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
 import { logger } from '../utils/logger';
@@ -46,7 +47,7 @@ export interface ClientProgress {
 }
 
 export class ClientService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: PrismaClient | PrismaTenantWrapper) {}
 
   /**
    * Listar clientes com filtros e paginação
@@ -458,7 +459,7 @@ export class ClientService {
     }
 
     // Verificar se já está atribuído
-    const existingAssignment = await this.prisma.clientTrainer.findFirst({
+    const existingAssignment = await (this.prisma as any).clientTrainer.findFirst({
       where: {
         clientId,
         trainerId,
@@ -470,7 +471,7 @@ export class ClientService {
       throw new Error('Trainer já está atribuído a este cliente');
     }
 
-    await this.prisma.clientTrainer.create({
+    await (this.prisma as any).clientTrainer.create({
       data: {
         clientId,
         trainerId,
@@ -486,7 +487,7 @@ export class ClientService {
    * Remover trainer de um cliente
    */
   async unassignTrainer(clientId: string, trainerId: string, tenantId: string, unassignedBy: string): Promise<void> {
-    const assignment = await this.prisma.clientTrainer.findFirst({
+    const assignment = await (this.prisma as any).clientTrainer.findFirst({
       where: {
         clientId,
         trainerId,
@@ -498,7 +499,7 @@ export class ClientService {
       throw new Error('Atribuição não encontrada');
     }
 
-    await this.prisma.clientTrainer.update({
+    await (this.prisma as any).clientTrainer.update({
       where: { id: assignment.id },
       data: { isActive: false }
     });
@@ -510,7 +511,7 @@ export class ClientService {
    * Obter clientes atribuídos a um trainer
    */
   async getClientsByTrainer(trainerId: string, tenantId: string): Promise<Client[]> {
-    const assignments = await this.prisma.clientTrainer.findMany({
+    const assignments = await (this.prisma as any).clientTrainer.findMany({
       where: {
         trainerId,
         isActive: true,
@@ -643,7 +644,7 @@ export class ClientService {
       where.client = { tenantId };
     }
     
-    const assignments = await this.prisma.clientTrainer.findMany({
+    const assignments = await (this.prisma as any).clientTrainer.findMany({
       where,
       select: {
         clientId: true

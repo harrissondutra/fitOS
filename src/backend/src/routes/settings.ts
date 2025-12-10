@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { SettingsService } from '../services/settings.service';
 import { uploadAvatar, uploadLogo, validateImageDimensions, handleUploadError } from '../middleware/upload.middleware';
 import { logger } from '../utils/logger';
@@ -11,7 +11,7 @@ import { RequestWithTenant } from '../middleware/tenant';
 import { UserRole } from '../../../shared/types/auth.types';
 
 // PrismaClient global compartilhado
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const settingsService = new SettingsService(prisma);
 
 const router = Router();

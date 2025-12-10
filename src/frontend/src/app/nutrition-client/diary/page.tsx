@@ -28,7 +28,8 @@ import {
   Target,
   Calculator,
   Camera,
-  Barcode
+  Barcode,
+  UtensilsCrossed
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 

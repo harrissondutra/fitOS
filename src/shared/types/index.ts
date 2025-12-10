@@ -1,22 +1,19 @@
 import React from 'react';
 
-// User types
-export interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  role: UserRole;
-  status: UserStatus;
-  tenantId: string;
-  createdAt: Date;
-  updatedAt: Date;
-  lastLogin?: Date;
-}
+import { User, UserRole, UserRoles, UserStatus } from './auth.types';
+export { User, UserRoles, type UserRole, type UserStatus };
+export * from './auth.types';
 
-export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
-export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DELETED';
+// Re-export specific types if needed internally (though export * handles external consumers)
+// but to use them inside this file without 'user: import("./auth.types").User', we might need to import them?
+// Actually, let's just use the export * at the end and remove the local definitions.
+// But some interfaces inside this file refer to 'User'.
+// It's safer to not rely on global scope resolution if I remove the definition.
+// So I will modify the top to import first.
+
+// NOTE: I will do this via a cleaner replace block.
+// Since replace_file_content replaces a block, I will replace the top section first.
+
 
 // Tenant types
 export interface Tenant {
@@ -754,12 +751,12 @@ export interface BioimpedanceMeasurement {
   professionalId?: string;
   measurementId?: string; // ID do dispositivo (ex: 050625-1)
   measuredAt: Date;
-  
+
   // Dados básicos do usuário
   height: number; // Altura em cm
   age: number; // Idade em anos
   gender: 'male' | 'female'; // Gênero
-  
+
   // Composição corporal básica
   weight: number; // Peso em kg
   totalBodyWater: number; // Água corporal total em L
@@ -767,54 +764,54 @@ export interface BioimpedanceMeasurement {
   minerals: number; // Minerais em kg
   bodyFatMass: number; // Massa de gordura em kg
   skeletalMuscleMass: number; // Massa muscular esquelética em kg
-  
+
   // Análise de obesidade
   bmi: number; // IMC
   bodyFatPercentage: number; // PGC - Porcentual de gordura corporal
   waistHipRatio?: number; // Relação cintura-quadril
   visceralFatLevel?: number; // Nível de gordura visceral (1-59)
-  
+
   // Dados adicionais
   fatFreeMass: number; // Massa livre de gordura em kg
   basalMetabolicRate: number; // TMB em kcal
   obesityDegree: number; // Grau de obesidade em %
   skeletalMuscleIndex: number; // SMI em kg/m²
   recommendedCalories: number; // Ingestão calórica recomendada
-  
+
   // Peso ideal e controles
   idealWeight: number; // Peso ideal em kg
   weightControl: number; // Controle de peso em kg
   fatControl: number; // Controle de gordura em kg
   muscleControl: number; // Controle muscular em kg
-  
+
   // Análise segmentar - Massa magra
   leftArmMuscle: number; // Braço esquerdo em kg
   rightArmMuscle: number; // Braço direito em kg
   trunkMuscle: number; // Tronco em kg
   leftLegMuscle: number; // Perna esquerda em kg
   rightLegMuscle: number; // Perna direita em kg
-  
+
   // Análise segmentar - Gordura
   leftArmFat: number; // Gordura braço esquerdo em kg
   rightArmFat: number; // Gordura braço direito em kg
   trunkFat: number; // Gordura tronco em kg
   leftLegFat: number; // Gordura perna esquerda em kg
   rightLegFat: number; // Gordura perna direita em kg
-  
+
   // Impedância bioelétrica - 20kHz
   impedance20kRightArm?: number; // Impedância braço direito 20kHz
   impedance20kLeftArm?: number; // Impedância braço esquerdo 20kHz
   impedance20kTrunk?: number; // Impedância tronco 20kHz
   impedance20kRightLeg?: number; // Impedância perna direita 20kHz
   impedance20kLeftLeg?: number; // Impedância perna esquerda 20kHz
-  
+
   // Impedância bioelétrica - 100kHz
   impedance100kRightArm?: number; // Impedância braço direito 100kHz
   impedance100kLeftArm?: number; // Impedância braço esquerdo 100kHz
   impedance100kTrunk?: number; // Impedância tronco 100kHz
   impedance100kRightLeg?: number; // Impedância perna direita 100kHz
   impedance100kLeftLeg?: number; // Impedância perna esquerda 100kHz
-  
+
   // Classificações e faixas normais
   inbodyScore?: number; // Pontuação InBody (0-100+)
   weightClassification?: 'Normal' | 'Acima' | 'Abaixo'; // Classificação do peso
@@ -822,7 +819,7 @@ export interface BioimpedanceMeasurement {
   fatClassification?: 'Normal' | 'Acima' | 'Abaixo'; // Classificação da gordura
   bmiClassification?: 'Normal' | 'Acima' | 'Abaixo'; // Classificação do IMC
   bodyFatClassification?: 'Normal' | 'Acima' | 'Abaixo'; // Classificação da gordura corporal
-  
+
   // Faixas normais de referência
   normalWeightRange: { min: number; max: number }; // Faixa normal de peso
   normalMuscleRange: { min: number; max: number }; // Faixa normal de massa muscular
@@ -830,16 +827,16 @@ export interface BioimpedanceMeasurement {
   normalBMIRange: { min: number; max: number }; // Faixa normal de IMC
   normalBodyFatRange: { min: number; max: number }; // Faixa normal de gordura corporal
   normalWaistHipRange: { min: number; max: number }; // Faixa normal de relação cintura-quadril
-  
+
   // Dados adicionais
   equipment?: string; // Equipamento utilizado (ex: InBody270)
   operator?: string; // Operador que fez a medição
   notes?: string; // Observações adicionais
   qrCode?: string; // Código QR do relatório
-  
+
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Relações
   client?: {
     id: string;
@@ -860,61 +857,61 @@ export interface BioimpedanceMeasurementFormData {
   age: number;
   gender: 'male' | 'female';
   weight: number;
-  
+
   // Dados de composição corporal
   totalBodyWater: number;
   protein: number;
   minerals: number;
   bodyFatMass: number;
   skeletalMuscleMass: number;
-  
+
   // Dados de obesidade
   bmi: number;
   bodyFatPercentage: number;
   waistHipRatio?: number;
   visceralFatLevel?: number;
-  
+
   // Dados adicionais
   fatFreeMass: number;
   basalMetabolicRate: number;
   obesityDegree: number;
   skeletalMuscleIndex: number;
   recommendedCalories: number;
-  
+
   // Controles
   idealWeight: number;
   weightControl: number;
   fatControl: number;
   muscleControl: number;
-  
+
   // Análise segmentar - Massa magra
   leftArmMuscle: number;
   rightArmMuscle: number;
   trunkMuscle: number;
   leftLegMuscle: number;
   rightLegMuscle: number;
-  
+
   // Análise segmentar - Gordura
   leftArmFat: number;
   rightArmFat: number;
   trunkFat: number;
   leftLegFat: number;
   rightLegFat: number;
-  
+
   // Impedância bioelétrica - 20kHz
   impedance20kRightArm?: number;
   impedance20kLeftArm?: number;
   impedance20kTrunk?: number;
   impedance20kRightLeg?: number;
   impedance20kLeftLeg?: number;
-  
+
   // Impedância bioelétrica - 100kHz
   impedance100kRightArm?: number;
   impedance100kLeftArm?: number;
   impedance100kTrunk?: number;
   impedance100kRightLeg?: number;
   impedance100kLeftLeg?: number;
-  
+
   // Dados adicionais
   equipment?: string;
   operator?: string;
@@ -931,20 +928,20 @@ export interface BioimpedanceAnalysis {
     bodyFatMass: { value: number; normal: { min: number; max: number }; classification: string };
     weight: { value: number; normal: { min: number; max: number }; classification: string };
   };
-  
+
   // Análise músculo-gordura
   muscleFatAnalysis: {
     weight: { value: number; percentage: number; classification: string };
     skeletalMuscleMass: { value: number; percentage: number; classification: string };
     bodyFatMass: { value: number; percentage: number; classification: string };
   };
-  
+
   // Análise de obesidade
   obesityAnalysis: {
     bmi: { value: number; normal: { min: number; max: number }; classification: string };
     bodyFatPercentage: { value: number; normal: { min: number; max: number }; classification: string };
   };
-  
+
   // Controle de peso
   weightControl: {
     idealWeight: number;
@@ -952,20 +949,20 @@ export interface BioimpedanceAnalysis {
     fatControl: number;
     muscleControl: number;
   };
-  
+
   // Relação cintura-quadril
   waistHipRatio: {
     value: number;
     normal: { min: number; max: number };
     classification: string;
   };
-  
+
   // Gordura visceral
   visceralFat: {
     level: number;
     classification: string;
   };
-  
+
   // Dados adicionais
   additionalData: {
     fatFreeMass: { value: number; normal: { min: number; max: number }; classification: string };
@@ -974,7 +971,7 @@ export interface BioimpedanceAnalysis {
     skeletalMuscleIndex: number;
     recommendedCalories: number;
   };
-  
+
   // Análise segmentar
   segmentalAnalysis: {
     muscle: {
@@ -992,7 +989,7 @@ export interface BioimpedanceAnalysis {
       rightLeg: { value: number; percentage: number; classification: string };
     };
   };
-  
+
   // Pontuação InBody
   inbodyScore: {
     total: number;

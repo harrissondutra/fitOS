@@ -7,6 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAnalytics } from '@/hooks/use-analytics';
+import { useAuth } from '@/hooks/use-auth';
+import { usePermissions } from '@/hooks/use-permissions';
+import { FeatureLock } from '@/components/billing/feature-lock';
 import { TrendingUp, Target, Calendar, Award, Download, BarChart3, LineChart } from 'lucide-react';
 
 // Configurações para evitar problemas de SSR com useAuth
@@ -16,10 +19,10 @@ export const runtime = 'nodejs'
 export const preferredRegion = 'auto'
 
 export default function MemberProgressPage() {
-  // Auth removed - using default values
-  const user = { role: 'CLIENT' as const, id: 'default-member-id' };
-  const [timeRange, setTimeRange] = useState('30d');
-  
+  const { user } = useAuth();
+  const { analyticsHistoryDays, canExportData } = usePermissions(user?.role, user?.plan);
+  const [timeRange, setTimeRange] = useState(`${Math.min(analyticsHistoryDays, 30)}d`);
+
   const { analytics, loading, error, refetch } = useAnalytics({
     clientId: user?.id,
   });
@@ -90,10 +93,24 @@ export default function MemberProgressPage() {
               <SelectItem value="1y">Last year</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export Progress
-          </Button>
+
+          {/* Botão de exportação - bloqueado para FREE (funcionalidade premium) */}
+          {canExportData ? (
+            <Button variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Export Progress
+            </Button>
+          ) : (
+            <div className="relative group inline-block">
+              <Button variant="outline" disabled className="opacity-50 cursor-not-allowed">
+                <Download className="h-4 w-4 mr-2" />
+                Export 🔒
+              </Button>
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                Disponível no plano Professional+
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

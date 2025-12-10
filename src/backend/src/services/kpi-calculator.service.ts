@@ -2,8 +2,6 @@ import { getPrismaClient } from '../config/database';
 import { logger } from '../utils/logger';
 import { cache } from '../config/redis';
 
-const prisma = getPrismaClient();
-
 interface ExecutiveKPIs {
   // Métricas de eficiência
   costPerUser: number;           // Custo total / usuários ativos
@@ -46,12 +44,21 @@ interface KPICalculationParams {
 export class KPICalculatorService {
   private readonly CACHE_KEY_PREFIX: string;
   private readonly CACHE_TTL: number;
+  private _prisma: ReturnType<typeof getPrismaClient> | null = null;
 
   constructor() {
     // Usar variáveis de ambiente (ZERO hardcode)
     const redisPrefix = process.env.REDIS_KEY_PREFIX || 'fitos:';
     this.CACHE_KEY_PREFIX = `${redisPrefix}kpis:executive:`;
     this.CACHE_TTL = parseInt(process.env.COST_CACHE_TTL_DASHBOARD || process.env.COST_CACHE_TTL || '300');
+  }
+
+  // Lazy getter para PrismaClient
+  private get prisma() {
+    if (!this._prisma) {
+      this._prisma = getPrismaClient();
+    }
+    return this._prisma;
   }
 
   /**
@@ -149,7 +156,7 @@ export class KPICalculatorService {
       where.tenantId = params.tenantId;
     }
 
-    const result = await prisma.costEntry.aggregate({
+    const result = await this.prisma.costEntry.aggregate({
       where,
       _sum: {
         amount: true,
@@ -175,7 +182,7 @@ export class KPICalculatorService {
       where.tenantId = params.tenantId;
     }
 
-    return await prisma.user.count({ where });
+    return await this.prisma.user.count({ where });
   }
 
   /**
@@ -194,14 +201,14 @@ export class KPICalculatorService {
     }
 
     // Usar UsageTracking como proxy para requests
-    return await prisma.usageTracking.count({ where });
+    return await this.prisma.usageTracking.count({ where });
   }
 
   /**
    * Obtém orçamento mensal
    */
   private async getMonthlyBudget(params: KPICalculationParams): Promise<number> {
-    const budget = await prisma.costBudget.findFirst({
+    const budget = await this.prisma.costBudget.findFirst({
       where: {
         startDate: { lte: params.endDate },
         endDate: { gte: params.startDate },
@@ -255,7 +262,7 @@ export class KPICalculatorService {
       where.tenantId = params.tenantId;
     }
 
-    const costs = await prisma.costEntry.groupBy({
+    const costs = await this.prisma.costEntry.groupBy({
       by: ['categoryId'],
       where,
       _sum: {
@@ -288,7 +295,7 @@ export class KPICalculatorService {
       where.tenantId = params.tenantId;
     }
 
-    const result = await prisma.costEntry.aggregate({
+    const result = await this.prisma.costEntry.aggregate({
       where,
       _sum: {
         amount: true,
@@ -314,7 +321,7 @@ export class KPICalculatorService {
       where.tenantId = params.tenantId;
     }
 
-    const result = await prisma.costEntry.aggregate({
+    const result = await this.prisma.costEntry.aggregate({
       where,
       _sum: {
         amount: true,

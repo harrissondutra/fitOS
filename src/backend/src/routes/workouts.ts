@@ -2,14 +2,17 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { body, validationResult, query } from 'express-validator';
+import { createWorkoutService } from '../utils/service-factory';
+import { WorkoutFilters } from '../services/workout.service';
+import { UserRole } from '../../../shared/types/auth.types';
+import { checkWorkoutLimit } from '../middleware/plan-limits.middleware';
 
-// Tipos temporários para evitar erros de compilação após remoção da autenticação
-type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
+// Usar tipo compartilhado de role
 
 // PrismaClient global compartilhado
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 const router = Router();
 
@@ -25,7 +28,7 @@ interface RequestWithTenantAndAuth extends RequestWithTenant {
 }
 
 // Get all workouts - Auth removed
-router.get('/', 
+router.get('/',
   [
     query('search').optional().isString().trim(),
     query('clientId').optional().isString().trim(),
@@ -58,79 +61,37 @@ router.get('/',
       });
     }
 
-    const {
-      search,
-      clientId,
-      createdFrom,
-      createdTo,
-      page = 1,
-      limit = 10,
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
-    } = req.query;
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const workoutService = await createWorkoutService(req);
 
-    const where: any = {};
+    const filters: WorkoutFilters = {
+      search: req.query.search as string,
+      clientId: req.query.clientId as string,
+      userId: req.user?.id,
+      createdFrom: req.query.createdFrom as string,
+      createdTo: req.query.createdTo as string,
+      page: Number(req.query.page) || 1,
+      limit: Number(req.query.limit) || 10,
+      sortBy: (req.query.sortBy as string) || 'createdAt',
+      sortOrder: (req.query.sortOrder as 'asc' | 'desc') || 'desc'
+    };
 
-    // SUPER_ADMIN pode ver todos os workouts de todos os tenants
-    // Outros roles precisam de tenantId específico
-    if (req.user?.role !== 'SUPER_ADMIN' && tenantId) {
-      where.tenantId = tenantId;
-    }
-
-    if (search) {
-      where.name = { contains: search as string, mode: 'insensitive' };
-    }
-
-    if (clientId) {
-      where.clientId = clientId;
-    }
-
-    if (createdFrom || createdTo) {
-      where.createdAt = {};
-      if (createdFrom) where.createdAt.gte = new Date(createdFrom as string);
-      if (createdTo) where.createdAt.lte = new Date(createdTo as string);
-    }
-
-    // Validação de escopo por role
-    if (req.user?.role === 'CLIENT') {
-      where.clientId = req.user.id;
-    } else if (req.user?.role === 'TRAINER' && tenantId) {
-      // Trainers podem ver workouts dos membros que treinam
-      where.client = {
-        trainerId: req.user.id
-      };
-    }
-
-    const [workouts, total] = await Promise.all([
-      prisma.workout.findMany({
-        where,
-        include: {
-          client: {
-            select: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        },
-        orderBy: sortBy === 'name' 
-          ? { name: sortOrder as 'asc' | 'desc' }
-          : { createdAt: sortOrder as 'asc' | 'desc' },
-        take: Number(limit),
-        skip: (Number(page) - 1) * Number(limit)
-      }),
-      prisma.workout.count({ where })
-    ]);
+    const result = await workoutService.getWorkouts(
+      filters,
+      tenantId || '',
+      (req.user?.role as any) || 'CLIENT',
+      req.user?.id
+    );
 
     return res.json({
       success: true,
       data: {
-        treinos: workouts,
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total,
-          pages: Math.ceil(total / Number(limit))
+        treinos: result.workouts || [],
+        pagination: result.pagination || {
+          page: filters.page,
+          limit: filters.limit,
+          total: 0,
+          pages: 0
         }
       }
     });
@@ -151,34 +112,15 @@ router.get('/:id',
       });
     }
 
-    const where: any = { id };
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const workoutService = await createWorkoutService(req);
 
-    // SUPER_ADMIN pode ver todos os workouts, outros roles precisam de tenantId
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
-    // Validação de escopo por role
-    if (req.user?.role === 'CLIENT') {
-      where.clientId = req.user.id;
-    } else if (req.user?.role === 'TRAINER' && tenantId) {
-      where.client = {
-        trainerId: req.user.id
-      };
-    }
-
-    const workout = await prisma.workout.findFirst({
-      where,
-      include: {
-        client: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    });
+    const workout = await workoutService.getWorkoutById(
+      id,
+      tenantId || '',
+      (req.user?.role as any) || 'CLIENT',
+      req.user?.id
+    );
 
     if (!workout) {
       return res.status(404).json({
@@ -202,6 +144,7 @@ router.post('/',
     body('clientId').optional().isString(),
     body('exercises').optional().isArray()
   ],
+  checkWorkoutLimit,
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -223,6 +166,9 @@ router.post('/',
       });
     }
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const workoutService = await createWorkoutService(req);
+
     const { name, description, clientId, exercises = [] } = req.body;
 
     // Determinar clientId baseado no role
@@ -238,25 +184,17 @@ router.post('/',
       });
     }
 
-    const workout = await prisma.workout.create({
-      data: {
+    const workout = await workoutService.createWorkout(
+      {
         name,
         description,
-        tenantId,
+        exercises: exercises || [],
         clientId: targetMemberId,
-        userId: req.user!.id,
-        exercises: exercises || []
+        aiGenerated: false
       },
-      include: {
-        client: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
-      }
-    });
+      tenantId,
+      req.user!.id
+    );
 
     logger.info('Workout created', {
       workoutId: workout.id,
@@ -300,58 +238,33 @@ router.put('/:id',
       });
     }
 
-    const where: any = { id, tenantId };
-
-    // Validação de escopo por role
-    if (req.user?.role === 'CLIENT') {
-      where.clientId = req.user.id;
-    } else if (req.user?.role === 'TRAINER') {
-      where.client = {
-        trainerId: req.user.id
-      };
-    }
-
-    const existingWorkout = await prisma.workout.findFirst({
-      where
-    });
-
-    if (!existingWorkout) {
-      return res.status(404).json({
-        success: false,
-        error: { message: 'Workout not found or access denied' }
-      });
-    }
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const workoutService = await createWorkoutService(req);
 
     const { name, description, exercises } = req.body;
 
-    const workout = await prisma.workout.update({
-      where: { id },
-      data: {
-        ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(exercises && { exercises })
-      },
-      include: {
-        client: {
-          select: {
-            id: true,
-            name: true,
-            email: true
-          }
-        }
+    try {
+      const workout = await workoutService.updateWorkout(
+        id,
+        { name, description, exercises },
+        tenantId,
+        req.user!.id,
+        (req.user?.role as any) || 'CLIENT'
+      );
+
+      return res.json({
+        success: true,
+        data: { workout }
+      });
+    } catch (error: any) {
+      if (error.message.includes('não encontrado')) {
+        return res.status(404).json({
+          success: false,
+          error: { message: error.message }
+        });
       }
-    });
-
-    logger.info('Workout updated', {
-      workoutId: workout.id,
-      userId: req.user?.id,
-      tenantId
-    });
-
-    return res.json({
-      success: true,
-      data: { workout }
-    });
+      throw error;
+    }
   })
 );
 
@@ -368,42 +281,30 @@ router.delete('/:id',
       });
     }
 
-    const where: any = { id, tenantId };
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const workoutService = await createWorkoutService(req);
 
-    // Validação de escopo por role
-    if (req.user?.role === 'CLIENT') {
-      where.clientId = req.user.id;
-    } else if (req.user?.role === 'TRAINER') {
-      where.client = {
-        trainerId: req.user.id
-      };
-    }
+    try {
+      await workoutService.deleteWorkout(
+        id,
+        tenantId,
+        req.user!.id,
+        (req.user?.role as any) || 'CLIENT'
+      );
 
-    const existingWorkout = await prisma.workout.findFirst({
-      where
-    });
-
-    if (!existingWorkout) {
-      return res.status(404).json({
-        success: false,
-        error: { message: 'Workout not found or access denied' }
+      return res.json({
+        success: true,
+        message: 'Workout deleted successfully'
       });
+    } catch (error: any) {
+      if (error.message.includes('não encontrado')) {
+        return res.status(404).json({
+          success: false,
+          error: { message: error.message }
+        });
+      }
+      throw error;
     }
-
-    await prisma.workout.delete({
-      where: { id }
-    });
-
-    logger.info('Workout deleted', {
-      workoutId: id,
-      userId: req.user?.id,
-      tenantId
-    });
-
-    return res.json({
-      success: true,
-      message: 'Workout deleted successfully'
-    });
   })
 );
 

@@ -6,10 +6,11 @@
 
 import { Router } from 'express';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
+import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
-const authMiddleware = getAuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 import { 
   foodDatabaseService,
   mealPlanService,

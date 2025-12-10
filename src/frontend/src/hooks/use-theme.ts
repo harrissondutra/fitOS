@@ -40,6 +40,9 @@ export function useTheme(): UseThemeReturn {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     
+    // Salvar no localStorage imediatamente para sincronização
+    localStorage.setItem('theme-mode', newTheme);
+    
     // Salvar no backend se autenticado
     if (isAuthenticated && !authLoading && !settingsLoading) {
       updateSettings({
@@ -53,12 +56,8 @@ export function useTheme(): UseThemeReturn {
         }
       }).catch(error => {
         console.error('Erro ao salvar tema no backend:', error);
-        // Fallback para localStorage se falhar
-        localStorage.setItem('theme', newTheme);
+        // localStorage já foi atualizado acima como fallback
       });
-    } else {
-      // Fallback para localStorage se não autenticado
-      localStorage.setItem('theme', newTheme);
     }
   }, [theme, isAuthenticated, authLoading, settingsLoading, settings?.theme, updateSettings]);
 
@@ -66,28 +65,44 @@ export function useTheme(): UseThemeReturn {
   const isLight = theme === 'light';
   const isCustom = isCustomTheme(THEME_PRESETS);
 
-  // Apply theme to document
+  // Apply theme to document and sync with next-themes
   useEffect(() => {
     applyTheme(theme);
+    // Também sincronizar com next-themes se disponível
+    if (typeof window !== 'undefined') {
+      const htmlElement = document.documentElement;
+      htmlElement.classList.remove('light', 'dark');
+      htmlElement.classList.add(theme);
+      htmlElement.style.colorScheme = theme;
+    }
   }, [theme]);
 
   // Load theme from backend or localStorage on mount
   useEffect(() => {
-    if (isAuthenticated && !authLoading && !settingsLoading && settings?.theme?.mode) {
-      // Carregar tema do backend se autenticado
-      setTheme(settings.theme.mode);
-      console.log('🎨 Tema carregado do backend:', settings.theme.mode);
-    } else if (!isAuthenticated || authLoading || settingsLoading) {
-      // Fallback para localStorage se não autenticado ou ainda carregando
+    // Priorizar tema do perfil do usuário se autenticado e carregado
+    if (isAuthenticated && !authLoading && !settingsLoading) {
+      if (settings?.theme?.mode) {
+        // Carregar tema do backend se autenticado e settings disponível
+        setTheme(settings.theme.mode);
+        console.log('🎨 Tema carregado do backend:', settings.theme.mode);
+      } else {
+        // Se autenticado mas sem tema no perfil, usar localStorage como fallback
+        const savedTheme = loadThemeFromStorage();
+        setTheme(savedTheme);
+        console.log('🎨 Tema carregado do localStorage (usuário autenticado sem tema no perfil):', savedTheme);
+      }
+    } else if (!isAuthenticated && !authLoading) {
+      // Se não autenticado e não está carregando, usar localStorage
       const savedTheme = loadThemeFromStorage();
       setTheme(savedTheme);
-      console.log('🎨 Tema carregado do localStorage:', savedTheme);
+      console.log('🎨 Tema carregado do localStorage (não autenticado):', savedTheme);
     }
+    // Se ainda está carregando (authLoading ou settingsLoading), não fazer nada para evitar conflitos
     
     // Load current preset
     const preset = getCurrentThemePreset(THEME_PRESETS);
     setCurrentPreset(preset);
-  }, [isAuthenticated, authLoading, settingsLoading, settings?.theme?.mode]); // Incluído settings?.theme?.mode
+  }, [isAuthenticated, authLoading, settingsLoading, settings?.theme?.mode]);
 
   // Select theme preset
   const selectThemePreset = useCallback((presetId: string) => {
@@ -140,19 +155,35 @@ export function useTheme(): UseThemeReturn {
   }, [isAuthenticated, authLoading, settingsLoading, settings?.theme, updateSettings]);
 
   // Wrapper para applyCustomColors que salva no backend
-  const applyCustomColorsWithPersistence = useCallback((colors: CustomColors) => {
+  const applyCustomColorsWithPersistence = useCallback((colors: CustomColors, skipSave = false) => {
     applyCustomColors(colors);
     
-    // Salvar no backend se autenticado
-    if (isAuthenticated && !authLoading && !settingsLoading) {
-      updateSettings({
-        theme: {
-          mode: settings?.theme?.mode || 'light',
-          customColors: colors
-        }
-      }).catch(error => {
-        console.error('Erro ao salvar cores customizadas no backend:', error);
-      });
+    // Salvar no backend se autenticado e não for uma chamada de inicialização
+    if (!skipSave && isAuthenticated && !authLoading && !settingsLoading) {
+      // Verificar se as cores já são as mesmas (evitar salvar desnecessariamente)
+      const currentColors = settings?.theme?.customColors;
+      if (currentColors && 
+          currentColors.primary === colors.primary && 
+          currentColors.secondary === colors.secondary && 
+          currentColors.accent === colors.accent) {
+        // Cores já são as mesmas, não precisa salvar
+        return;
+      }
+      
+      // Usar setTimeout para evitar múltiplas chamadas síncronas
+      setTimeout(() => {
+        updateSettings({
+          theme: {
+            mode: settings?.theme?.mode || 'light',
+            customColors: colors
+          }
+        }).catch(error => {
+          // Silenciosamente ignorar erros de rede (backend offline)
+          if (error instanceof Error && !error.message.includes('Failed to fetch') && !error.message.includes('ERR_CONNECTION_REFUSED')) {
+            console.debug('Erro ao salvar cores customizadas no backend (non-critical):', error);
+          }
+        });
+      }, 200); // Debounce de 200ms
     }
   }, [isAuthenticated, authLoading, settingsLoading, settings?.theme, updateSettings]);
 

@@ -4,12 +4,12 @@
 import { Router } from 'express';
 import { pushNotificationService } from '../services/push-notification.service';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 const router = Router();
-const authMiddleware = getAuthMiddleware(prisma);
+const authMiddleware = getAuthMiddleware();
 
 // Obter chave pública VAPID
 router.get('/vapid-public-key', (req, res) => {

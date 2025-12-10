@@ -12,6 +12,8 @@ import { useAuth } from '@/hooks/use-auth'
 import { useSidebarView } from '@/hooks/use-sidebar-view'
 import { Badge } from '@/components/ui/badge'
 import { LayoutDashboard, Cog } from 'lucide-react'
+import { AdHeader } from '@/components/advertisements/AdHeader'
+import { AdFooter } from '@/components/advertisements/AdFooter'
 
 interface ConditionalLayoutProps {
   children: React.ReactNode
@@ -21,7 +23,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const { isAdminView } = useSidebarView()
-  
+
   // Rotas públicas que não devem ter sidebar
   const publicRoutes = [
     '/',
@@ -31,28 +33,23 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
     '/auth/forgot-password',
     '/auth/reset-password'
   ]
-  
+
   // Rotas que têm layouts específicos com sidebar próprio
-  const routesWithOwnLayout = [
-    '/admin',
-    '/client',
-    '/trainer',
-    '/professional',
-    '/marketplace',
-    '/super-admin'
+  const routesWithOwnLayout: string[] = [
+    // Todas as rotas agora usam o layout global condicional
   ]
-  
+
   // Verificar se é uma rota pública
   const isPublicRoute = publicRoutes.some(route => {
     if (route === '/') return pathname === '/'
     return pathname?.startsWith(route) || false
   })
-  
+
   // Verificar se é uma rota com layout próprio
   const hasOwnLayout = routesWithOwnLayout.some(route => {
     return pathname?.startsWith(route) || false
   })
-  
+
   // Se for rota pública, renderizar sem header
   if (isPublicRoute) {
     return (
@@ -61,7 +58,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
       </div>
     )
   }
-  
+
   // Se for rota com layout próprio, renderizar sem header adicional
   if (hasOwnLayout) {
     return (
@@ -70,12 +67,13 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
       </div>
     )
   }
-  
+
   // Para rotas protegidas sem layout próprio, renderizar com sidebar completa
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
+        <AdHeader />
         <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 border-b border-border/40">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
@@ -85,13 +83,12 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
             <BreadcrumbNav />
             <div className="flex items-center gap-4">
               {/* Badge de visão */}
-              <Badge 
-                variant="outline" 
-                className={`flex items-center gap-2 px-3 py-1 ${
-                  isAdminView 
-                    ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300' 
-                    : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300'
-                }`}
+              <Badge
+                variant="outline"
+                className={`flex items-center gap-2 px-3 py-1 ${isAdminView
+                  ? 'border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300'
+                  : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                  }`}
               >
                 {isAdminView ? (
                   <>
@@ -110,9 +107,10 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
             </div>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 min-h-screen">
           {children}
         </div>
+        <AdFooter />
       </SidebarInset>
     </SidebarProvider>
   )

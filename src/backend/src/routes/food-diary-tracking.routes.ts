@@ -8,14 +8,14 @@
  */
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { foodDiaryTrackingService } from '../services/nutrition/food-diary-tracking.service';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { logger } from '../utils/logger';
 
 const router = Router();
-const prisma = new PrismaClient();
-const authMiddleware = getAuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 
 /**
  * POST /api/nutrition/tracking/entries
@@ -23,7 +23,7 @@ const authMiddleware = getAuthMiddleware(prisma);
  * Permissão: CLIENT (próprio diário)
  */
 router.post('/entries',
-  authMiddleware.requireRole(['CLIENT']),
+  authMiddleware.requireRole(['CLIENT', 'SUPER_ADMIN']),
   async (req, res) => {
     try {
       const entry = await foodDiaryTrackingService.addFoodEntry({
@@ -53,7 +53,7 @@ router.post('/entries',
  * Permissão: CLIENT (próprio) ou NUTRITIONIST (clientes)
  */
 router.get('/daily/:date',
-  authMiddleware.requireRole(['CLIENT', 'NUTRITIONIST']),
+  authMiddleware.requireRole(['CLIENT', 'NUTRITIONIST', 'SUPER_ADMIN']),
   async (req, res) => {
     try {
       const clientId = (req.query.clientId as string) || req.user!.id;
@@ -91,7 +91,7 @@ router.get('/daily/:date',
  * Permissão: CLIENT (próprio) ou NUTRITIONIST (clientes)
  */
 router.get('/history',
-  authMiddleware.requireRole(['CLIENT', 'NUTRITIONIST']),
+  authMiddleware.requireRole(['CLIENT', 'NUTRITIONIST', 'SUPER_ADMIN']),
   async (req, res) => {
     try {
       const clientId = (req.query.clientId as string) || req.user!.id;
@@ -127,7 +127,7 @@ router.get('/history',
  * Permissão: CLIENT (próprio diário)
  */
 router.delete('/entries/:id',
-  authMiddleware.requireRole(['CLIENT']),
+  authMiddleware.requireRole(['CLIENT', 'SUPER_ADMIN']),
   async (req, res) => {
     try {
       await foodDiaryTrackingService.deleteEntry(req.params.id, req.user!.id);
@@ -168,4 +168,6 @@ router.get('/health', async (req, res) => {
 });
 
 export default router;
+
+
 

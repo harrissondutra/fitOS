@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { UserRole } from '@/shared/types/auth.types';
+import { UserRole, UserRoles } from '@/shared/types/auth.types';
 
 interface UsePermissionsReturn {
   canAccess: (resource: string, action?: string) => boolean;
@@ -18,9 +18,12 @@ interface UsePermissionsReturn {
   canAccessCRM: boolean;
   canAccessWhatsApp: boolean;
   canAccessMarketing: boolean;
+  // Permissões de analytics
+  analyticsHistoryDays: number;
+  canViewAdvancedCharts: boolean;
 }
 
-export function usePermissions(userRole?: UserRole): UsePermissionsReturn {
+export function usePermissions(userRole?: UserRole, userPlan?: string): UsePermissionsReturn {
   const [permissions, setPermissions] = useState<UsePermissionsReturn>({
     canAccess: () => false,
     canManageUsers: false,
@@ -37,51 +40,75 @@ export function usePermissions(userRole?: UserRole): UsePermissionsReturn {
     canAccessCRM: false,
     canAccessWhatsApp: false,
     canAccessMarketing: false,
+    analyticsHistoryDays: 7,
+    canViewAdvancedCharts: false,
   });
 
-  const updatePermissions = useCallback((role: UserRole) => {
+  const updatePermissions = useCallback((role: UserRole, plan?: string) => {
+    // Se for plano gratuito, bloquear funcionalidades administrativas
+    const isFreePlan = plan === 'free';
+
     const newPermissions: UsePermissionsReturn = {
       canAccess: (resource: string, action?: string) => {
         // SUPER_ADMIN tem acesso a TUDO - é o dono do sistema
-        if (role === 'SUPER_ADMIN') {
+        if (role === UserRoles.SUPER_ADMIN) {
           return true;
         }
-        
+
+        // Bloqueios do plano gratuito
+        if (isFreePlan) {
+          const blockedResources = ['analytics', 'plan-limits', 'export', 'crm', 'marketing'];
+          if (blockedResources.includes(resource)) {
+            return false;
+          }
+        }
+
+        const checkRole = (allowed: UserRole[]) => allowed.includes(role);
+
         // Define resource-based permissions para outros roles
         switch (resource) {
           case 'users':
-            return ['OWNER', 'ADMIN'].includes(role);
+            return checkRole([UserRoles.ADMIN]);
           case 'members':
-            return ['OWNER', 'ADMIN', 'TRAINER'].includes(role);
+            return checkRole([UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.NUTRITIONIST, UserRoles.PROFESSIONAL]);
           case 'workouts':
-            return ['OWNER', 'ADMIN', 'TRAINER'].includes(role);
+            return checkRole([UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.PROFESSIONAL]);
           case 'exercises':
-            return ['OWNER', 'ADMIN', 'TRAINER'].includes(role);
+            return checkRole([UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.PROFESSIONAL]);
           case 'analytics':
-            return ['OWNER', 'ADMIN'].includes(role);
+            return checkRole([UserRoles.ADMIN]);
           case 'plan-limits':
-            return ['OWNER'].includes(role);
+            return checkRole([UserRoles.ADMIN]);
           case 'export':
-            return ['OWNER', 'ADMIN'].includes(role);
+            return checkRole([UserRoles.ADMIN]);
           default:
             return false;
         }
       },
-      canManageUsers: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN'].includes(role),
-      canManageClients: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'TRAINER'].includes(role),
-      canManageWorkouts: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'TRAINER'].includes(role),
-      canManageExercises: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'TRAINER'].includes(role),
-      canViewAnalytics: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN'].includes(role),
-      canViewGlobalAnalytics: role === 'SUPER_ADMIN',
-      canManagePlanLimits: role === 'SUPER_ADMIN' || ['OWNER'].includes(role),
-      canExportData: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN'].includes(role),
-      // Permissões nutricionais
-      canManageNutrition: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'NUTRITIONIST'].includes(role),
-      canCreateMealPlans: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'NUTRITIONIST'].includes(role),
-      canViewFoodDiary: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'NUTRITIONIST', 'CLIENT'].includes(role),
-      canAccessCRM: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'NUTRITIONIST'].includes(role),
-      canAccessWhatsApp: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN', 'NUTRITIONIST'].includes(role),
-      canAccessMarketing: role === 'SUPER_ADMIN' || ['OWNER', 'ADMIN'].includes(role),
+      canManageUsers: !isFreePlan && (role === UserRoles.SUPER_ADMIN || role === UserRoles.ADMIN),
+      canManageClients: role === UserRoles.SUPER_ADMIN || [UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.NUTRITIONIST, UserRoles.PROFESSIONAL].includes(role as any),
+      canManageWorkouts: role === UserRoles.SUPER_ADMIN || [UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.PROFESSIONAL].includes(role as any),
+      canManageExercises: role === UserRoles.SUPER_ADMIN || [UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.PROFESSIONAL].includes(role as any),
+      canViewAnalytics: !isFreePlan && (role === UserRoles.SUPER_ADMIN || role === UserRoles.ADMIN),
+      canViewGlobalAnalytics: role === UserRoles.SUPER_ADMIN,
+      canManagePlanLimits: !isFreePlan && (role === UserRoles.SUPER_ADMIN || role === UserRoles.ADMIN),
+      canExportData: !isFreePlan && (role === UserRoles.SUPER_ADMIN || role === UserRoles.ADMIN),
+      // Permissões nutricionais (PROFESSIONAL tem acesso)
+      canManageNutrition: role === UserRoles.SUPER_ADMIN || [UserRoles.ADMIN, UserRoles.NUTRITIONIST, UserRoles.PROFESSIONAL].includes(role as any),
+      canCreateMealPlans: role === UserRoles.SUPER_ADMIN || [UserRoles.ADMIN, UserRoles.NUTRITIONIST, UserRoles.PROFESSIONAL].includes(role as any),
+      canViewFoodDiary: role === UserRoles.SUPER_ADMIN || [UserRoles.ADMIN, UserRoles.NUTRITIONIST, UserRoles.PROFESSIONAL, UserRoles.CLIENT].includes(role as any),
+      canAccessCRM: !isFreePlan && (role === UserRoles.SUPER_ADMIN || [UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.NUTRITIONIST, UserRoles.PROFESSIONAL].includes(role as any)),
+      canAccessWhatsApp: !isFreePlan && (role === UserRoles.SUPER_ADMIN || [UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.NUTRITIONIST, UserRoles.PROFESSIONAL].includes(role as any)),
+      canAccessMarketing: !isFreePlan && (role === UserRoles.SUPER_ADMIN || role === UserRoles.ADMIN),
+      // Analytics por plano - FREE tem acesso completo aos próprios dados para engajamento
+      analyticsHistoryDays: (() => {
+        // FREE: acesso completo aos próprios dados (estratégia de conversão)
+        // Diferenciação está em funcionalidades administrativas, não visualização
+        return 365; // Todos os planos: 1 ano de histórico
+      })(),
+      // Charts avançados disponíveis para todos (engajamento)
+      // Bloqueio está em funcionalidades empresariais (CRM, exportação, etc)
+      canViewAdvancedCharts: true,
     };
 
     setPermissions(newPermissions);
@@ -89,9 +116,9 @@ export function usePermissions(userRole?: UserRole): UsePermissionsReturn {
 
   useEffect(() => {
     if (userRole) {
-      updatePermissions(userRole);
+      updatePermissions(userRole, userPlan);
     }
-  }, [userRole, updatePermissions]);
+  }, [userRole, userPlan, updatePermissions]);
 
   return permissions;
 }

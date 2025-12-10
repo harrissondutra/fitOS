@@ -1,9 +1,10 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { GoogleCalendarService } from './google-calendar.service';
 import { NotificationService } from './notification.service';
 import { AuditService } from './audit.service';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export interface CreateAppointmentData {
   tenantId: string;
@@ -51,11 +52,13 @@ export interface AvailabilitySlot {
 }
 
 export class SchedulingService {
+  private prisma: PrismaClient;
   private googleCalendarService: GoogleCalendarService;
   private notificationService: NotificationService;
   private auditService: AuditService;
 
   constructor() {
+    this.prisma = prisma; // reuse singleton defined above
     this.googleCalendarService = new GoogleCalendarService();
     this.notificationService = new NotificationService();
     this.auditService = new AuditService();
@@ -86,7 +89,7 @@ export class SchedulingService {
       }
 
       // Cria agendamento
-      const appointment = await prisma.appointment.create({
+      const appointment = await this.prisma.appointment.create({
         data: {
           ...data,
           status: 'scheduled'
@@ -111,7 +114,7 @@ export class SchedulingService {
       await this.createReminders(appointment.id, data.scheduledAt);
 
       // Cria registro de presença
-      await prisma.attendance.create({
+      await this.prisma.attendance.create({
         data: {
           appointmentId: appointment.id,
           clientId: data.clientId,
@@ -134,7 +137,7 @@ export class SchedulingService {
       await this.notificationService.create({
         userId: data.professionalId,
         tenantId: data.tenantId,
-        type: 'appointment',
+          type: 'info',
         title: 'Novo Agendamento',
         message: `Agendamento criado: ${data.title} - ${data.scheduledAt.toLocaleString()}`,
         data: { appointmentId: appointment.id }
@@ -156,7 +159,7 @@ export class SchedulingService {
     userId: string
   ): Promise<{ success: boolean; appointment?: any; error?: string }> {
     try {
-      const existingAppointment = await prisma.appointment.findUnique({
+      const existingAppointment = await this.prisma.appointment.findUnique({
         where: { id: appointmentId }
       });
 
@@ -181,7 +184,7 @@ export class SchedulingService {
         }
       }
 
-      const updatedAppointment = await prisma.appointment.update({
+      const updatedAppointment = await this.prisma.appointment.update({
         where: { id: appointmentId },
         data: {
           ...data,
@@ -219,7 +222,7 @@ export class SchedulingService {
       await this.notificationService.create({
         userId: existingAppointment.professionalId,
         tenantId: existingAppointment.tenantId,
-        type: 'appointment',
+          type: 'info',
         title: 'Agendamento Atualizado',
         message: `Agendamento atualizado: ${updatedAppointment.title}`,
         data: { appointmentId: updatedAppointment.id }
@@ -241,7 +244,7 @@ export class SchedulingService {
     userId: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const appointment = await prisma.appointment.findUnique({
+      const appointment = await this.prisma.appointment.findUnique({
         where: { id: appointmentId }
       });
 
@@ -249,7 +252,7 @@ export class SchedulingService {
         return { success: false, error: 'Agendamento não encontrado' };
       }
 
-      await prisma.appointment.update({
+      await this.prisma.appointment.update({
         where: { id: appointmentId },
         data: {
           status: 'cancelled',
@@ -268,7 +271,7 @@ export class SchedulingService {
       }
 
       // Cancela lembretes pendentes
-      await prisma.appointmentReminder.updateMany({
+      await this.prisma.appointmentReminder.updateMany({
         where: {
           appointmentId,
           status: 'pending'
@@ -337,7 +340,7 @@ export class SchedulingService {
       }
 
       const [appointments, total] = await Promise.all([
-        prisma.appointment.findMany({
+        this.prisma.appointment.findMany({
           where,
           include: {
             professional: {
@@ -359,7 +362,7 @@ export class SchedulingService {
           take: filters.limit || 50,
           skip: filters.offset || 0
         }),
-        prisma.appointment.count({ where })
+        this.prisma.appointment.count({ where })
       ]);
 
       return { success: true, appointments, total };
@@ -378,7 +381,7 @@ export class SchedulingService {
     error?: string;
   }> {
     try {
-      const appointment = await prisma.appointment.findUnique({
+      const appointment = await this.prisma.appointment.findUnique({
         where: { id: appointmentId },
         include: {
           professional: {
@@ -432,7 +435,7 @@ export class SchedulingService {
       const dayOfWeek = scheduledAt.getDay();
 
       // Verifica se o profissional tem disponibilidade neste dia
-      const availability = await prisma.professionalAvailability.findFirst({
+      const availability = await this.prisma.professionalAvailability.findFirst({
         where: {
           tenantId,
           professionalId,
@@ -454,7 +457,7 @@ export class SchedulingService {
       }
 
       // Verifica se não há bloqueios de disponibilidade
-      const hasBlock = await prisma.availabilityBlock.findFirst({
+      const hasBlock = await this.prisma.availabilityBlock.findFirst({
         where: {
           tenantId,
           professionalId,
@@ -510,7 +513,7 @@ export class SchedulingService {
   ): Promise<AvailabilitySlot[]> {
     try {
       const dayOfWeek = date.getDay();
-      const availability = await prisma.professionalAvailability.findFirst({
+      const availability = await this.prisma.professionalAvailability.findFirst({
         where: {
           tenantId,
           professionalId,
@@ -605,7 +608,7 @@ export class SchedulingService {
         );
 
         if (result.success && result.eventId) {
-          await prisma.appointment.update({
+          await this.prisma.appointment.update({
             where: { id: appointment.id },
             data: {
               googleEventId: result.eventId,
@@ -618,7 +621,7 @@ export class SchedulingService {
       console.error('Erro ao sincronizar com Google Calendar:', error);
       
       // Marca como erro de sincronização
-      await prisma.appointment.update({
+      await this.prisma.appointment.update({
         where: { id: appointment.id },
         data: {
           googleCalendarSynced: false,
@@ -676,7 +679,7 @@ export class SchedulingService {
         thisMonth,
         thisWeek
       ] = await Promise.all([
-        prisma.appointment.count({ where }),
+        this.prisma.appointment.count({ where }),
         prisma.appointment.count({ where: { ...where, status: 'completed' } }),
         prisma.appointment.count({ where: { ...where, status: 'cancelled' } }),
         prisma.appointment.count({ where: { ...where, status: 'no_show' } }),

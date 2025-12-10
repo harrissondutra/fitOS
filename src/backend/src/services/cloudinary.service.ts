@@ -425,7 +425,11 @@ export class CloudinaryService {
       // Rastrear custo do upload
       try {
         const fileSizeMB = (file.length || 0) / (1024 * 1024);
-        await costTrackerService.trackCloudinaryCost(fileSizeMB, 'video');
+        await costTrackerService.trackCloudinaryUsage({
+          type: 'upload',
+          quantity: fileSizeMB,
+          metadata: { resourceType: 'video', exerciseId }
+        });
       } catch (costError) {
         logger.warn('Error tracking Cloudinary video cost:', costError);
       }

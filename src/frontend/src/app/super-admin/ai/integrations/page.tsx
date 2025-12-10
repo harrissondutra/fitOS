@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -24,9 +25,11 @@ import {
   Edit,
   Trash2,
   Play,
-  Pause
+  Pause,
+  RefreshCw
 } from "lucide-react"
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 interface Integration {
   id: string;
@@ -37,104 +40,13 @@ interface Integration {
   icon: string;
   isActive: boolean;
   isConfigured: boolean;
-  lastTested?: Date;
+  lastTested?: Date | string;
   lastTestStatus?: 'success' | 'failure' | 'warning';
   lastTestMessage?: string;
   environment: 'development' | 'staging' | 'production';
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
-
-const mockIntegrations: Integration[] = [
-  {
-    id: '1',
-    integration: 'openai',
-    displayName: 'OpenAI',
-    description: 'API de inteligência artificial para geração de texto e conversas',
-    category: 'ai',
-    icon: 'brain',
-    isActive: true,
-    isConfigured: true,
-    lastTested: new Date('2024-01-15T10:30:00Z'),
-    lastTestStatus: 'success',
-    lastTestMessage: 'Conexão estabelecida com sucesso',
-    environment: 'production',
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    updatedAt: new Date('2024-01-15T10:30:00Z')
-  },
-  {
-    id: '2',
-    integration: 'anthropic',
-    displayName: 'Anthropic Claude',
-    description: 'API Claude para assistência inteligente e análise de texto',
-    category: 'ai',
-    icon: 'brain',
-    isActive: true,
-    isConfigured: true,
-    lastTested: new Date('2024-01-14T15:20:00Z'),
-    lastTestStatus: 'success',
-    environment: 'production',
-    createdAt: new Date('2024-01-02T00:00:00Z'),
-    updatedAt: new Date('2024-01-14T15:20:00Z')
-  },
-  {
-    id: '3',
-    integration: 'google-gemini',
-    displayName: 'Google Gemini',
-    description: 'API Gemini para processamento multimodal e geração de conteúdo',
-    category: 'ai',
-    icon: 'brain',
-    isActive: false,
-    isConfigured: false,
-    environment: 'production',
-    createdAt: new Date('2024-01-03T00:00:00Z'),
-    updatedAt: new Date('2024-01-03T00:00:00Z')
-  },
-  {
-    id: '4',
-    integration: 'groq',
-    displayName: 'Groq',
-    description: 'API Groq para inferência rápida de modelos de IA',
-    category: 'ai',
-    icon: 'brain',
-    isActive: true,
-    isConfigured: true,
-    lastTested: new Date('2024-01-13T09:15:00Z'),
-    lastTestStatus: 'warning',
-    lastTestMessage: 'Conexão instável - verificar configurações',
-    environment: 'production',
-    createdAt: new Date('2024-01-04T00:00:00Z'),
-    updatedAt: new Date('2024-01-13T09:15:00Z')
-  },
-  {
-    id: '5',
-    integration: 'mistral',
-    displayName: 'Mistral AI',
-    description: 'API Mistral para modelos de linguagem eficientes',
-    category: 'ai',
-    icon: 'brain',
-    isActive: false,
-    isConfigured: false,
-    environment: 'production',
-    createdAt: new Date('2024-01-05T00:00:00Z'),
-    updatedAt: new Date('2024-01-05T00:00:00Z')
-  },
-  {
-    id: '6',
-    integration: 'cohere',
-    displayName: 'Cohere',
-    description: 'API Cohere para processamento de linguagem natural',
-    category: 'ai',
-    icon: 'brain',
-    isActive: true,
-    isConfigured: true,
-    lastTested: new Date('2024-01-12T14:45:00Z'),
-    lastTestStatus: 'success',
-    environment: 'production',
-    createdAt: new Date('2024-01-06T00:00:00Z'),
-    updatedAt: new Date('2024-01-12T14:45:00Z')
-  }
-];
 
 const categoryIcons: { [key: string]: any } = {
   ai: Brain,
@@ -145,14 +57,61 @@ const categoryColors: { [key: string]: string } = {
 };
 
 export default function AIIntegrationsPage() {
-  const [integrations, setIntegrations] = useState<Integration[]>(mockIntegrations);
-  const [filteredIntegrations, setFilteredIntegrations] = useState<Integration[]>(mockIntegrations);
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [filteredIntegrations, setFilteredIntegrations] = useState<Integration[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
+    loadIntegrations();
+  }, []);
+
+  const loadIntegrations = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/super-admin/ai/integrations', {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar integrações');
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        // Converter strings de data para Date objects
+        const formattedIntegrations = result.data.map((integration: any) => ({
+          ...integration,
+          lastTested: integration.lastTested ? new Date(integration.lastTested) : undefined,
+          createdAt: integration.createdAt ? new Date(integration.createdAt) : new Date(),
+          updatedAt: integration.updatedAt ? new Date(integration.updatedAt) : new Date()
+        }));
+        setIntegrations(formattedIntegrations);
+        setFilteredIntegrations(formattedIntegrations);
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar integrações:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar as integrações',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (loading) return;
+    
     let filtered = integrations;
 
     if (searchTerm) {
@@ -175,35 +134,82 @@ export default function AIIntegrationsPage() {
     setFilteredIntegrations(filtered);
   }, [integrations, searchTerm, statusFilter]);
 
-  const handleToggleActive = async (integrationId: string) => {
-    setLoading(true);
+  const handleTestIntegration = async (integrationId: string) => {
     try {
-      // Simular API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setIntegrations(prev => prev.map(integration =>
-        integration.id === integrationId
-          ? { ...integration, isActive: !integration.isActive }
-          : integration
-      ));
-    } catch (error) {
-      console.error('Error toggling integration:', error);
+      setTestingId(integrationId);
+      const response = await fetch(`/api/super-admin/ai/integrations/${integrationId}/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao testar integração');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast({
+          title: 'Sucesso',
+          description: result.data?.message || 'Teste realizado com sucesso'
+        });
+        
+        // Recarregar integrações para atualizar status
+        await loadIntegrations();
+      } else {
+        throw new Error(result.error || 'Erro ao testar');
+      }
+    } catch (error: any) {
+      console.error('Error testing integration:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível testar a integração',
+        variant: 'destructive'
+      });
     } finally {
-      setLoading(false);
+      setTestingId(null);
+    }
+  };
+
+  const handleToggleActive = async (integrationId: string) => {
+    try {
+      // As integrações são gerenciadas via provedores
+      // Redirecionar para página de provedores
+      toast({
+        title: 'Info',
+        description: 'Para ativar/desativar integrações, edite os provedores na página de Provedores'
+      });
+    } catch (error: any) {
+      console.error('Error toggling integration:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível atualizar a integração',
+        variant: 'destructive'
+      });
     }
   };
 
   const handleDeleteIntegration = async (integrationId: string) => {
-    if (confirm('Tem certeza que deseja deletar esta integração?')) {
-      setLoading(true);
-      try {
-        // Simular API call
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setIntegrations(prev => prev.filter(integration => integration.id !== integrationId));
-      } catch (error) {
-        console.error('Error deleting integration:', error);
-      } finally {
-        setLoading(false);
-      }
+    if (!confirm('Tem certeza que deseja deletar esta integração?')) {
+      return;
+    }
+
+    try {
+      // Integrações são gerenciadas via provedores
+      toast({
+        title: 'Info',
+        description: 'Para deletar integrações, remova os provedores na página de Provedores'
+      });
+    } catch (error: any) {
+      console.error('Error deleting integration:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível deletar a integração',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -242,6 +248,10 @@ export default function AIIntegrationsPage() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={loadIntegrations} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
           <Badge variant="outline" className="text-green-600 border-green-600">
             <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
             Sistema Ativo
@@ -325,9 +335,41 @@ export default function AIIntegrationsPage() {
         </Card>
       </div>
 
-      {/* Integrations Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredIntegrations.map((integration) => {
+      {/* Loading State */}
+      {loading && integrations.length === 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-48 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-20 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <>
+          {/* Integrations Grid */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredIntegrations.length === 0 ? (
+              <div className="col-span-full">
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Brain className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">Nenhuma integração encontrada</h3>
+                    <p className="text-muted-foreground text-center">
+                      {searchTerm || statusFilter !== 'all'
+                        ? 'Tente ajustar os filtros'
+                        : 'Configure provedores na página de Provedores'}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              filteredIntegrations.map((integration) => {
           const Icon = categoryIcons[integration.category] || Settings;
           const StatusIcon = getStatusIcon(integration);
           
@@ -388,14 +430,29 @@ export default function AIIntegrationsPage() {
                 )}
 
                 <div className="flex space-x-2">
-                  <Button asChild size="sm" className="flex-1">
-                    <Link href={`/super-admin/ai/providers`}>
-                      <Settings className="h-4 w-4 mr-2" />
-                      Configurar
-                    </Link>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => handleTestIntegration(integration.id)}
+                    disabled={testingId === integration.id || !integration.isConfigured}
+                  >
+                    {testingId === integration.id ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Testando...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-2" />
+                        Testar
+                      </>
+                    )}
                   </Button>
-                  <Button variant="outline" size="sm">
-                    <Edit className="h-4 w-4" />
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/super-admin/ai/providers`}>
+                      <Settings className="h-4 w-4" />
+                    </Link>
                   </Button>
                   <Button 
                     variant="outline" 
@@ -407,24 +464,11 @@ export default function AIIntegrationsPage() {
                 </div>
               </CardContent>
             </Card>
-          );
-        })}
-      </div>
-
-      {filteredIntegrations.length === 0 && (
-        <div className="text-center py-12">
-          <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Nenhuma integração de IA encontrada</h3>
-          <p className="text-muted-foreground mb-4">
-            Tente ajustar os filtros ou configurar uma nova integração
-          </p>
-          <Button asChild>
-            <Link href="/super-admin/ai/providers">
-              <Plus className="h-4 w-4 mr-2" />
-              Configurar Provedores
-            </Link>
-          </Button>
-        </div>
+              );
+            })
+            )}
+          </div>
+        </>
       )}
     </div>
   );

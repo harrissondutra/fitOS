@@ -7,10 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
 import { useAnalytics } from '@/hooks/use-analytics';
 import { usePermissions } from '@/hooks/use-permissions';
+import { UserRoles } from '@/shared/types/auth.types';
 import { TenantAnalytics, TrainerAnalytics, ClientAnalytics, GlobalAnalytics } from '@/shared/types';
-import { 
-  BarChart3, 
-  TrendingUp, 
+import {
+  BarChart3,
+  TrendingUp,
   Users,
   Dumbbell,
   Calendar,
@@ -27,12 +28,12 @@ export const preferredRegion = 'auto'
 
 export default function AnalyticsPage() {
   // Auth removed - using default values
-  const user = { role: 'ADMIN' as const, tenantId: 'default-tenant' };
+  const user = { role: UserRoles.ADMIN, tenantId: 'default-tenant' };
   const permissions = usePermissions(user?.role);
   const type = 'tenant'; // Define the analytics type for this page
-  const { analytics, loading, error, refetch } = useAnalytics({ 
+  const { analytics, loading, error, refetch } = useAnalytics({
     tenantId: user?.tenantId,
-    enabled: !!user?.tenantId 
+    enabled: !!user?.tenantId
   });
 
   if (!permissions.canViewAnalytics) {
@@ -59,7 +60,7 @@ export default function AnalyticsPage() {
             <div className="h-4 bg-muted rounded w-96 mt-2 animate-pulse"></div>
           </div>
         </div>
-        
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <Card key={index} className="animate-pulse">
@@ -188,7 +189,7 @@ export default function AnalyticsPage() {
                 <span className="text-sm text-muted-foreground">Active this week</span>
                 <span className="text-sm font-medium">
                   {type === 'tenant' ? (analytics as TenantAnalytics).activeClients || 0 :
-                   type === 'trainer' ? (analytics as TrainerAnalytics).activeClients || 0 : 0} clients
+                    type === 'trainer' ? (analytics as TrainerAnalytics).activeClients || 0 : 0} clients
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -218,36 +219,36 @@ export default function AnalyticsPage() {
           <CardDescription>Key performance indicators</CardDescription>
         </CardHeader>
         <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">
-                  {type === 'tenant' ? (analytics as TenantAnalytics).completionRate || 0 :
-                   type === 'trainer' ? (analytics as TrainerAnalytics).completionRate || 0 :
-                   type === 'client' ? (analytics as ClientAnalytics).completionRate || 0 : 0}%
-                </div>
-                <div className="text-sm text-muted-foreground">Completion Rate</div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {type === 'tenant' ? (analytics as TenantAnalytics).completionRate || 0 :
+                  type === 'trainer' ? (analytics as TrainerAnalytics).completionRate || 0 :
+                    type === 'client' ? (analytics as ClientAnalytics).completionRate || 0 : 0}%
               </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">
-                  {type === 'tenant' ? (analytics as TenantAnalytics).retentionRate || 0 : 0}%
-                </div>
-                <div className="text-sm text-muted-foreground">Retention Rate</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">
-                  {type === 'tenant' ? (analytics as TenantAnalytics).completionRate || 0 :
-                   type === 'trainer' ? (analytics as TrainerAnalytics).completionRate || 0 :
-                   type === 'client' ? (analytics as ClientAnalytics).completionRate || 0 : 0}%
-                </div>
-                <div className="text-sm text-muted-foreground">Workout Completion</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">
-                  {type === 'tenant' ? (analytics as TenantAnalytics).retentionRate || 0 : 0}%
-                </div>
-                <div className="text-sm text-muted-foreground">Satisfaction</div>
-              </div>
+              <div className="text-sm text-muted-foreground">Completion Rate</div>
             </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {type === 'tenant' ? (analytics as TenantAnalytics).retentionRate || 0 : 0}%
+              </div>
+              <div className="text-sm text-muted-foreground">Retention Rate</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {type === 'tenant' ? (analytics as TenantAnalytics).completionRate || 0 :
+                  type === 'trainer' ? (analytics as TrainerAnalytics).completionRate || 0 :
+                    type === 'client' ? (analytics as ClientAnalytics).completionRate || 0 : 0}%
+              </div>
+              <div className="text-sm text-muted-foreground">Workout Completion</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {type === 'tenant' ? (analytics as TenantAnalytics).retentionRate || 0 : 0}%
+              </div>
+              <div className="text-sm text-muted-foreground">Satisfaction</div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -261,31 +262,31 @@ export default function AnalyticsPage() {
           <CardDescription>Latest client activities</CardDescription>
         </CardHeader>
         <CardContent>
-            <div className="space-y-4">
-              {type === 'tenant' && (analytics as TenantAnalytics).activityTrends && (analytics as TenantAnalytics).activityTrends.length > 0 ? (
-                (analytics as TenantAnalytics).activityTrends.slice(0, 5).map((activity, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-medium">
-                        {activity.count}
-                      </div>
-                      <div>
-                        <span className="text-sm font-medium">{activity.date}</span>
-                        <p className="text-xs text-muted-foreground">Activities</p>
-                      </div>
+          <div className="space-y-4">
+            {type === 'tenant' && (analytics as TenantAnalytics).activityTrends && (analytics as TenantAnalytics).activityTrends.length > 0 ? (
+              (analytics as TenantAnalytics).activityTrends.slice(0, 5).map((activity, index) => (
+                <div key={index} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-medium">
+                      {activity.count}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {activity.count} activities
+                    <div>
+                      <span className="text-sm font-medium">{activity.date}</span>
+                      <p className="text-xs text-muted-foreground">Activities</p>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground">No recent activity</p>
+                  <div className="text-xs text-muted-foreground">
+                    {activity.count} activities
+                  </div>
                 </div>
-              )}
-            </div>
+              ))
+            ) : (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground">No recent activity</p>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

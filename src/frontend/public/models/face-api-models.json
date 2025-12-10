@@ -1,0 +1,26 @@
+{
+  "models": [
+    {
+      "name": "tiny_face_detector_model",
+      "url": "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/tiny_face_detector_model-weights_manifest.json",
+      "description": "Detector de faces otimizado para performance"
+    },
+    {
+      "name": "face_landmark_68_model",
+      "url": "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/face_landmark_68_model-weights_manifest.json",
+      "description": "Modelo para detectar 68 pontos de referência facial"
+    },
+    {
+      "name": "face_recognition_model",
+      "url": "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/face_recognition_model-weights_manifest.json",
+      "description": "Modelo para reconhecimento e comparação facial"
+    },
+    {
+      "name": "face_expression_model",
+      "url": "https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights/face_expression_model-weights_manifest.json",
+      "description": "Modelo para detectar expressões faciais"
+    }
+  ],
+  "version": "1.0.0",
+  "lastUpdated": "2025-10-26"
+}

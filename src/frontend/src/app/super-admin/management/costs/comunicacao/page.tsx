@@ -35,67 +35,72 @@ export default function ComunicacaoPage() {
   const { getDashboard, getServices } = useCosts();
   const { toast } = useToast();
 
-  // Carregar dados
+    // Carregar dados
   const loadData = useCallback(async () => {
     setLoading(true);
-    
-    // Usar dados mockados diretamente para garantir que sempre há dados
-    const mockDashboard = {
-      totalCost: 35.50,
-      monthlyTrend: 1.8,
-      services: [
-        {
-          id: 'email',
-          name: 'Email Service',
-          cost: 15.20,
-          trend: 0.5,
-          status: 'active',
-          icon: MessageCircle,
-          description: 'Serviço de email transacional'
-        },
-        {
-          id: 'sms',
-          name: 'SMS Gateway',
-          cost: 12.80,
-          trend: 2.1,
-          status: 'active',
-          icon: MessageCircle,
-          description: 'Envio de SMS'
-        },
-        {
-          id: 'whatsapp',
-          name: 'WhatsApp API',
-          cost: 7.50,
-          trend: 3.2,
-          status: 'active',
-          icon: MessageCircle,
-          description: 'API do WhatsApp Business'
-        }
-      ],
-      trends: [
-        { date: '2024-01-01', totalCost: 30, categories: { communication: 30 } },
-        { date: '2024-02-01', totalCost: 32, categories: { communication: 32 } },
-        { date: '2024-03-01', totalCost: 34, categories: { communication: 34 } },
-        { date: '2024-04-01', totalCost: 33, categories: { communication: 33 } },
-        { date: '2024-05-01', totalCost: 35, categories: { communication: 35 } },
-        { date: '2024-06-01', totalCost: 35, categories: { communication: 35 } }
-      ]
-    };
-    
-    // Simular carregamento
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    setDashboard(mockDashboard);
-    setServices(mockDashboard.services);
-    
-    toast({
-      title: 'Modo Demonstração',
-      description: 'Usando dados de exemplo para comunicação',
-      variant: 'default',
-    });
-    
-    setLoading(false);
-  }, [toast]);
+
+    try {
+      // Buscar dados reais do banco de dados
+      const [dashboardData, servicesData] = await Promise.all([
+        getDashboard(filters),
+        getServices({ category: 'communication', ...filters })
+      ]);
+
+      // Processar dados do dashboard
+      const communicationCategory = dashboardData?.categories?.find(
+        (cat: any) => cat.name === 'communication' || cat.id === 'communication'
+      );
+
+      // Processar serviços de comunicação
+      const processedServices = (servicesData || []).map((service: any) => ({
+        id: service.id,
+        name: service.name,
+        cost: service.totalCost || 0,
+        trend: service.monthlyTrend || 0,
+        status: service.isActive ? 'active' : 'inactive',
+        icon: service.name?.toLowerCase().includes('whatsapp') ? MessageCircle :
+              service.name?.toLowerCase().includes('email') || service.name?.toLowerCase().includes('mail') ? Mail :
+              service.name?.toLowerCase().includes('sms') ? Smartphone : MessageCircle,
+        description: service.description || ''
+      }));
+
+      // Processar trends de comunicação
+      const processedTrends = (dashboardData?.trends || []).map((trend: any) => ({
+        date: trend.date,
+        totalCost: trend.categories?.communication || 0,
+        categories: { communication: trend.categories?.communication || 0 }
+      }));
+
+      setDashboard({
+        totalCost: communicationCategory?.totalCost || 0,
+        monthlyTrend: communicationCategory?.variation || 0,
+        services: processedServices,
+        trends: processedTrends,
+        categories: dashboardData?.categories || []
+      });
+
+      setServices(processedServices);
+    } catch (error) {
+      console.error('Error loading communication costs:', error);
+      toast({
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível carregar os custos de comunicação',
+        variant: 'destructive',
+      });
+      
+      // Fallback para dados vazios em caso de erro
+      setDashboard({
+        totalCost: 0,
+        monthlyTrend: 0,
+        services: [],
+        trends: [],
+        categories: []
+      });
+      setServices([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [getDashboard, getServices, filters, toast]);
 
   useEffect(() => {
     loadData();
@@ -124,12 +129,15 @@ export default function ComunicacaoPage() {
     return 'text-gray-500';
   };
 
-  // Filtrar dados de comunicação do dashboard
-  const communicationCategory = dashboard?.categories?.find((cat: any) => cat.name === 'communication');
-  const communicationTrends = dashboard?.trends?.map((trend: any) => ({
-    ...trend,
-    totalCost: trend.categories?.communication || 0,
-  })) || [];
+    // Extrair dados de comunicação do dashboard
+  const communicationCategory = dashboard?.categories?.find(
+    (cat: any) => cat.name === 'communication' || cat.id === 'communication'
+  ) || {
+    totalCost: dashboard?.totalCost || 0,
+    variation: dashboard?.monthlyTrend || 0
+  };
+  
+  const communicationTrends = dashboard?.trends || [];
 
   if (loading) {
     return (

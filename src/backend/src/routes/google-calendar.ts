@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { GoogleCalendarService } from '../services/google-calendar.service';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { requireGoogleCalendarAccess } from '../middleware/permissions';
 import { param, query, validationResult } from 'express-validator';
 
 const router = Router();
 const googleCalendarService = new GoogleCalendarService();
-const prisma = new PrismaClient();
-const authMiddleware = getAuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 
 // Middleware de autenticação para todas as rotas
 router.use(authMiddleware.requireAuth);

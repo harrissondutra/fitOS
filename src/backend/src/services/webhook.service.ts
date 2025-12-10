@@ -6,8 +6,6 @@ import { awsCostTracker } from '../services/aws-cost-tracker.service';
 import { aiCostTrackingService } from '../services/ai-cost-tracking.service';
 import crypto from 'crypto';
 
-const prisma = getPrismaClient();
-
 interface WebhookPayload {
   event: string;
   timestamp: string;
@@ -28,6 +26,7 @@ export class WebhookService {
   private readonly config: WebhookConfig;
   private readonly ENABLED: boolean;
   private readonly rateLimitMap: Map<string, { count: number; resetTime: number }> = new Map();
+  private _prisma: ReturnType<typeof getPrismaClient> | null = null;
 
   constructor() {
     // Usar variáveis de ambiente (ZERO hardcode)
@@ -40,6 +39,14 @@ export class WebhookService {
       allowedSources: this.parseSources(process.env.WEBHOOK_ALLOWED_SOURCES || 'cloudinary,aws,stripe,mercadopago'),
       signatureValidation: process.env.WEBHOOK_SIGNATURE_VALIDATION === 'true',
     };
+  }
+
+  // Lazy getter para PrismaClient
+  private get prisma() {
+    if (!this._prisma) {
+      this._prisma = getPrismaClient();
+    }
+    return this._prisma;
   }
 
   /**
@@ -477,7 +484,7 @@ export class WebhookService {
     metadata: Record<string, any>
   ): Promise<void> {
     try {
-      await prisma.costEntry.create({
+      await this.prisma.costEntry.create({
         data: {
           categoryId: 'payment',
           serviceId: provider,
@@ -510,7 +517,7 @@ export class WebhookService {
   }): Promise<void> {
     try {
       // Usar AiWebhookLog como proxy para webhook logs
-      await prisma.aiWebhookLog.create({
+      await this.prisma.aiWebhookLog.create({
         data: {
           providerId: 'webhook-service',
           direction: 'inbound',
@@ -564,7 +571,7 @@ export class WebhookService {
 
       if (source) where.requestUrl = source;
 
-      const webhooks = await prisma.aiWebhookLog.findMany({
+      const webhooks = await this.prisma.aiWebhookLog.findMany({
         where,
         orderBy: { createdAt: 'asc' },
       });

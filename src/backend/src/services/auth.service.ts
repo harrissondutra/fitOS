@@ -28,11 +28,30 @@ import { redisService } from './redis.service';
 import { generateCacheKey, calculateTTL } from '../utils/cache-utils';
 
 export class AuthService {
-  private prisma: PrismaClient;
+  private _prisma?: PrismaClient;
+  private prismaGetter?: () => PrismaClient;
   private config: AuthConfig;
 
-  constructor(prisma: PrismaClient) {
-    this.prisma = prisma;
+  // Lazy getter para prisma - só cria conexão quando realmente necessário
+  private get prisma(): PrismaClient {
+    if (!this._prisma) {
+      if (this.prismaGetter) {
+        this._prisma = this.prismaGetter();
+      } else {
+        // Fallback: obter do singleton se não foi fornecido getter
+        const { getPrismaClient } = require('../config/database');
+        this._prisma = getPrismaClient();
+      }
+    }
+    return this._prisma;
+  }
+
+  constructor(prisma?: PrismaClient | (() => PrismaClient)) {
+    if (typeof prisma === 'function') {
+      this.prismaGetter = prisma;
+    } else if (prisma) {
+      this._prisma = prisma;
+    }
     this.config = this.loadConfig();
   }
 
@@ -218,7 +237,8 @@ export class AuthService {
     userId: string, 
     tenantId: string, 
     ipAddress?: string, 
-    userAgent?: string
+    userAgent?: string,
+    deviceFingerprint?: any // Adicionar fingerprint opcional
   ): Promise<SessionData> {
     // Obter dados do usuário para a sessão
     const user = await this.prisma.user.findUnique({
@@ -230,15 +250,18 @@ export class AuthService {
       throw new Error('User not found');
     }
 
-    // Criar sessão usando SessionService
-    const sessionId = await sessionService.createSession(
+    // Criar sessão usando SessionService (agora com fingerprint)
+    const result = await sessionService.createSession(
       userId,
       tenantId,
       user.role || 'CLIENT',
       user.email,
       ipAddress || 'unknown',
-      userAgent || 'unknown'
+      userAgent || 'unknown',
+      deviceFingerprint // Passar fingerprint
     );
+    
+    const sessionId = typeof result === 'object' ? result.sessionId : result;
 
     const expiresAt = new Date(Date.now() + this.config.sessionInactivityTimeout);
     
@@ -535,9 +558,23 @@ export class AuthService {
 // Instância singleton do serviço
 let authServiceInstance: AuthService | null = null;
 
-export function getAuthService(prisma: PrismaClient): AuthService {
+// Lazy getter para garantir que PrismaClient seja obtido apenas quando necessário
+function getPrismaClientLazy(): PrismaClient {
+  const { getPrismaClient } = require('../config/database');
+  return getPrismaClient();
+}
+
+export function getAuthService(prisma?: PrismaClient): AuthService {
+  // Se já existe instância, retornar ela (usa singleton sempre)
+  // Usar lazy getter para evitar criar conexão prematuramente
   if (!authServiceInstance) {
-    authServiceInstance = new AuthService(prisma);
+    if (prisma) {
+      // Se prisma foi fornecido, usar diretamente
+      authServiceInstance = new AuthService(prisma);
+    } else {
+      // Usar lazy getter para obter PrismaClient apenas quando necessário
+      authServiceInstance = new AuthService(() => getPrismaClientLazy());
+    }
   }
   return authServiceInstance;
 }

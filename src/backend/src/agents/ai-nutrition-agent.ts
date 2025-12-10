@@ -6,6 +6,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { RedisService } from '../services/redis.service';
 import { logger } from '../utils/logger';
 
@@ -149,7 +150,7 @@ export class AINutritionAgent {
   private redis: RedisService;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = getPrismaClient();
     this.redis = new RedisService();
   }
 

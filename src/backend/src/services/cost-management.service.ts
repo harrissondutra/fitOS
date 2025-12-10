@@ -1,9 +1,11 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { config } from '../config/config-simple';
 import { logger } from '../utils/logger';
 import { cache } from '../config/redis';
+import { aiCostTrackingService } from './ai-cost-tracking.service';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 // Interfaces para tipagem
 export interface CostDashboard {
@@ -124,18 +126,35 @@ export class CostManagementService {
   /**
    * Obter dashboard completo de custos
    */
-  async getDashboard(filters: CostFilters = {}): Promise<CostDashboard> {
-    const cacheKey = `costs:dashboard:${JSON.stringify(filters)}`;
-    
-    // Tentar buscar do cache primeiro
+    async getDashboard(filters: CostFilters = {}): Promise<CostDashboard> {
+    // Normalizar filtros para chave de cache consistente
+    const normalizedFilters = {
+      categoryId: filters.categoryId || undefined,
+      serviceId: filters.serviceId || undefined,
+      tenantId: filters.tenantId || undefined,
+      clientId: filters.clientId || undefined,
+    };
+    const cacheKey = `costs:dashboard:${JSON.stringify(normalizedFilters)}`;
+
+    // Tentar buscar do cache primeiro (com timeout)
     if (config.costs.redisCacheEnabled) {
       try {
-        const cached = await cache.get(cacheKey);
+        // Timeout de 2 segundos para cache - não esperar muito
+        const cachePromise = cache.get(cacheKey);
+        const timeoutPromise = new Promise<null>((resolve) => {
+          setTimeout(() => resolve(null), 2000);
+        });
+
+        const cached = await Promise.race([cachePromise, timeoutPromise]);      
         if (cached) {
+          logger.info(`✅ Cache HIT for dashboard: ${cacheKey}`);
           return JSON.parse(cached);
+        } else {
+          logger.debug(`❌ Cache MISS for dashboard: ${cacheKey}`);
         }
       } catch (error) {
         logger.warn('Failed to get dashboard from cache:', error);
+        // Continuar sem cache se houver erro
       }
     }
 
@@ -168,25 +187,106 @@ export class CostManagementService {
       };
     }
 
-    // Buscar dados em paralelo
-    const [
-      currentMonthData,
-      previousMonthData,
-      categories,
-      services,
-      alerts,
-      trendsData,
-    ] = await Promise.all([
-      // Dados do mês atual
+    // Buscar dados de IA se categoria for 'ai' ou se não houver filtro de categoria
+    const shouldIncludeAICosts = !categoryId || categoryId === 'ai';
+    let aiCostSummary = null;
+    let aiCostSummaryPrevious = null;
+    let aiServices: any[] = [];
+
+        if (shouldIncludeAICosts) {
+      try {
+        // Timeout de 10 segundos para chamadas de IA
+        const aiSummaryPromise = Promise.all([
+          aiCostTrackingService.getCostSummary(start, end, clientId, undefined, undefined),                                                                     
+          aiCostTrackingService.getCostSummary(previousMonthStart, previousMonthEnd, clientId, undefined, undefined)                                            
+        ]);
+        
+        const timeoutPromise = new Promise<null[]>((resolve) => {
+          setTimeout(() => {
+            logger.warn('AI cost summary timeout - skipping AI costs');
+            resolve([null, null]);
+          }, 10000);
+        });
+        
+        [aiCostSummary, aiCostSummaryPrevious] = await Promise.race([
+          aiSummaryPromise,
+          timeoutPromise
+        ]);
+
+        // Buscar serviços de IA (provedores e modelos) - com timeout
+        const aiCostsPromise = prisma.aiCostTracking.findMany({
+          where: {
+            timestamp: {
+              gte: start,
+              lte: end,
+            },
+            ...(clientId && { clientId }),
+          },
+          select: {
+            provider: true,
+            model: true,
+            cost: true,
+          },
+          take: 10000, // Limitar resultados para evitar queries muito grandes
+        });
+        
+        const aiCostsTimeoutPromise = new Promise<any[]>((resolve) => {
+          setTimeout(() => {
+            logger.warn('AI costs query timeout - skipping AI services');
+            resolve([]);
+          }, 5000);
+        });
+        
+        const aiCosts = await Promise.race([aiCostsPromise, aiCostsTimeoutPromise]);
+
+        // Agrupar por provedor/modelo
+        const serviceMap = new Map<string, { cost: number; count: number }>();
+        aiCosts.forEach(cost => {
+          const key = `${cost.provider}-${cost.model}`;
+          const existing = serviceMap.get(key) || { cost: 0, count: 0 };
+          serviceMap.set(key, {
+            cost: existing.cost + (cost.cost || 0),
+            count: existing.count + 1,
+          });
+        });
+
+        aiServices = Array.from(serviceMap.entries()).map(([key, data]) => {
+          const [provider, model] = key.split('-');
+          return {
+            id: key,
+            name: key,
+            displayName: `${provider} - ${model}`,
+            categoryName: 'ai',
+            totalCost: data.cost,
+            percentage: 0, // Será calculado depois
+            requestCount: data.count,
+            averageCost: data.count > 0 ? data.cost / data.count : 0,
+            trend: 'stable' as const,
+          };
+        });
+      } catch (error) {
+        logger.warn('Failed to fetch AI costs:', error);
+        // Continuar sem dados de IA - não quebrar o dashboard
+        aiCostSummary = null;
+        aiCostSummaryPrevious = null;
+        aiServices = [];
+      }
+    }
+
+        // Buscar dados em paralelo - com timeout de 15 segundos
+    const queriesPromise = Promise.all([
+      // Dados do mês atual (com limite para evitar queries muito grandes)
       prisma.costEntry.findMany({
         where: whereClause,
         include: {
           category: true,
           service: true,
         },
+        take: 50000, // Limitar resultados
+        orderBy: { date: 'desc' }, // Ordenar por data mais recente primeiro
       }),
-      
-      // Dados do mês anterior
+
+      // Dados do mês anterior (com limite)
       prisma.costEntry.findMany({
         where: {
           ...whereClause,
@@ -199,9 +299,11 @@ export class CostManagementService {
           category: true,
           service: true,
         },
+        take: 50000, // Limitar resultados
+        orderBy: { date: 'desc' },
       }),
-      
-      // Categorias
+
+      // Categorias (sem limite, mas geralmente são poucas)
       prisma.costCategory.findMany({
         where: { isActive: true },
         include: {
@@ -210,29 +312,47 @@ export class CostManagementService {
           },
         },
       }),
-      
-      // Serviços
+
+      // Serviços (sem limite, mas geralmente são poucos)
       prisma.costService.findMany({
         where: { isActive: true },
         include: {
           category: true,
         },
       }),
-      
-      // Alertas ativos
+
+      // Alertas ativos (já limitado a 10)
       prisma.costAlert.findMany({
         where: { isActive: true },
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
-      
-      // Dados de tendência (últimos 6 meses)
-      this.getTrendsData(6),
-    ]);
 
-    // Calcular totais
-    const totalCost = currentMonthData.reduce((sum, entry) => sum + entry.amount, 0);
-    const totalCostPreviousMonth = previousMonthData.reduce((sum, entry) => sum + entry.amount, 0);
+      // Dados de tendência (últimos 6 meses) - já otimizado
+      this.getTrendsData(6, categoryId),
+    ]);
+    
+        // Timeout de 15 segundos para queries principais (reduzido de 20s após otimização)
+    const queriesTimeoutPromise = new Promise<any[]>((resolve) => {
+      setTimeout(() => {
+        logger.error('Dashboard queries timeout - returning partial data');     
+        // Retornar arrays vazios para não quebrar o processamento
+        resolve([[], [], [], [], [], []]);
+      }, 15000); // 15 segundos de timeout
+    });
+    
+    const [
+      currentMonthData,
+      previousMonthData,
+      categories,
+      services,
+      alerts,
+      trendsData,
+    ] = await Promise.race([queriesPromise, queriesTimeoutPromise]);
+
+    // Calcular totais (incluindo custos de IA)
+    const totalCost = currentMonthData.reduce((sum, entry) => sum + entry.amount, 0) + (aiCostSummary?.totalCost || 0);
+    const totalCostPreviousMonth = previousMonthData.reduce((sum, entry) => sum + entry.amount, 0) + (aiCostSummaryPrevious?.totalCost || 0);
     const costVariation = totalCostPreviousMonth > 0 
       ? ((totalCost - totalCostPreviousMonth) / totalCostPreviousMonth) * 100 
       : 0;
@@ -259,6 +379,39 @@ export class CostManagementService {
       });
     });
 
+    // Adicionar categoria de IA se não existir
+    if (shouldIncludeAICosts && !categoryMap.has('ai')) {
+      const aiCategory = categories.find(cat => cat.name === 'ai' || cat.id === 'ai');
+      if (aiCategory) {
+        categoryMap.set('ai', {
+          id: aiCategory.id,
+          name: aiCategory.name,
+          displayName: aiCategory.displayName || 'Inteligência Artificial',
+          icon: aiCategory.icon || 'Brain',
+          color: aiCategory.color || '#8B5CF6',
+          totalCost: 0,
+          percentage: 0,
+          previousMonthCost: 0,
+          variation: 0,
+          trend: 'stable',
+        });
+      } else {
+        // Criar categoria de IA se não existir no banco
+        categoryMap.set('ai', {
+          id: 'ai',
+          name: 'ai',
+          displayName: 'Inteligência Artificial',
+          icon: 'Brain',
+          color: '#8B5CF6',
+          totalCost: 0,
+          percentage: 0,
+          previousMonthCost: 0,
+          variation: 0,
+          trend: 'stable',
+        });
+      }
+    }
+
     // Calcular custos por categoria (mês atual)
     currentMonthData.forEach(entry => {
       const category = categoryMap.get(entry.categoryId);
@@ -267,6 +420,14 @@ export class CostManagementService {
       }
     });
 
+    // Adicionar custos de IA à categoria
+    if (shouldIncludeAICosts && aiCostSummary) {
+      const aiCategory = categoryMap.get('ai');
+      if (aiCategory) {
+        aiCategory.totalCost = aiCostSummary.totalCost || 0;
+      }
+    }
+
     // Calcular custos por categoria (mês anterior)
     previousMonthData.forEach(entry => {
       const category = categoryMap.get(entry.categoryId);
@@ -274,6 +435,14 @@ export class CostManagementService {
         category.previousMonthCost += entry.amount;
       }
     });
+
+    // Adicionar custos de IA do mês anterior
+    if (shouldIncludeAICosts && aiCostSummaryPrevious) {
+      const aiCategory = categoryMap.get('ai');
+      if (aiCategory) {
+        aiCategory.previousMonthCost = aiCostSummaryPrevious.totalCost || 0;
+      }
+    }
 
     // Calcular percentuais e variações
     categoryMap.forEach(category => {
@@ -299,6 +468,13 @@ export class CostManagementService {
         trend: 'stable',
       });
     });
+
+    // Adicionar serviços de IA
+    if (shouldIncludeAICosts) {
+      aiServices.forEach(service => {
+        serviceMap.set(service.id, service);
+      });
+    }
 
     // Calcular custos por serviço
     currentMonthData.forEach(entry => {
@@ -360,10 +536,13 @@ export class CostManagementService {
       fixedVsVariable,
     };
 
-    // Cachear resultado
+        // Cachear resultado com TTL maior para dashboard (mínimo 15 minutos)
+    const envDashboardTtl = parseInt(process.env.COST_CACHE_TTL_DASHBOARD || '1800', 10);
+    const dashboardCacheTtl = Math.max(envDashboardTtl, 900); // Mínimo 15 minutos para evitar timeouts
     if (config.costs.redisCacheEnabled) {
       try {
-        await cache.set(cacheKey, JSON.stringify(dashboard), config.costs.cacheTtl);
+        await cache.set(cacheKey, JSON.stringify(dashboard), dashboardCacheTtl);
+        logger.info(`✅ Dashboard cached for ${dashboardCacheTtl} seconds`);
       } catch (error) {
         logger.warn('Failed to cache dashboard:', error);
       }
@@ -372,42 +551,166 @@ export class CostManagementService {
     return dashboard;
   }
 
-  /**
+    /**
    * Obter dados de tendência
+   * Otimizado para fazer uma única query agregada ao invés de múltiplas queries no loop
    */
-  async getTrendsData(months: number = 6): Promise<TrendData[]> {
+  async getTrendsData(months: number = 6, categoryFilter?: string): Promise<TrendData[]> {
+    // Cache individual para trends data
+    const trendsCacheKey = `costs:trends:${months}:${categoryFilter || 'all'}`;
+    
+    if (config.costs.redisCacheEnabled) {
+      try {
+        const cachePromise = cache.get(trendsCacheKey);
+        const timeoutPromise = new Promise<null>((resolve) => {
+          setTimeout(() => resolve(null), 2000);
+        });
+
+        const cached = await Promise.race([cachePromise, timeoutPromise]);
+        if (cached) {
+          logger.debug(`✅ Cache HIT for trends: ${trendsCacheKey}`);
+          return JSON.parse(cached);
+        }
+      } catch (error) {
+        logger.warn('Failed to get trends from cache:', error);
+      }
+    }
+
     const now = new Date();
     const trends: TrendData[] = [];
+    const shouldIncludeAI = !categoryFilter || categoryFilter === 'ai';
 
-    for (let i = months - 1; i >= 0; i--) {
-      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+    // Calcular range de datas (primeiro mês ao último mês)
+    const firstMonthStart = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-      const entries = await prisma.costEntry.findMany({
+    try {
+      // Timeout de 8 segundos para toda a query de tendências
+      const entriesPromise = prisma.costEntry.findMany({
         where: {
           date: {
-            gte: monthStart,
-            lte: monthEnd,
+            gte: firstMonthStart,
+            lte: lastMonthEnd,
+          },
+          ...(categoryFilter && categoryFilter !== 'ai' && { categoryId: categoryFilter }),
+        },
+        select: {
+          date: true,
+          amount: true,
+          category: {
+            select: {
+              name: true,
+            },
           },
         },
-        include: {
-          category: true,
-        },
+        // Limitar resultados para evitar queries muito grandes
+        take: 50000,
       });
 
-      const totalCost = entries.reduce((sum, entry) => sum + entry.amount, 0);
-      const categories: Record<string, number> = {};
+      const entriesTimeoutPromise = new Promise<any[]>((resolve) => {
+        setTimeout(() => {
+          logger.warn('Trends entries query timeout - returning empty entries');
+          resolve([]);
+        }, 8000); // 8 segundos de timeout
+      });
 
+      const entries = await Promise.race([entriesPromise, entriesTimeoutPromise]);
+
+      // Agrupar entries por mês
+      const entriesByMonth = new Map<string, typeof entries>();
+      
       entries.forEach(entry => {
-        const categoryName = entry.category.name;
-        categories[categoryName] = (categories[categoryName] || 0) + entry.amount;
+        const monthKey = entry.date.toISOString().substring(0, 7); // YYYY-MM
+        if (!entriesByMonth.has(monthKey)) {
+          entriesByMonth.set(monthKey, []);
+        }
+        entriesByMonth.get(monthKey)!.push(entry);
       });
 
-      trends.push({
-        date: monthStart.toISOString().split('T')[0],
-        totalCost,
-        categories,
-      });
+      // Buscar custos de IA agrupados por mês (se necessário)
+      const aiCostsByMonth = new Map<string, number>();
+      if (shouldIncludeAI) {
+        try {
+          // Buscar todos os custos de IA do período e agrupar por mês
+          const aiCostsPromise = prisma.aiCostTracking.findMany({
+            where: {
+              timestamp: {
+                gte: firstMonthStart,
+                lte: lastMonthEnd,
+              },
+            },
+            select: {
+              timestamp: true,
+              cost: true,
+            },
+            take: 50000, // Limitar para evitar queries muito grandes
+          });
+
+          const aiCostsTimeoutPromise = new Promise<any[]>((resolve) => {
+            setTimeout(() => {
+              logger.warn('AI costs query for trends timeout');
+              resolve([]);
+            }, 5000); // 5 segundos de timeout
+          });
+
+          const aiCosts = await Promise.race([aiCostsPromise, aiCostsTimeoutPromise]);
+          
+          // Agrupar por mês
+          aiCosts.forEach(aiCost => {
+            const monthKey = aiCost.timestamp.toISOString().substring(0, 7);
+            const currentCost = aiCostsByMonth.get(monthKey) || 0;
+            aiCostsByMonth.set(monthKey, currentCost + (aiCost.cost || 0));
+          });
+        } catch (error) {
+          logger.warn('Failed to get AI costs for trends:', error);
+          // Continuar sem custos de IA
+        }
+      }
+
+      // Processar cada mês
+      for (let i = months - 1; i >= 0; i--) {
+        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = monthStart.toISOString().substring(0, 7);
+        const monthEntries = entriesByMonth.get(monthKey) || [];
+
+        const totalCost = monthEntries.reduce((sum, entry) => sum + entry.amount, 0);
+        const categories: Record<string, number> = {};
+
+        monthEntries.forEach(entry => {
+          const categoryName = entry.category.name;
+          categories[categoryName] = (categories[categoryName] || 0) + entry.amount;
+        });
+
+        // Adicionar custos de IA do mês
+        if (shouldIncludeAI) {
+          const aiMonthCost = aiCostsByMonth.get(monthKey) || 0;
+          if (aiMonthCost > 0) {
+            categories['ai'] = (categories['ai'] || 0) + aiMonthCost;
+          }
+        }
+
+        trends.push({
+          date: monthStart.toISOString().split('T')[0],
+          totalCost: totalCost + (categories['ai'] || 0),
+          categories,
+        });
+      }
+
+      // Cachear resultado de trends (mínimo 15 minutos)
+      const envTrendsTtl = parseInt(process.env.COST_CACHE_TTL_DASHBOARD || '1800', 10);
+      const trendsCacheTtl = Math.max(envTrendsTtl, 900); // Mínimo 15 minutos
+      if (config.costs.redisCacheEnabled) {
+        try {
+          await cache.set(trendsCacheKey, JSON.stringify(trends), trendsCacheTtl);
+          logger.debug(`✅ Trends cached for ${trendsCacheTtl} seconds`);
+        } catch (error) {
+          logger.warn('Failed to cache trends:', error);
+        }
+      }
+    } catch (error) {
+      logger.error('Error getting trends data:', error);
+      // Retornar array vazio se houver erro crítico
+      return [];
     }
 
     return trends;
@@ -759,16 +1062,286 @@ export class CostManagementService {
    * Obter serviços
    */
   async getServices(categoryId?: string): Promise<any[]> {
-    const where: any = { isActive: true };
-    if (categoryId) where.categoryId = categoryId;
+    const services: any[] = [];
 
-    return await prisma.costService.findMany({
-      where,
-      include: {
-        category: true,
-      },
-      orderBy: { displayName: 'asc' },
-    });
+    // Se não há filtro de categoria ou categoria é 'ai', incluir serviços de IA
+    if (!categoryId || categoryId === 'ai') {
+      try {
+        // Buscar provedores e configurações de serviços cadastrados
+        const [providers, serviceConfigs, aiCosts] = await Promise.all([
+          prisma.aiProvider.findMany({
+            where: { isActive: true },
+            select: {
+              id: true,
+              provider: true,
+              name: true,
+              displayName: true,
+            },
+          }),
+          prisma.aiServiceConfig.findMany({
+            where: { isActive: true },
+            select: {
+              id: true,
+              serviceType: true,
+              serviceName: true,
+              model: true,
+              providerId: true,
+              provider: {
+                select: {
+                  id: true,
+                  provider: true,
+                  name: true,
+                  displayName: true,
+                },
+              },
+            },
+          }),
+            // Buscar TODOS os custos de IA (não apenas últimos 30 dias)
+          // Isso garante que todos os custos registrados sejam exibidos
+          prisma.aiCostTracking.findMany({
+            select: {
+              provider: true,
+              model: true,
+              cost: true,
+              timestamp: true,
+              inputTokens: true,
+              outputTokens: true,
+            },
+            orderBy: {
+              timestamp: 'desc'
+            },
+          }),
+        ]);
+
+        // Agrupar custos por provedor/modelo
+        const costMap = new Map<string, { cost: number; count: number }>();
+        aiCosts.forEach(cost => {
+          const key = `${cost.provider}-${cost.model}`;
+          const existing = costMap.get(key) || { cost: 0, count: 0 };
+          costMap.set(key, {
+            cost: existing.cost + (cost.cost || 0),
+            count: existing.count + 1,
+          });
+        });
+
+        // Criar mapa de serviços únicos (provedor + modelo)
+        const serviceMap = new Map<string, any>();
+
+        // PRIMEIRO: Adicionar TODOS os serviços baseados nas configurações cadastradas
+        // Isso garante que mesmo serviços sem custos apareçam
+        serviceConfigs.forEach(config => {
+          const provider = config.provider;
+          const key = `${provider.provider}-${config.model}`;
+          
+          if (!serviceMap.has(key)) {
+            const costData = costMap.get(key) || { cost: 0, count: 0 };
+            
+            serviceMap.set(key, {
+              id: key,
+              name: key,
+              displayName: `${provider.displayName || provider.name} - ${config.model}`,
+              categoryId: 'ai',
+              category: {
+                id: 'ai',
+                name: 'ai',
+                displayName: 'Inteligência Artificial',
+                icon: 'Brain',
+                color: '#8B5CF6',
+              },
+              costType: 'variable',
+              captureType: 'usage_tracking',
+              isActive: true,
+              provider: provider.provider,
+              providerId: provider.id,
+              providerName: provider.displayName || provider.name,
+              model: config.model,
+              serviceType: config.serviceType,
+              serviceName: config.serviceName,
+              totalCost: costData.cost,
+              requestCount: costData.count,
+              averageCost: costData.count > 0 ? costData.cost / costData.count : 0,
+              trend: 'stable' as const,
+              metadata: {
+                provider: provider.provider,
+                providerId: provider.id,
+                model: config.model,
+                serviceType: config.serviceType,
+                serviceName: config.serviceName,
+                totalCost: costData.cost,
+                requestCount: costData.count,
+              },
+            });
+          } else {
+            // Atualizar dados de custo se já existir
+            const existing = serviceMap.get(key);
+            const costData = costMap.get(key) || { cost: 0, count: 0 };
+            existing.totalCost = costData.cost;
+            existing.requestCount = costData.count;
+            existing.averageCost = costData.count > 0 ? costData.cost / costData.count : 0;
+            existing.metadata.totalCost = costData.cost;
+            existing.metadata.requestCount = costData.count;
+          }
+        });
+
+        // SEGUNDO: Adicionar serviços que têm custos mas podem não estar cadastrados
+        // Isso garante que serviços com uso apareçam mesmo sem configuração
+        costMap.forEach((costData, key) => {
+          if (!serviceMap.has(key)) {
+            const [provider, model] = key.split('-');
+            serviceMap.set(key, {
+              id: key,
+              name: key,
+              displayName: `${provider} - ${model}`,
+              categoryId: 'ai',
+              category: {
+                id: 'ai',
+                name: 'ai',
+                displayName: 'Inteligência Artificial',
+                icon: 'Brain',
+                color: '#8B5CF6',
+              },
+              costType: 'variable',
+              captureType: 'usage_tracking',
+              isActive: true,
+              provider,
+              model,
+              totalCost: costData.cost,
+              requestCount: costData.count,
+              averageCost: costData.count > 0 ? costData.cost / costData.count : 0,
+              trend: 'stable' as const,
+              metadata: {
+                provider,
+                model,
+                totalCost: costData.cost,
+                requestCount: costData.count,
+              },
+            });
+          }
+        });
+
+        // TERCEIRO: Se não houver serviços cadastrados, mas houver provedores ativos,
+        // criar serviços baseados apenas nos provedores (sem modelos específicos)
+        if (serviceMap.size === 0 && providers.length > 0) {
+          providers.forEach(provider => {
+            const key = `${provider.provider}-all`;
+            if (!serviceMap.has(key)) {
+              serviceMap.set(key, {
+                id: key,
+                name: key,
+                displayName: `${provider.displayName || provider.name} (Todos os modelos)`,
+                categoryId: 'ai',
+                category: {
+                  id: 'ai',
+                  name: 'ai',
+                  displayName: 'Inteligência Artificial',
+                  icon: 'Brain',
+                  color: '#8B5CF6',
+                },
+                costType: 'variable',
+                captureType: 'usage_tracking',
+                isActive: true,
+                provider: provider.provider,
+                providerId: provider.id,
+                providerName: provider.displayName || provider.name,
+                model: 'all',
+                totalCost: 0,
+                requestCount: 0,
+                averageCost: 0,
+                trend: 'stable' as const,
+                metadata: {
+                  provider: provider.provider,
+                  providerId: provider.id,
+                  model: 'all',
+                  totalCost: 0,
+                  requestCount: 0,
+                },
+              });
+            }
+          });
+        }
+
+        // Adicionar todos os serviços ao array, ordenados por custo total (decrescente)
+        const sortedServices = Array.from(serviceMap.values()).sort((a, b) => b.totalCost - a.totalCost);
+        services.push(...sortedServices);
+      } catch (error) {
+        logger.error('Failed to fetch AI services:', error);
+        // Em caso de erro, tentar buscar apenas pelos custos
+              try {
+                // Buscar TODOS os custos de IA (não apenas últimos 30 dias)
+                const aiCosts = await prisma.aiCostTracking.findMany({
+                  select: {
+                    provider: true,
+                    model: true,
+                    cost: true,
+                    timestamp: true,
+                    inputTokens: true,
+                    outputTokens: true,
+                  },
+                  orderBy: {
+                    timestamp: 'desc'
+                  },
+                });
+
+          const serviceMap = new Map<string, { cost: number; count: number }>();
+          aiCosts.forEach(cost => {
+            const key = `${cost.provider}-${cost.model}`;
+            const existing = serviceMap.get(key) || { cost: 0, count: 0 };
+            serviceMap.set(key, {
+              cost: existing.cost + (cost.cost || 0),
+              count: existing.count + 1,
+            });
+          });
+
+          Array.from(serviceMap.entries()).forEach(([key, data]) => {
+            const [provider, model] = key.split('-');
+            services.push({
+              id: key,
+              name: key,
+              displayName: `${provider} - ${model}`,
+              categoryId: 'ai',
+              category: {
+                id: 'ai',
+                name: 'ai',
+                displayName: 'Inteligência Artificial',
+                icon: 'Brain',
+                color: '#8B5CF6',
+              },
+              costType: 'variable',
+              captureType: 'usage_tracking',
+              isActive: true,
+              totalCost: data.cost,
+              requestCount: data.count,
+              metadata: {
+                provider,
+                model,
+                totalCost: data.cost,
+                requestCount: data.count,
+              },
+            });
+          });
+        } catch (fallbackError) {
+          logger.error('Failed to fetch AI services (fallback):', fallbackError);
+        }
+      }
+    }
+
+    // Buscar serviços normais se não for apenas IA
+    if (!categoryId || categoryId !== 'ai') {
+      const where: any = { isActive: true };
+      if (categoryId) where.categoryId = categoryId;
+
+      const normalServices = await prisma.costService.findMany({
+        where,
+        include: {
+          category: true,
+        },
+        orderBy: { displayName: 'asc' },
+      });
+
+      services.push(...normalServices);
+    }
+
+    return services;
   }
 
   /**

@@ -35,7 +35,14 @@ async function main() {
       provider: 'OPENAI' as const,
       apiKey: encryptionService.encrypt(openaiKey),
       baseUrl: 'https://api.openai.com/v1',
-      models: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'gpt-4-vision-preview'],
+      models: [
+        'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-4-32k',
+        'gpt-3.5-turbo', 'gpt-3.5-turbo-16k',
+        'o1-preview', 'o1-mini', 'o3-mini', 'o3',
+        'text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002',
+        'whisper-1', 'tts-1', 'tts-1-hd',
+        'dall-e-3', 'dall-e-2'
+      ],
       isDefault: true,
       isActive: true,
       timeout: 30000,
@@ -55,7 +62,14 @@ async function main() {
       provider: 'GROQ' as const,
       apiKey: encryptionService.encrypt(groqKey),
       baseUrl: 'https://api.groq.com/openai/v1',
-      models: ['llama3-70b-8192', 'llama3-8b-8192', 'mixtral-8x7b-32768', 'whisper-large-v3-turbo'],
+      models: [
+        'llama-3.3-70b-versatile',
+        'llama-3.1-70b-versatile', 'llama-3.1-8b-instant',
+        'llama-3-70b-8192', 'llama-3-8b-8192',
+        'mixtral-8x7b-32768',
+        'gemma-7b-it', 'gemma2-9b-it', 'gemma2-27b-it',
+        'whisper-large-v3'
+      ],
       isActive: true,
       timeout: 30000,
       maxRetries: 3,
@@ -74,7 +88,11 @@ async function main() {
       provider: 'GEMINI' as const,
       apiKey: encryptionService.encrypt(geminiKey),
       baseUrl: 'https://generativelanguage.googleapis.com/v1',
-      models: ['gemini-pro', 'gemini-pro-vision'],
+      models: [
+        'gemini-2.5-pro', 'gemini-2.0-flash-exp',
+        'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.5-pro-vision',
+        'gemini-1.0-pro', 'gemini-1.0-pro-vision', 'gemini-pro-vision'
+      ],
       isActive: true,
       timeout: 30000,
       maxRetries: 3,
@@ -106,7 +124,7 @@ async function main() {
     {
       serviceType: 'CHAT' as const,
       providerId: 'openai-default',
-      model: 'gpt-4',
+      model: 'gpt-4o',
       priority: 0,
       isActive: true,
       config: {
@@ -121,7 +139,7 @@ async function main() {
     {
       serviceType: 'CHAT' as const,
       providerId: 'groq-default',
-      model: 'llama3-70b-8192',
+      model: 'llama-3.1-70b-versatile',
       priority: 1,
       isActive: true,
       config: {
@@ -136,7 +154,7 @@ async function main() {
     {
       serviceType: 'TRANSCRIPTION' as const,
       providerId: 'groq-default',
-      model: 'whisper-large-v3-turbo',
+      model: 'whisper-large-v3',
       priority: 0,
       isActive: true,
       config: {
@@ -151,7 +169,7 @@ async function main() {
     {
       serviceType: 'IMAGE_ANALYSIS' as const,
       providerId: 'gemini-default',
-      model: 'gemini-pro-vision',
+      model: 'gemini-1.5-pro-vision',
       priority: 0,
       isActive: true,
       config: {
@@ -165,7 +183,7 @@ async function main() {
     {
       serviceType: 'WORKOUT' as const,
       providerId: 'openai-default',
-      model: 'gpt-4',
+      model: 'gpt-4o',
       priority: 0,
       isActive: true,
       config: {
@@ -180,7 +198,7 @@ async function main() {
     {
       serviceType: 'NUTRITION' as const,
       providerId: 'gemini-default',
-      model: 'gemini-pro',
+      model: 'gemini-1.5-pro',
       priority: 0,
       isActive: true,
       config: {
@@ -195,7 +213,7 @@ async function main() {
     {
       serviceType: 'ANALYTICS' as const,
       providerId: 'groq-default',
-      model: 'llama3-70b-8192',
+      model: 'llama-3.1-70b-versatile',
       priority: 0,
       isActive: true,
       config: {
@@ -210,7 +228,7 @@ async function main() {
     {
       serviceType: 'CHURN' as const,
       providerId: 'openai-default',
-      model: 'gpt-4',
+      model: 'gpt-4o',
       priority: 0,
       isActive: true,
       config: {

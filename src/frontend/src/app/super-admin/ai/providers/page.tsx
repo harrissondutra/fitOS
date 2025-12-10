@@ -495,7 +495,11 @@ export default function AIProvidersPage() {
                       </TableHeader>
                       <TableBody>
                         {providers.map((provider) => (
-                          <TableRow key={provider.id}>
+                          <TableRow 
+                            key={provider.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => setSelectedProvider(provider)}
+                          >
                             <TableCell>
                               <div className="flex items-center space-x-3">
                                 <span className="text-2xl">{getProviderIcon(provider.provider)}</span>
@@ -541,7 +545,7 @@ export default function AIProvidersPage() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="text-right">
+                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button variant="ghost" className="h-8 w-8 p-0">
@@ -550,11 +554,21 @@ export default function AIProvidersPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                  <DropdownMenuItem onClick={() => handleTestProvider(provider)}>
+                                  <DropdownMenuItem 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleTestProvider(provider);
+                                    }}
+                                  >
                                     <Play className="mr-2 h-4 w-4" />
                                     Testar Conexão
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setSelectedProvider(provider)}>
+                                  <DropdownMenuItem 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedProvider(provider);
+                                    }}
+                                  >
                                     <Edit className="mr-2 h-4 w-4" />
                                     Editar
                                   </DropdownMenuItem>
@@ -570,7 +584,10 @@ export default function AIProvidersPage() {
                                   )}
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem 
-                                    onClick={() => handleDeleteProvider(provider)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteProvider(provider);
+                                    }}
                                     className="text-destructive"
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" />

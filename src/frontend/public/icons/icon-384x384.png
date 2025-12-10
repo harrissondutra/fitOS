@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="384" height="384" viewBox="0 0 384 384" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  
+  
+  <!-- Dumbbell Icon -->
+  <g transform="translate(0, 0)">
+    <!-- Left weight -->
+    <rect x="38.400000000000006" y="115.19999999999999" width="57.599999999999994" height="153.60000000000002" fill="url(#gradient)" rx="19.200000000000003"/>
+    
+    <!-- Bar -->
+    <rect x="96" y="172.8" width="192" height="38.400000000000006" fill="url(#gradient)" rx="19.200000000000003"/>
+    
+    <!-- Right weight -->
+    <rect x="288" y="115.19999999999999" width="57.599999999999994" height="153.60000000000002" fill="url(#gradient)" rx="19.200000000000003"/>
+    
+    <!-- Center grip -->
+    <rect x="153.60000000000002" y="153.60000000000002" width="76.80000000000001" height="76.80000000000001" fill="white" rx="38.400000000000006"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="192" y="345.6" text-anchor="middle" font-family="Arial, sans-serif" font-size="46.08" font-weight="bold" fill="white">FitOS</text>
+</svg>

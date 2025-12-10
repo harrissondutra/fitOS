@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { PlanLimitsService } from '../services/plan-limits.service';
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const planLimitsService = new PlanLimitsService(prisma);
 
 // Extend Request interface to include tenantId

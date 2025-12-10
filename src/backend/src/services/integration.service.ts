@@ -10,10 +10,12 @@ import {
   TestInstructions,
   IntegrationUsageLog
 } from '../../../shared/types/integrations.types';
-import { encryptionService } from './encryption.service';
+import { EncryptionService } from './encryption.service';
+const encryptionService = new EncryptionService();
 import integrationKnowledgeBase from '../data/integration-knowledge-base.json';
+import { getPrismaClient } from '../config/database';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export class IntegrationService {
   /**

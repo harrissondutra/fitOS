@@ -5,7 +5,7 @@
 
 import { logger } from '../../utils/logger';
 import { AiClientFactory } from '../ai-client.factory';
-import { AiServiceType } from '@/shared/types/ai.types';
+import { AiServiceType } from '../../../../shared/types/ai.types';
 
 export interface ClientProfile {
   age: number;
@@ -56,7 +56,7 @@ export class NutritionGoalsAIService {
         }
       );
 
-      const goals = this.parseGoalsResponse(response);
+      const goals = this.parseGoalsResponse(response.content);
       
       logger.info('Nutrition goals generated successfully', {
         clientGoals: profile.goals,
@@ -95,7 +95,7 @@ export class NutritionGoalsAIService {
         }
       );
 
-      const analysis = this.parseProgressResponse(response);
+      const analysis = this.parseProgressResponse(response.content);
       
       return analysis;
 

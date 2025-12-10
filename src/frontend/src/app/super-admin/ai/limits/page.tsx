@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Select,
@@ -34,6 +35,7 @@ import {
   Trash2,
   Plus
 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface Limit {
   id: string;
@@ -47,109 +49,12 @@ interface Limit {
   isActive: boolean;
   isEnforced: boolean;
   currentUsage: number;
-  lastReset: Date;
-  createdAt: Date;
-  updatedAt: Date;
+  lastReset: Date | string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  plan?: string;
+  provider?: string;
 }
-
-const mockLimits: Limit[] = [
-  {
-    id: '1',
-    name: 'Rate Limit Global',
-    description: 'Limite global de requisições por minuto',
-    category: 'rate',
-    type: 'global',
-    value: 1000,
-    unit: 'requests',
-    period: 'minute',
-    isActive: true,
-    isEnforced: true,
-    currentUsage: 450,
-    lastReset: new Date('2024-01-15T00:00:00Z'),
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    updatedAt: new Date('2024-01-15T00:00:00Z')
-  },
-  {
-    id: '2',
-    name: 'Custo Mensal',
-    description: 'Limite de custo total por mês',
-    category: 'cost',
-    type: 'global',
-    value: 500,
-    unit: 'dollars',
-    period: 'month',
-    isActive: true,
-    isEnforced: true,
-    currentUsage: 125.50,
-    lastReset: new Date('2024-01-01T00:00:00Z'),
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    updatedAt: new Date('2024-01-15T00:00:00Z')
-  },
-  {
-    id: '3',
-    name: 'Tokens por Usuário',
-    description: 'Limite de tokens por usuário por dia',
-    category: 'usage',
-    type: 'per_user',
-    value: 10000,
-    unit: 'tokens',
-    period: 'day',
-    isActive: true,
-    isEnforced: true,
-    currentUsage: 0,
-    lastReset: new Date('2024-01-15T00:00:00Z'),
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    updatedAt: new Date('2024-01-15T00:00:00Z')
-  },
-  {
-    id: '4',
-    name: 'Requisições Concorrentes',
-    description: 'Número máximo de requisições simultâneas',
-    category: 'concurrent',
-    type: 'global',
-    value: 50,
-    unit: 'requests',
-    period: 'minute',
-    isActive: true,
-    isEnforced: true,
-    currentUsage: 12,
-    lastReset: new Date('2024-01-15T00:00:00Z'),
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    updatedAt: new Date('2024-01-15T00:00:00Z')
-  },
-  {
-    id: '5',
-    name: 'Rate Limit OpenAI',
-    description: 'Limite específico para provedor OpenAI',
-    category: 'rate',
-    type: 'per_provider',
-    value: 500,
-    unit: 'requests',
-    period: 'minute',
-    isActive: true,
-    isEnforced: true,
-    currentUsage: 200,
-    lastReset: new Date('2024-01-15T00:00:00Z'),
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    updatedAt: new Date('2024-01-15T00:00:00Z')
-  },
-  {
-    id: '6',
-    name: 'Custo por Serviço',
-    description: 'Limite de custo por serviço de IA por dia',
-    category: 'cost',
-    type: 'per_service',
-    value: 50,
-    unit: 'dollars',
-    period: 'day',
-    isActive: false,
-    isEnforced: false,
-    currentUsage: 0,
-    lastReset: new Date('2024-01-15T00:00:00Z'),
-    createdAt: new Date('2024-01-01T00:00:00Z'),
-    updatedAt: new Date('2024-01-15T00:00:00Z')
-  }
-];
 
 const categoryIcons: { [key: string]: any } = {
   rate: Zap,
@@ -173,15 +78,61 @@ const typeLabels: { [key: string]: string } = {
 };
 
 export default function AILimitsPage() {
-  const [limits, setLimits] = useState<Limit[]>(mockLimits);
-  const [filteredLimits, setFilteredLimits] = useState<Limit[]>(mockLimits);
+  const [limits, setLimits] = useState<Limit[]>([]);
+  const [filteredLimits, setFilteredLimits] = useState<Limit[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [editingLimit, setEditingLimit] = useState<Limit | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
+    loadLimits();
+  }, []);
+
+  const loadLimits = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/super-admin/ai/limits', {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar limites');
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        // Converter strings de data para Date objects
+        const formattedLimits = result.data.map((limit: any) => ({
+          ...limit,
+          lastReset: limit.lastReset ? new Date(limit.lastReset) : new Date(),
+          createdAt: limit.createdAt ? new Date(limit.createdAt) : new Date(),
+          updatedAt: limit.updatedAt ? new Date(limit.updatedAt) : new Date()
+        }));
+        setLimits(formattedLimits);
+        setFilteredLimits(formattedLimits);
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar limites:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os limites',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (loading) return;
+    
     let filtered = limits;
 
     if (searchTerm) {
@@ -209,48 +160,116 @@ export default function AILimitsPage() {
   }, [limits, searchTerm, categoryFilter, statusFilter]);
 
   const handleToggleActive = async (limitId: string) => {
-    setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setLimits(prev => prev.map(limit =>
-        limit.id === limitId
-          ? { ...limit, isActive: !limit.isActive }
-          : limit
+      const limit = limits.find(l => l.id === limitId);
+      if (!limit) return;
+
+      // Atualizar localmente primeiro
+      setLimits(prev => prev.map(l =>
+        l.id === limitId ? { ...l, isActive: !l.isActive } : l
       ));
-    } catch (error) {
+
+      // Atualizar na API
+      const response = await fetch(`/api/super-admin/ai/limits/${limitId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          value: limit.value,
+          isActive: !limit.isActive,
+          isEnforced: limit.isEnforced
+        })
+      });
+
+      if (!response.ok) {
+        // Reverter mudança local
+        setLimits(prev => prev.map(l =>
+          l.id === limitId ? { ...l, isActive: limit.isActive } : l
+        ));
+        throw new Error('Erro ao atualizar limite');
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: 'Limite atualizado com sucesso'
+      });
+    } catch (error: any) {
       console.error('Error toggling limit:', error);
-    } finally {
-      setLoading(false);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível atualizar o limite',
+        variant: 'destructive'
+      });
     }
   };
 
   const handleToggleEnforced = async (limitId: string) => {
-    setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setLimits(prev => prev.map(limit =>
-        limit.id === limitId
-          ? { ...limit, isEnforced: !limit.isEnforced }
-          : limit
+      const limit = limits.find(l => l.id === limitId);
+      if (!limit) return;
+
+      // Atualizar localmente primeiro
+      setLimits(prev => prev.map(l =>
+        l.id === limitId ? { ...l, isEnforced: !l.isEnforced } : l
       ));
-    } catch (error) {
+
+      // Atualizar na API
+      const response = await fetch(`/api/super-admin/ai/limits/${limitId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          value: limit.value,
+          isActive: limit.isActive,
+          isEnforced: !limit.isEnforced
+        })
+      });
+
+      if (!response.ok) {
+        // Reverter mudança local
+        setLimits(prev => prev.map(l =>
+          l.id === limitId ? { ...l, isEnforced: limit.isEnforced } : l
+        ));
+        throw new Error('Erro ao atualizar limite');
+      }
+
+      toast({
+        title: 'Sucesso',
+        description: 'Limite atualizado com sucesso'
+      });
+    } catch (error: any) {
       console.error('Error toggling enforcement:', error);
-    } finally {
-      setLoading(false);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível atualizar o limite',
+        variant: 'destructive'
+      });
     }
   };
 
   const handleDeleteLimit = async (limitId: string) => {
-    if (confirm('Tem certeza que deseja deletar este limite?')) {
-      setLoading(true);
-      try {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setLimits(prev => prev.filter(limit => limit.id !== limitId));
-      } catch (error) {
-        console.error('Error deleting limit:', error);
-      } finally {
-        setLoading(false);
-      }
+    if (!confirm('Tem certeza que deseja deletar este limite?')) {
+      return;
+    }
+
+    try {
+      // Remover localmente (limites são derivados de planos, então não podem ser deletados diretamente)
+      // Apenas mostrar mensagem
+      toast({
+        title: 'Info',
+        description: 'Limites são configurados por plano. Para remover, edite o plano correspondente.'
+      });
+    } catch (error: any) {
+      console.error('Error deleting limit:', error);
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível deletar o limite',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -283,6 +302,10 @@ export default function AILimitsPage() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <Button variant="outline" onClick={loadLimits} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
           <Badge variant="outline" className="text-green-600 border-green-600">
             <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
             Sistema Ativo
@@ -378,9 +401,43 @@ export default function AILimitsPage() {
         </Card>
       </div>
 
-      {/* Limits List */}
-      <div className="space-y-4">
-        {filteredLimits.map((limit) => {
+      {/* Loading State */}
+      {loading && limits.length === 0 ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-6 w-64" />
+                <Skeleton className="h-4 w-96 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <>
+          {/* Limits List */}
+          <div className="space-y-4">
+            {filteredLimits.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Shield className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Nenhum limite encontrado</h3>
+                  <p className="text-muted-foreground text-center">
+                    {searchTerm || categoryFilter !== 'all' || statusFilter !== 'all'
+                      ? 'Tente ajustar os filtros'
+                      : 'Configure limites nos planos de assinatura'}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              filteredLimits.map((limit) => {
           const Icon = categoryIcons[limit.category] || Settings;
           const usagePercentage = getUsagePercentage(limit);
           const usageColor = getUsageColor(limit);
@@ -501,22 +558,11 @@ export default function AILimitsPage() {
                 </div>
         </CardContent>
       </Card>
-          );
-        })}
-      </div>
-
-      {filteredLimits.length === 0 && (
-        <div className="text-center py-12">
-          <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Nenhum limite encontrado</h3>
-          <p className="text-muted-foreground mb-4">
-            Tente ajustar os filtros ou criar um novo limite
-          </p>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Criar Limite
-          </Button>
-        </div>
+              );
+            })
+            )}
+          </div>
+        </>
       )}
     </div>
   )

@@ -1,32 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { getPrismaClient } from '../config/database';
+import { logger } from '../utils/logger';
 // Tipos temporários para evitar erros de compilação após remoção da autenticação
-type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
+import { UserRoles, UserRole } from '../constants/roles';
 
 // Extend Request interface to include user information
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        email: string;
-        role: UserRole;
-        tenantId?: string;
-        name?: string;
-      };
-      superAdmin?: {
-        id: string;
-        role: string;
-      };
-      adminInfo?: {
-        id: string;
-        role: string;
-        tenantId: string | null;
-        isSuperAdmin: boolean;
-      };
-    }
-  }
-}
+// Não redeclarar Request.user aqui para evitar conflitos com a definição global
 
 /**
  * Middleware para verificar se o usuário é super admin
@@ -48,8 +27,8 @@ export const requireSuperAdmin = async (req: Request, res: Response, next: NextF
     // Buscar usuário no banco para verificar role
     const user = await getPrismaClient().user.findUnique({
       where: { id: userId },
-      select: { 
-        role: true, 
+      select: {
+        role: true,
         tenantId: true,
         status: true
       }
@@ -98,7 +77,7 @@ export const requireSuperAdmin = async (req: Request, res: Response, next: NextF
 
     next();
   } catch (error) {
-    console.error('Erro ao verificar super admin:', error);
+    logger.error('Erro ao verificar super admin:', error);
     res.status(500).json({
       success: false,
       error: {
@@ -128,8 +107,8 @@ export const requireAdminOrSuperAdmin = async (req: Request, res: Response, next
     // Buscar usuário no banco para verificar role
     const user = await getPrismaClient().user.findUnique({
       where: { id: userId },
-      select: { 
-        role: true, 
+      select: {
+        role: true,
         tenantId: true,
         status: true
       }
@@ -183,7 +162,7 @@ export const requireAdminOrSuperAdmin = async (req: Request, res: Response, next
 
     next();
   } catch (error) {
-    console.error('Erro ao verificar admin:', error);
+    logger.error('Erro ao verificar admin:', error);
     res.status(500).json({
       success: false,
       error: {
@@ -223,8 +202,8 @@ export const requireTenantAccess = (tenantIdParam: string = 'tenantId') => {
       // Buscar usuário no banco para verificar role
       const user = await getPrismaClient().user.findUnique({
         where: { id: userId },
-        select: { 
-          role: true, 
+        select: {
+          role: true,
           tenantId: true,
           status: true
         }
@@ -282,7 +261,7 @@ export const requireTenantAccess = (tenantIdParam: string = 'tenantId') => {
         }
       });
     } catch (error) {
-      console.error('Erro ao verificar acesso ao tenant:', error);
+      logger.error('Erro ao verificar acesso ao tenant:', error);
       return res.status(500).json({
         success: false,
         error: {

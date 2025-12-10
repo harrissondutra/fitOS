@@ -53,6 +53,18 @@ export class RedisRateLimiter {
   middleware() {
     return async (req: Request, res: Response, next: NextFunction) => {
       try {
+        // Bypass para SUPER_ADMIN
+        const role = (req as any).user?.role;
+        if (role === 'SUPER_ADMIN') {
+          return next();
+        }
+
+        // Whitelist de rotas críticas (perfil, sidebar) para evitar UX ruim
+        const path = req.path || '';
+        if (path.startsWith('/api/settings/profile') || path.startsWith('/api/sidebar/config')) {
+          return next();
+        }
+
         const key = this.config.keyGenerator ? 
           this.config.keyGenerator(req) : 
           this.generateDefaultKey(req);

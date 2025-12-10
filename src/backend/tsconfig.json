@@ -2,7 +2,9 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "outDir": "./dist",
     "rootDir": "../..",
     "composite": true,
@@ -33,8 +35,12 @@
     "emitDecoratorMetadata": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@/shared/*": ["../shared/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "@/shared/*": [
+        "../shared/*"
+      ]
     },
     "moduleResolution": "node",
     "allowJs": false,
@@ -44,6 +50,7 @@
   },
   "include": [
     "src/**/*",
+    "api/**/*",
     "../shared/**/*",
     "src/data/integration-knowledge-base.json"
   ],

@@ -1,4 +1,5 @@
 import { PrismaClient, Workout } from '@prisma/client';
+import { PrismaTenantWrapper } from './prisma-tenant-wrapper.service';
 // Tipos temporários para evitar erros de compilação após remoção da autenticação
 type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
 import { logger } from '../utils/logger';
@@ -39,7 +40,7 @@ export interface WorkoutStats {
 }
 
 export class WorkoutService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: PrismaClient | PrismaTenantWrapper) {}
 
   /**
    * Listar workouts com filtros e paginação
@@ -571,7 +572,7 @@ export class WorkoutService {
    * Obter clientes atribuídos a um trainer
    */
   private async getAssignedClients(trainerId: string, tenantId: string): Promise<string[]> {
-    const assignments = await this.prisma.clientTrainer.findMany({
+    const assignments = await (this.prisma as any).clientTrainer.findMany({
       where: {
         trainerId,
         isActive: true,

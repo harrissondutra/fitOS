@@ -7,7 +7,12 @@ async function main() {
 
   // Verificar se já existe um tenant padrão
   const existingTenant = await prisma.tenant.findFirst({
-    where: { name: 'FitOS Default' }
+    where: {
+      OR: [
+        { id: 'default-tenant' },
+        { subdomain: 'default' }
+      ]
+    }
   });
 
   if (existingTenant) {
@@ -20,10 +25,12 @@ async function main() {
   // Criar tenant padrão
   const defaultTenant = await prisma.tenant.create({
     data: {
+      id: 'default-tenant',
       name: 'FitOS Default',
-      slug: 'fitos-default',
-      description: 'Tenant padrão do FitOS para desenvolvimento e testes',
-      isActive: true,
+      subdomain: 'default',
+      status: 'active',
+      billingEmail: 'admin@fitos.com',
+      plan: 'free',
       settings: {
         timezone: 'America/Sao_Paulo',
         currency: 'BRL',
@@ -33,12 +40,6 @@ async function main() {
           analyticsEnabled: true,
           notificationsEnabled: true
         }
-      },
-      subscription: {
-        planId: 'free',
-        status: 'active',
-        startDate: new Date(),
-        endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 ano
       }
     }
   });

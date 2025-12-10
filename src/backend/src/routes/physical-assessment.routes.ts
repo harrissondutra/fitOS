@@ -1,28 +1,32 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { PhysicalAssessmentService } from '../services/physical-assessment.service';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authenticateToken } from '../middleware/auth.middleware';
 import { tenantMiddleware } from '../middleware/tenant.middleware';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
 import { body, query, param } from 'express-validator';
+import { UserRole } from '../../../shared/types/auth.types';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const assessmentService = new PhysicalAssessmentService(prisma);
 
 // Extend Request interface
 interface RequestWithTenantAndAuth extends RequestWithTenant {
   user?: {
     id: string;
-    role: string;
+    email: string;
+    role: UserRole;
+    tenantId?: string;
+    name?: string;
   };
 }
 
 // POST /api/assessments - Criar avaliação física
 router.post(
   '/',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [
     body('clientId').notEmpty().withMessage('Client ID is required'),
@@ -44,7 +48,7 @@ router.post(
 // GET /api/assessments/client/:clientId - Histórico de avaliações do cliente
 router.get(
   '/client/:clientId',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('clientId').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
@@ -62,7 +66,7 @@ router.get(
 // GET /api/assessments/:id - Buscar avaliação por ID
 router.get(
   '/:id',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('id').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
@@ -87,7 +91,7 @@ router.get(
 // GET /api/assessments/compare/:id1/:id2 - Comparar duas avaliações
 router.get(
   '/compare/:id1/:id2',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [
     param('id1').isString().notEmpty(),
@@ -108,7 +112,7 @@ router.get(
 // PUT /api/assessments/:id - Atualizar avaliação
 router.put(
   '/:id',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('id').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
@@ -126,7 +130,7 @@ router.put(
 // DELETE /api/assessments/:id - Deletar avaliação
 router.delete(
   '/:id',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('id').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {

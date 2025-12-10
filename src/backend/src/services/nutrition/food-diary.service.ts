@@ -7,6 +7,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database';
 import { RedisService } from '../redis.service';
 import { logger } from '../../utils/logger';
 import { foodDatabaseService } from './food-database.service';
@@ -61,7 +62,7 @@ export class FoodDiaryService {
   private redis: RedisService;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = getPrismaClient();
     this.redis = new RedisService();
   }
 

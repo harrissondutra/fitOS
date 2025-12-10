@@ -4,14 +4,17 @@ import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { PrismaClient } from '@prisma/client';
 import { requireRole, requireResourceAccess, requireCRMAccess } from '../middleware/permissions';
 import { body, param, query, validationResult } from 'express-validator';
+import { createProfessionalCRMService } from '../utils/service-factory';
+import { getPrismaClient } from '../config/database';
 
 const router = Router();
-const crmService = new ProfessionalCRMService();
-const prisma = new PrismaClient();
-const authMiddleware = getAuthMiddleware(prisma);
 
-// Middleware de autenticação para todas as rotas
-router.use(authMiddleware.requireAuth);
+// Middleware de autenticação para todas as rotas (lazy evaluation)
+router.use((req, res, next) => {
+  const prisma = getPrismaClient();
+  const authMiddleware = getAuthMiddleware();
+  authMiddleware.requireAuth()(req, res, next);
+});
 
 // Middleware para verificar acesso ao CRM (não MEMBER)
 router.use(requireCRMAccess);
@@ -38,6 +41,8 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.createClientProfile(
         {
           ...req.body,
@@ -93,6 +98,8 @@ router.get(
         filters.professionalId = req.user.id;
       }
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.getClientProfiles(filters);
 
       if (!result.success) {
@@ -128,6 +135,8 @@ router.get(
         return res.status(400).json({ errors: errors.array() });
       }
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.getClientProfileById(req.params.id);
 
       if (!result.success) {
@@ -165,6 +174,8 @@ router.put(
         return res.status(400).json({ errors: errors.array() });
       }
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.updateClientProfile(
         req.params.id,
         req.body,
@@ -212,6 +223,8 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.createInteraction(
         {
           ...req.body,
@@ -258,6 +271,8 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.createTask(
         {
           ...req.body,
@@ -303,6 +318,8 @@ router.get(
 
       const professionalId = req.user.role === 'TRAINER' ? req.user.id : undefined;
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.getTasks(
         req.user.tenantId,
         professionalId,
@@ -350,6 +367,8 @@ router.put(
         return res.status(400).json({ errors: errors.array() });
       }
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.updateTask(
         req.params.id,
         req.body,
@@ -383,6 +402,8 @@ router.get(
     try {
       const professionalId = req.user.role === 'TRAINER' ? req.user.id : undefined;
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.getClientPipeline(
         req.user.tenantId,
         professionalId
@@ -412,6 +433,8 @@ router.get(
     try {
       const professionalId = req.user.role === 'TRAINER' ? req.user.id : undefined;
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.getCRMStats(
         req.user.tenantId,
         professionalId
@@ -445,6 +468,8 @@ router.get(
         return res.status(400).json({ errors: errors.array() });
       }
 
+      // Criar service com tenant context do request
+      const crmService = createProfessionalCRMService(req);
       const result = await crmService.getClientInsights(req.params.id);
 
       if (!result.success) {

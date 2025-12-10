@@ -33,18 +33,74 @@ export default function CostsPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [filters, setFilters] = useState<CostFilters>({});
   
-  const { exportReport } = useCosts();
+    const { exportReport, getDashboard } = useCosts();
   const { toast } = useToast();
 
   // Carregar dashboard
   const loadDashboard = useCallback(async () => {
     setLoading(true);
-    
-    // Simular carregamento
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Usar dados mockados diretamente
-    const mockDashboard = {
+
+    try {
+      // Buscar dados reais do banco de dados
+      const dashboardData = await getDashboard(filters);
+      
+      if (dashboardData) {
+        setDashboard(dashboardData);
+      } else {
+        // Fallback para dados vazios se não houver dados
+        setDashboard({
+          totalCost: 0,
+          totalCostPreviousMonth: 0,
+          costVariation: 0,
+          projectedCost: 0,
+          categories: [],
+          topServices: [],
+          alerts: [],
+          trends: [],
+          fixedVsVariable: {
+            fixed: 0,
+            variable: 0,
+            fixedPercentage: 0,
+            variablePercentage: 0
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error loading costs dashboard:', error);
+      toast({
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível carregar o dashboard de custos',
+        variant: 'destructive',
+      });
+      
+      // Fallback para dados vazios em caso de erro
+      setDashboard({
+        totalCost: 0,
+        totalCostPreviousMonth: 0,
+        costVariation: 0,
+        projectedCost: 0,
+        categories: [],
+        topServices: [],
+        alerts: [],
+        trends: [],
+        fixedVsVariable: {
+          fixed: 0,
+          variable: 0,
+          fixedPercentage: 0,
+          variablePercentage: 0
+        }
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [getDashboard, filters, toast]);
+
+  useEffect(() => {
+    loadDashboard();
+  }, [filters, loadDashboard]);
+
+  /* REMOVIDO: Dados mockados - usando dados reais do banco através de getDashboard
+  const oldMockDashboard = {
         totalCost: 1250.50,
         totalCostPreviousMonth: 1100.00,
         costVariation: 13.7,
@@ -160,22 +216,8 @@ export default function CostsPage() {
           fixedPercentage: 40.0,
           variablePercentage: 60.0
         }
-      };
-      
-    setDashboard(mockDashboard);
-    
-    toast({
-      title: 'Modo Demonstração',
-      description: 'Usando dados de exemplo para o dashboard principal',
-      variant: 'default',
-    });
-    
-    setLoading(false);
-  }, [toast]);
-
-  useEffect(() => {
-    loadDashboard();
-  }, [filters, loadDashboard]);
+            };
+  */
 
   // Exportar relatório
   const handleExport = async (format: 'csv' | 'json') => {

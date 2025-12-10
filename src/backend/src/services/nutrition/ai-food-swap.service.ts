@@ -6,11 +6,12 @@
  */
 
 import { AiClientFactory } from '../ai-client.factory';
-import { AiServiceType } from '../../../shared/types/ai.types';
+import { AiServiceType } from '../../../../shared/types/ai.types';
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database';
 import { logger } from '../../utils/logger';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export interface FoodSwap {
   original: {

@@ -1,9 +1,11 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database';
 import twilio from 'twilio';
 import { logger } from '../../utils/logger';
 import { whatsAppConfigManager } from '../../config/whatsapp.config';
+import { CostTrackerService } from '../cost-tracker.service';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export interface WhatsAppMessage {
   to: string;
@@ -42,6 +44,11 @@ export interface WhatsAppWebhook {
 
 export class WhatsAppService {
   private static instance: WhatsAppService;
+  private costTracker: CostTrackerService;
+
+  constructor() {
+    this.costTracker = new CostTrackerService();
+  }
 
   public static getInstance(): WhatsAppService {
     if (!WhatsAppService.instance) {
@@ -80,7 +87,7 @@ export class WhatsAppService {
         statusCallback: `${process.env.API_BASE_URL}/webhooks/whatsapp/status`,
       });
 
-      // Save message to database com schema correto
+            // Save message to database com schema correto
       await this.saveMessage({
         phone: message.to,
         messageContent: message.body,
@@ -89,7 +96,29 @@ export class WhatsAppService {
         tenantId: message.tenantId,
       });
 
-      logger.info('WhatsApp message sent successfully', { messageId: twilioMessage.sid });
+      // Rastrear custo do envio de mensagem
+      try {
+        await this.costTracker.trackUsage({
+          categoryName: 'communication',
+          serviceName: 'whatsapp',
+          usage: {
+            quantity: 1,
+            unit: 'message',
+            metadata: {
+              to: message.to,
+              messageId: twilioMessage.sid,
+              type: 'text',
+              provider: config.provider,
+            },
+          },
+          tenantId: message.tenantId,
+        });
+      } catch (error) {
+        logger.warn('Failed to track WhatsApp usage cost:', error);
+        // Não lançar erro para não quebrar o fluxo
+      }
+
+      logger.info('WhatsApp message sent successfully', { messageId: twilioMessage.sid });                                                                      
       return { success: true, messageId: twilioMessage.sid };
     } catch (error: any) {
       logger.error('Failed to send WhatsApp message', { error: error?.message || 'Unknown error', to: message.to });
@@ -149,7 +178,7 @@ export class WhatsAppService {
         statusCallback: `${process.env.API_BASE_URL}/webhooks/whatsapp/status`,
       });
 
-      // Save message to database com schema correto
+            // Save message to database com schema correto
       await this.saveMessage({
         phone: to,
         messageContent: body,
@@ -158,7 +187,30 @@ export class WhatsAppService {
         tenantId: tenantId,
       });
 
-      logger.info('WhatsApp template message sent successfully', { messageId: twilioMessage.sid });
+      // Rastrear custo do envio de mensagem template
+      try {
+        await this.costTracker.trackUsage({
+          categoryName: 'communication',
+          serviceName: 'whatsapp',
+          usage: {
+            quantity: 1,
+            unit: 'message',
+            metadata: {
+              to,
+              messageId: twilioMessage.sid,
+              type: 'template',
+              templateName,
+              provider: config.provider,
+            },
+          },
+          tenantId,
+        });
+      } catch (error) {
+        logger.warn('Failed to track WhatsApp template usage cost:', error);
+        // Não lançar erro para não quebrar o fluxo
+      }
+
+      logger.info('WhatsApp template message sent successfully', { messageId: twilioMessage.sid });                                                             
       return { success: true, messageId: twilioMessage.sid };
     } catch (error: any) {
       logger.error('Failed to send WhatsApp template message', { error: error?.message || 'Unknown error', to });

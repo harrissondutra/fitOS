@@ -1,0 +1,17 @@
+
+> fitos-backend@1.0.0 dev
+> tsx watch --clear-screen=false --ignore node_modules --ignore dist src/index.ts
+
+⚠️ WEBHOOK_SECRET not configured - webhook validation disabled
+[31m[ERROR][0m ❌ Uncaught Exception: Error: listen EADDRINUSE: address already in use :::3001
+    at Server.setupListenHandle [as _listen2] (node:net:1939:16)
+    at listenInCluster (node:net:1996:12)
+    at Server.listen (node:net:2101:7)
+    at FitOSServer.start (E:\Documentos\Desenvolvimento\Sistudo\fitOS\src\backend\src\index.ts:405:19)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 3001
+}

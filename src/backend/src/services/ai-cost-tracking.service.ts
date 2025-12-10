@@ -4,8 +4,6 @@ import { Prisma } from '@prisma/client';
 import { logger } from '../utils/logger';
 import { cache } from '../config/redis';
 
-const prisma = getPrismaClient();
-
 export interface CostTrackingData {
   id: string;
   clientId: string;
@@ -58,6 +56,7 @@ export class AiCostTrackingService {
   private readonly CACHE_KEY_PREFIX: string;
   private readonly CACHE_TTL: number;
   private readonly DEFAULT_CURRENCY: string;
+  private _prisma: ReturnType<typeof getPrismaClient> | null = null;
 
   constructor() {
     // Usar variáveis de ambiente (ZERO hardcode)
@@ -65,6 +64,14 @@ export class AiCostTrackingService {
     this.CACHE_KEY_PREFIX = `${redisPrefix}costs:ai:`;
     this.CACHE_TTL = parseInt(process.env.COST_CACHE_TTL_DASHBOARD || process.env.COST_CACHE_TTL || '300');
     this.DEFAULT_CURRENCY = process.env.COST_DEFAULT_CURRENCY || 'BRL';
+  }
+
+  // Lazy getter para PrismaClient
+  private get prisma() {
+    if (!this._prisma) {
+      this._prisma = getPrismaClient();
+    }
+    return this._prisma;
   }
 
   /**
@@ -138,7 +145,7 @@ export class AiCostTrackingService {
       }
 
       // 3. Salvar no banco de dados
-      const costRecord = await prisma.aiCostTracking.create({
+      const costRecord = await this.prisma.aiCostTracking.create({
         data: {
           clientId: data.clientId,
           model: data.model,
@@ -215,7 +222,7 @@ export class AiCostTrackingService {
       if (provider) where.provider = provider;
       if (model) where.model = model;
 
-      const costs = await prisma.aiCostTracking.findMany({
+      const costs = await this.prisma.aiCostTracking.findMany({
         where,
         orderBy: { timestamp: 'asc' }
       });
@@ -345,13 +352,13 @@ export class AiCostTrackingService {
       }
 
       const [costs, total] = await Promise.all([
-        prisma.aiCostTracking.findMany({
+        this.prisma.aiCostTracking.findMany({
           where,
           orderBy: { timestamp: 'desc' },
           skip: (page - 1) * limit,
           take: limit
         }),
-        prisma.aiCostTracking.count({ where })
+        this.prisma.aiCostTracking.count({ where })
       ]);
 
       const result = {
@@ -393,7 +400,7 @@ export class AiCostTrackingService {
    * Define limite de custos para um cliente
    */
   async setClientCostLimit(clientId: string, monthlyLimit: number, currency: string = 'USD') {
-    return prisma.clientCostLimit.upsert({
+    return this.prisma.clientCostLimit.upsert({
       where: { clientId },
       update: {
         monthlyLimit,
@@ -414,7 +421,7 @@ export class AiCostTrackingService {
    * Obtém limite de custos de um cliente
    */
   async getClientCostLimit(clientId: string) {
-    return prisma.clientCostLimit.findUnique({
+    return this.prisma.clientCostLimit.findUnique({
       where: { clientId }
     });
   }
@@ -494,7 +501,7 @@ export class AiCostTrackingService {
 
     // Salvar alertas no banco
     for (const alert of alerts) {
-      await prisma.costAlert.upsert({
+      await this.prisma.costAlert.upsert({
         where: { id: alert.id },
         update: {
           alertType: alert.alertType,
@@ -526,7 +533,7 @@ export class AiCostTrackingService {
    * Obtém todos os alertas ativos
    */
   async getActiveAlerts(): Promise<CostAlert[]> {
-    const alerts = await prisma.costAlert.findMany({
+    const alerts = await this.prisma.costAlert.findMany({
       where: { isActive: true },
       orderBy: { createdAt: 'desc' }
     });
@@ -555,7 +562,7 @@ export class AiCostTrackingService {
 
     if (clientId) where.clientId = clientId;
 
-    const costs = await prisma.aiCostTracking.findMany({
+    const costs = await this.prisma.aiCostTracking.findMany({
       where,
       orderBy: { timestamp: 'asc' }
     });
@@ -572,28 +579,29 @@ export class AiCostTrackingService {
     // Calcular média diária dos últimos 30 dias
     const dailyCosts = costs.reduce((acc, cost) => {
       const date = cost.timestamp.toISOString().split('T')[0];
-      acc[date] = (acc[date] || 0) + cost.cost;
+      const costValue = typeof cost.cost === 'number' ? cost.cost : Number(cost.cost) || 0;
+      acc[date] = (acc[date] || 0) + costValue;
       return acc;
     }, {} as Record<string, number>);
 
     const dailyValues = Object.values(dailyCosts);
-    const currentDailyAverage = dailyValues.reduce((sum, cost) => sum + cost, 0) / dailyValues.length;
+    const currentDailyAverage = dailyValues.reduce((sum: number, cost: number) => sum + cost, 0) / dailyValues.length;
 
     // Calcular tendência
     const firstHalf = dailyValues.slice(0, Math.floor(dailyValues.length / 2));
     const secondHalf = dailyValues.slice(Math.floor(dailyValues.length / 2));
 
-    const firstHalfAvg = firstHalf.reduce((sum, cost) => sum + cost, 0) / firstHalf.length;
-    const secondHalfAvg = secondHalf.reduce((sum, cost) => sum + cost, 0) / secondHalf.length;
+    const firstHalfAvg = firstHalf.reduce((sum: number, cost: number) => sum + cost, 0) / (firstHalf.length || 1);
+    const secondHalfAvg = secondHalf.reduce((sum: number, cost: number) => sum + cost, 0) / (secondHalf.length || 1);
 
     let trend: 'INCREASING' | 'DECREASING' | 'STABLE' = 'STABLE';
-    const changePercent = ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100;
+    const changePercent = firstHalfAvg > 0 ? ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100 : 0;
 
     if (changePercent > 10) trend = 'INCREASING';
     else if (changePercent < -10) trend = 'DECREASING';
 
     // Calcular confiança baseada na consistência dos dados
-    const variance = dailyValues.reduce((sum, cost) => sum + Math.pow(cost - currentDailyAverage, 2), 0) / dailyValues.length;
+    const variance = dailyValues.reduce((sum: number, cost: number) => sum + Math.pow(cost - currentDailyAverage, 2), 0) / (dailyValues.length || 1);
     const standardDeviation = Math.sqrt(variance);
     const coefficientOfVariation = standardDeviation / currentDailyAverage;
     const confidence = Math.max(0, Math.min(100, 100 - (coefficientOfVariation * 100)));
@@ -617,7 +625,7 @@ export class AiCostTrackingService {
     format: 'CSV' | 'JSON' = 'CSV',
     clientId?: string
   ): Promise<string> {
-    const costs = await prisma.aiCostTracking.findMany({
+    const costs = await this.prisma.aiCostTracking.findMany({
       where: {
         timestamp: { gte: startDate, lte: endDate },
         ...(clientId && { clientId })

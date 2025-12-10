@@ -5,6 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   MessageSquare, 
   Calendar, 
@@ -399,48 +403,63 @@ export default function ConsultationsPage() {
               <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Tipo de Consulta</label>
-                    <select className="w-full p-2 border rounded-md">
-                      <option>Consulta de Acompanhamento</option>
-                      <option>Consulta Nutricional</option>
-                      <option>Consulta de Emergência</option>
-                    </select>
+                    <Label className="text-sm font-medium">Tipo de Consulta</Label>
+                    <Select defaultValue="acompanhamento">
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="acompanhamento">Consulta de Acompanhamento</SelectItem>
+                        <SelectItem value="nutricional">Consulta Nutricional</SelectItem>
+                        <SelectItem value="emergencia">Consulta de Emergência</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Modalidade</label>
-                    <select className="w-full p-2 border rounded-md">
-                      <option>Presencial</option>
-                      <option>Videochamada</option>
-                      <option>Telefone</option>
-                    </select>
+                    <Label className="text-sm font-medium">Modalidade</Label>
+                    <Select defaultValue="presencial">
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione a modalidade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="presencial">Presencial</SelectItem>
+                        <SelectItem value="video">Videochamada</SelectItem>
+                        <SelectItem value="telefone">Telefone</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Data</label>
-                    <input type="date" className="w-full p-2 border rounded-md" />
+                    <Label className="text-sm font-medium">Data</Label>
+                    <Input type="date" className="w-full" />
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Horário</label>
-                    <select className="w-full p-2 border rounded-md">
-                      <option>09:00</option>
-                      <option>10:00</option>
-                      <option>11:00</option>
-                      <option>14:00</option>
-                      <option>15:00</option>
-                      <option>16:00</option>
-                      <option>17:00</option>
-                    </select>
+                    <Label className="text-sm font-medium">Horário</Label>
+                    <Select defaultValue="14:00">
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecione o horário" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="09:00">09:00</SelectItem>
+                        <SelectItem value="10:00">10:00</SelectItem>
+                        <SelectItem value="11:00">11:00</SelectItem>
+                        <SelectItem value="14:00">14:00</SelectItem>
+                        <SelectItem value="15:00">15:00</SelectItem>
+                        <SelectItem value="16:00">16:00</SelectItem>
+                        <SelectItem value="17:00">17:00</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Observações</label>
-                  <textarea 
-                    className="w-full p-2 border rounded-md h-20" 
+                  <Label className="text-sm font-medium">Observações</Label>
+                  <Textarea 
+                    className="w-full h-20" 
                     placeholder="Descreva o motivo da consulta ou suas principais dúvidas..."
                   />
                 </div>

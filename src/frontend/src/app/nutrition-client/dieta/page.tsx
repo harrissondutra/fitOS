@@ -25,7 +25,7 @@ import {
   Wifi,
   WifiOff,
   RefreshCw,
-  CloudCheck
+  CheckCircle2
 } from 'lucide-react';
 import { useFoodDiaryTracking } from '@/hooks/use-food-diary-tracking';
 import { FoodSearchDialog } from '@/components/nutrition/food-search-dialog';
@@ -69,27 +69,27 @@ export default function DietaPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex-1 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Minha Dieta</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mt-1">
             Acompanhe seu progresso e metas diárias
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Status de Conexão */}
           <div className="flex items-center gap-2">
             {isOnline ? (
-              <Badge variant="default" className="bg-green-600">
+              <Badge variant="default" className="bg-green-600 hover:bg-green-700">
                 <Wifi className="w-3 h-3 mr-1" />
-                Online
+                <span className="hidden sm:inline">Online</span>
               </Badge>
             ) : (
               <Badge variant="destructive">
                 <WifiOff className="w-3 h-3 mr-1" />
-                Offline
+                <span className="hidden sm:inline">Offline</span>
               </Badge>
             )}
           </div>
@@ -101,13 +101,14 @@ export default function DietaPage() {
               size="sm"
               onClick={syncNow}
               disabled={!isOnline}
+              className="hidden sm:flex"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Sincronizar ({syncStatus.pendingCount})
             </Button>
           )}
 
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" aria-label="Calendário">
             <Calendar className="w-4 h-4" />
           </Button>
         </div>
@@ -131,7 +132,7 @@ export default function DietaPage() {
       {/* Alerta de Sincronização */}
       {isOnline && syncStatus && syncStatus.pendingCount > 0 && (
         <Alert variant="default" className="border-blue-500 bg-blue-50 dark:bg-blue-950">
-          <CloudCheck className="h-4 w-4" />
+          <CheckCircle2 className="h-4 w-4" />
           <AlertDescription>
             <strong>Sincronização em andamento</strong>. {syncStatus.pendingCount} entrada(s) sendo enviadas ao servidor...
           </AlertDescription>

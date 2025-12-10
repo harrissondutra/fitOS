@@ -1,7 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { UserProfileSettings } from '@/shared/types/settings';
 import { toast } from 'sonner';
 import { useAuth } from './use-auth';
+import api from '@/lib/api';
+
+// Circuit breaker para evitar requisições repetidas quando backend está offline
+let backendOfflineFlag = false;
+let backendOfflineUntil = 0;
+const BACKEND_OFFLINE_COOLDOWN = 30000; // 30 segundos
 
 export function useProfileSettings() {
   const [settings, setSettings] = useState<UserProfileSettings | null>(null);
@@ -21,22 +27,16 @@ export function useProfileSettings() {
         return;
       }
 
-      const response = await fetch('http://localhost:3001/api/settings/profile', {
+      const res = await api.get('/api/settings/profile', {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
+          'X-Tenant-Id': (localStorage.getItem('tenantId') as string) || 'sistema'
+        }
       });
-      
-      if (!response.ok) {
-        throw new Error('Erro ao buscar configurações do perfil');
-      }
 
-      const data = await response.json();
-      if (data.success) {
-        setSettings(data.data);
+      if (res.data?.success) {
+        setSettings(res.data.data as UserProfileSettings);
       } else {
-        throw new Error(data.error?.message || 'Erro ao buscar configurações');
+        throw new Error(res.data?.error?.message || 'Erro ao buscar configurações');
       }
     } catch (error) {
       console.log('Backend não disponível, usando configurações padrão:', error);
@@ -73,61 +73,90 @@ export function useProfileSettings() {
     }
   };
 
+  const updateSettingsRef = useRef<{ [key: string]: number }>({}); // Debounce por tipo de update
+  
   const updateSettings = async (data: Partial<UserProfileSettings>) => {
+    // Circuit breaker: evitar requisições se backend está offline
+    const now = Date.now();
+    if (backendOfflineFlag && now < backendOfflineUntil) {
+      // Backend ainda está offline - apenas atualizar localmente silenciosamente
+      setSettings(prev => prev ? { ...prev, ...data } : null);
+      return data;
+    }
+    
+    // Debounce: evitar múltiplas requisições simultâneas do mesmo tipo
+    const dataKey = JSON.stringify(Object.keys(data).sort());
+    const lastUpdate = updateSettingsRef.current[dataKey] || 0;
+    const DEBOUNCE_MS = 1000; // 1 segundo
+    
+    if (now - lastUpdate < DEBOUNCE_MS) {
+      // Última atualização foi muito recente - atualizar localmente
+      setSettings(prev => prev ? { ...prev, ...data } : null);
+      return data;
+    }
+    updateSettingsRef.current[dataKey] = now;
+    
     try {
       const accessToken = localStorage.getItem('accessToken');
       
       if (!accessToken) {
         // Se não há token, apenas atualizar localmente sem fazer requisição
         setSettings(prev => prev ? { ...prev, ...data } : null);
-        toast.success('Configurações atualizadas localmente');
-        return data;
+        return data; // Sem toast para não ser intrusivo
       }
 
-      const response = await fetch('http://localhost:3001/api/settings/profile', {
-        method: 'PUT',
+      // Usar AbortController para timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+      const res = await api.put('/api/settings/profile', data, {
+        signal: controller.signal as any,
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
+          'X-Tenant-Id': (localStorage.getItem('tenantId') as string) || 'sistema'
+        }
       });
 
-      if (!response.ok) {
-        // Se a resposta não é OK, verificar se é erro de autenticação
-        if (response.status === 401) {
-          // Token expirado ou inválido - atualizar localmente
-          setSettings(prev => prev ? { ...prev, ...data } : null);
-          toast.success('Configurações atualizadas localmente (token expirado)');
-          return data;
-        }
-        throw new Error('Erro ao atualizar configurações do perfil');
-      }
+      clearTimeout(timeoutId);
+      
+      // Reset circuit breaker se requisição foi bem-sucedida
+      backendOfflineFlag = false;
+      backendOfflineUntil = 0;
 
-      const result = await response.json();
-      if (result.success) {
+      const result = res.data;
+      if (result?.success) {
         setSettings(result.data);
-        toast.success('Perfil atualizado com sucesso');
         return result.data;
       } else {
-        throw new Error(result.error?.message || 'Erro ao atualizar configurações');
+        throw new Error(result?.error?.message || 'Erro ao atualizar configurações');
       }
     } catch (error) {
-      console.error('Error updating profile settings:', error);
+      // Verificar se é erro de rede/offline
+      const isNetworkError = error instanceof Error && (
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('ERR_CONNECTION_REFUSED') ||
+        error.message.includes('NetworkError') ||
+        error.name === 'AbortError'
+      );
       
-      // Se é erro de rede ou token expirado, atualizar localmente
-      if (error instanceof Error && (
-        error.message.includes('Failed to fetch') || 
-        error.message.includes('token') ||
-        error.message.includes('401')
-      )) {
+      if (isNetworkError) {
+        // Ativar circuit breaker
+        backendOfflineFlag = true;
+        backendOfflineUntil = Date.now() + BACKEND_OFFLINE_COOLDOWN;
+        
+        // Atualizar localmente silenciosamente (sem toast, sem console.error)
         setSettings(prev => prev ? { ...prev, ...data } : null);
-        toast.success('Configurações atualizadas localmente');
         return data;
       }
       
-      toast.error('Erro ao atualizar perfil');
-      throw error;
+      // Para outros erros, apenas logar uma vez e atualizar localmente
+      if (!(error instanceof Error && error.message.includes('token'))) {
+        // Não logar erros de token para evitar spam
+        console.debug('Error updating profile settings (non-critical):', error);
+      }
+      
+      // Atualizar localmente
+      setSettings(prev => prev ? { ...prev, ...data } : prev);
+      return data;
     }
   };
 
@@ -155,19 +184,14 @@ export function useProfileSettings() {
       const formData = new FormData();
       formData.append('avatar', file);
 
-      const response = await fetch('/api/settings/profile/avatar', {
-        method: 'POST',
+      const response = await api.post('/api/settings/profile/avatar', formData, {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: formData,
+          'Content-Type': 'multipart/form-data',
+          'X-Tenant-Id': (localStorage.getItem('tenantId') as string) || 'sistema'
+        }
       });
 
-      if (!response.ok) {
-        throw new Error('Erro ao fazer upload do avatar');
-      }
-
-      const result = await response.json();
+      const result = response.data;
       if (result.success) {
         // Atualizar settings com nova URL do avatar
         setSettings(prev => prev ? {
@@ -204,20 +228,13 @@ export function useProfileSettings() {
         throw new Error('Token de acesso não encontrado');
       }
       
-      const response = await fetch('/api/settings/profile/avatar/social', {
-        method: 'PUT',
+      const response = await api.put('/api/settings/profile/avatar/social', { provider }, {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ provider }),
+          'X-Tenant-Id': (localStorage.getItem('tenantId') as string) || 'sistema'
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`Erro ao sincronizar avatar do ${provider}`);
-      }
-
-      const result = await response.json();
+      const result = response.data;
       if (result.success) {
         // Atualizar settings com nova URL do avatar
         setSettings(prev => prev ? {

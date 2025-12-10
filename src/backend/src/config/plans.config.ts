@@ -38,6 +38,7 @@ export interface SubscriptionPlan {
   limits: PlanLimits;
   popular?: boolean;
   recommended?: boolean;
+  adsEnabled?: boolean; // Planos Free, Starter e Professional têm anúncios. Enterprise e Custom não.
   stripePriceId?: {
     monthly: string;
     yearly: string;
@@ -60,9 +61,46 @@ export class PlansConfig {
   private initializePlans(): SubscriptionPlan[] {
     return [
       {
+        id: 'individual',
+        name: 'Individual',
+        description: 'Plano gratuito para pessoas físicas que querem acompanhar seu próprio progresso',
+        price: {
+          monthly: 0.00,
+          yearly: 0.00
+        },
+        currency: 'BRL',
+        features: [
+          'Acompanhamento pessoal de treinos',
+          'Registro de medições corporais',
+          'Plano alimentar básico',
+          'Relatórios de progresso',
+          'App mobile incluído',
+          'Backup básico'
+        ],
+        limits: {
+          users: 1,
+          clients: 0,
+          storage: 1,
+          apiCalls: 100,
+          integrations: 0,
+          reports: 3,
+          support: 'email',
+          customDomain: false,
+          whiteLabel: false,
+          apiAccess: false,
+          webhooks: 0,
+          backups: 7
+        },
+        adsEnabled: true, // Individual (Free) tem anúncios
+        stripePriceId: {
+          monthly: 'price_individual_free',
+          yearly: 'price_individual_free'
+        }
+      },
+      {
         id: 'starter',
         name: 'Starter',
-        description: 'Perfeito para academias pequenas e personal trainers',
+        description: 'Perfeito para academias pequenas e personal trainers',    
         price: {
           monthly: 99.90,
           yearly: 799.20 // 20% desconto anual
@@ -92,6 +130,7 @@ export class PlansConfig {
           webhooks: 5,
           backups: 30
         },
+        adsEnabled: true, // Starter tem anúncios
         stripePriceId: {
           monthly: 'price_starter_monthly',
           yearly: 'price_starter_yearly'
@@ -135,6 +174,7 @@ export class PlansConfig {
         },
         popular: true,
         recommended: true,
+        adsEnabled: true, // Professional tem anúncios
         stripePriceId: {
           monthly: 'price_professional_monthly',
           yearly: 'price_professional_yearly'
@@ -179,6 +219,7 @@ export class PlansConfig {
           webhooks: -1, // ilimitado
           backups: -1 // ilimitado
         },
+        adsEnabled: false, // Enterprise não tem anúncios
         stripePriceId: {
           monthly: 'price_enterprise_monthly',
           yearly: 'price_enterprise_yearly'

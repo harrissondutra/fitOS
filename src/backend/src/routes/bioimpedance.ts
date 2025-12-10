@@ -1,15 +1,16 @@
 import express from 'express';
 import { body, query, param, validationResult } from 'express-validator';
-import { PrismaClient } from '@prisma/client';
-import { AuthMiddleware } from '../middleware/auth.middleware';
+import { getPrismaClient } from '../config/database';
+import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/permissions';
 import { asyncHandler } from '../utils/async-handler';
-import BioimpedanceService from '../services/bioimpedance.service';
+import { createBioimpedanceService } from '../utils/service-factory';
+import { getTenantPrismaWrapper } from '../utils/prisma-tenant-helper';
 import { requireNutritionAddon } from '../middleware/nutrition-addon-check';
 
 const router = express.Router();
-const prisma = new PrismaClient();
-const authMiddleware = new AuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 
 // Middleware de autenticação para todas as rotas
 router.use(authMiddleware.requireAuth);
@@ -59,9 +60,10 @@ router.get('/',
       ];
     }
 
-    // Se for TRAINER, filtrar apenas clientes atribuídos
-      if (req.user.role === 'TRAINER') {
-      const assignedClients = await prisma.clientTrainer.findMany({
+    // Se for TRAINER, filtrar apenas clientes atribuídos (usar prisma com wrapper)
+    if (req.user.role === 'TRAINER') {
+      const prismaTenant = await getTenantPrismaWrapper(tenantId);
+      const assignedClients = await (prismaTenant as any).clientTrainer.findMany({
         where: { trainerId: req.user.id },
         select: { clientId: true }
       });
@@ -71,7 +73,8 @@ router.get('/',
       };
     }
 
-    const measurements = await prisma.bioimpedanceMeasurement.findMany({
+    const prismaTenant = await getTenantPrismaWrapper(tenantId);
+    const measurements = await (prismaTenant as any).bioimpedanceMeasurement.findMany({
       where: whereClause,
       orderBy: { measuredAt: 'desc' },
       take: parseInt(limit),
@@ -95,7 +98,7 @@ router.get('/',
       }
     });
 
-    const total = await prisma.bioimpedanceMeasurement.count({
+    const total = await (prismaTenant as any).bioimpedanceMeasurement.count({
       where: whereClause
     });
 
@@ -139,7 +142,8 @@ router.get('/:id',
     const { id } = req.params;
     const tenantId = req.user.tenantId;
 
-    const result = await BioimpedanceService.getMeasurementById(id, tenantId);
+    const bioSvc = await createBioimpedanceService(req);
+    const result = await bioSvc.getMeasurementById(id, tenantId);
 
       if (!result.success) {
       return res.status(404).json({
@@ -227,7 +231,8 @@ router.post('/',
     const professionalId = req.user.id;
 
     // Verificar se o cliente existe e pertence ao tenant
-    const client = await prisma.client.findFirst({
+    const prismaTenant = await getTenantPrismaWrapper(tenantId);
+    const client = await (prismaTenant as any).client.findFirst({
       where: {
         id: req.body.clientId,
         tenantId
@@ -243,7 +248,7 @@ router.post('/',
 
     // Se for TRAINER, verificar se tem acesso ao cliente
     if (req.user.role === 'TRAINER') {
-      const hasAccess = await prisma.clientTrainer.findFirst({
+      const hasAccess = await (prismaTenant as any).clientTrainer.findFirst({
         where: {
           clientId: req.body.clientId,
           trainerId: professionalId,
@@ -267,7 +272,8 @@ router.post('/',
       measurement: req.body
     };
 
-    const result = await BioimpedanceService.createMeasurement(measurementData, professionalId);
+    const bioSvc = await createBioimpedanceService(req);
+    const result = await bioSvc.createMeasurement(measurementData, professionalId);
 
       if (!result.success) {
       return res.status(400).json({
@@ -308,7 +314,8 @@ router.get('/:id/analysis',
     const { id } = req.params;
     const tenantId = req.user.tenantId;
 
-    const result = await BioimpedanceService.getMeasurementById(id, tenantId);
+    const bioSvc = await createBioimpedanceService(req);
+    const result = await bioSvc.getMeasurementById(id, tenantId);
 
       if (!result.success) {
       return res.status(404).json({
@@ -317,7 +324,7 @@ router.get('/:id/analysis',
       });
     }
 
-    const analysis = await BioimpedanceService.generateAnalysis(result.measurement);
+    const analysis = await bioSvc.generateAnalysis(result.measurement);
 
     return res.json({
       success: true,
@@ -351,7 +358,8 @@ router.get('/:id/exercise-estimates',
     const { id } = req.params;
     const tenantId = req.user.tenantId;
 
-    const result = await BioimpedanceService.getMeasurementById(id, tenantId);
+    const bioSvc = await createBioimpedanceService(req);
+    const result = await bioSvc.getMeasurementById(id, tenantId);
 
       if (!result.success) {
       return res.status(404).json({
@@ -360,7 +368,8 @@ router.get('/:id/exercise-estimates',
       });
     }
 
-    const estimates = BioimpedanceService.generateExerciseCalorieEstimates(result.measurement.weight);
+    const bioSvc2 = await createBioimpedanceService(req);
+    const estimates = bioSvc2.generateExerciseCalorieEstimates(result.measurement.weight);
 
     return res.json({
       success: true,
@@ -398,7 +407,8 @@ router.get('/client/:clientId',
     const tenantId = req.user.tenantId;
 
     // Verificar se o cliente existe e pertence ao tenant
-    const client = await prisma.client.findFirst({
+    const prismaTenant = await getTenantPrismaWrapper(tenantId);
+    const client = await (prismaTenant as any).client.findFirst({
       where: {
         id: clientId,
         tenantId
@@ -430,7 +440,8 @@ router.get('/client/:clientId',
       }
     }
 
-    const result = await BioimpedanceService.getClientMeasurements(
+    const bioSvc = await createBioimpedanceService(req);
+    const result = await bioSvc.getClientMeasurements(
       clientId,
       tenantId,
       parseInt(limit),
@@ -505,7 +516,8 @@ router.post('/analyze-photos',
     }
 
     // Chamar serviço de análise por fotos
-    const result = await BioimpedanceService.analyzeByPhotos({
+    const bioSvc = await createBioimpedanceService(req);
+    const result = await bioSvc.analyzeByPhotos({
       tenantId,
       clientId,
       professionalId,

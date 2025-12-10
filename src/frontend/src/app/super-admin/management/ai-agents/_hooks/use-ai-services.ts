@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   AiServiceConfig, 
   AiServiceType, 
@@ -25,6 +25,17 @@ export function useAiServices() {
     total: 0,
     pages: 0
   });
+  
+  // Proteção contra loops: rastrear se já houve erro para evitar múltiplas tentativas
+  const hasErroredRef = React.useRef(false);
+  const refreshTimerRef = React.useRef<number | null>(null);
+  const isRefreshingRef = React.useRef(false);
+  const loadingRef = React.useRef(false);
+  
+  // Manter ref sincronizado com estado
+  React.useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
 
   /**
    * Lista configurações de serviços com filtros e paginação
@@ -45,13 +56,13 @@ export function useAiServices() {
       if (typeof filters.isActive === 'boolean') queryParams.append('isActive', filters.isActive.toString());
       if (filters.search) queryParams.append('search', filters.search);
 
-      // Adicionar paginação
+      // Adicionar paginação - corrigir para usar pageSize no backend
       queryParams.append('page', (paginationParams.page || 1).toString());
-      queryParams.append('limit', (paginationParams.limit || 20).toString());
+      queryParams.append('pageSize', (paginationParams.limit || 20).toString());
       if (paginationParams.sortBy) queryParams.append('sortBy', paginationParams.sortBy);
       if (paginationParams.sortOrder) queryParams.append('sortOrder', paginationParams.sortOrder);
 
-      const response = await fetch(`/api/super-admin/ai-service-configs?${queryParams}`, {
+      const response = await fetch(`/api/super-admin/ai/service-configs?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -59,15 +70,37 @@ export function useAiServices() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorJson.message || errorMessage;
+        } catch {
+          // Se não conseguir parsear, usar o texto original
+          if (errorText) errorMessage = errorText;
+        }
+        throw new Error(errorMessage);
       }
 
       const data: PaginatedResponse<AiServiceConfig> = await response.json();
       
       setServiceConfigs(data.data);
       setPagination(data.pagination);
+      setError(null); // Limpar erro em caso de sucesso
+      hasErroredRef.current = false; // Resetar flag de erro
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch service configs');
+      // Evitar loops: só atualizar erro se não houve erro recente
+      if (!hasErroredRef.current) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to fetch service configs';
+        setError(errorMessage);
+        hasErroredRef.current = true;
+        
+        // Resetar flag após um delay para permitir nova tentativa manual
+        setTimeout(() => {
+          hasErroredRef.current = false;
+        }, 5000); // 5 segundos de cooldown
+      }
+      // Não resetar dados em caso de erro para manter estado anterior visível
     } finally {
       setLoading(false);
     }
@@ -78,7 +111,7 @@ export function useAiServices() {
    */
   const getServiceConfigById = useCallback(async (id: string): Promise<AiServiceConfig | null> => {
     try {
-      const response = await fetch(`/api/super-admin/ai-service-configs/${id}`, {
+      const response = await fetch(`/api/super-admin/ai/service-configs/${id}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -104,7 +137,7 @@ export function useAiServices() {
     setError(null);
 
     try {
-      const response = await fetch('/api/super-admin/ai-service-configs', {
+      const response = await fetch('/api/super-admin/ai/service-configs', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
@@ -139,7 +172,7 @@ export function useAiServices() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/super-admin/ai-service-configs/${id}`, {
+      const response = await fetch(`/api/super-admin/ai/service-configs/${id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
@@ -174,7 +207,7 @@ export function useAiServices() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/super-admin/ai-service-configs/${id}`, {
+      const response = await fetch(`/api/super-admin/ai/service-configs/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
@@ -203,7 +236,7 @@ export function useAiServices() {
    */
   const getServiceConfigsByType = useCallback(async (serviceType: AiServiceType): Promise<AiServiceConfig[]> => {
     try {
-      const response = await fetch(`/api/super-admin/ai-service-configs/by-type/${serviceType}`, {
+      const response = await fetch(`/api/super-admin/ai/service-configs/by-type/${serviceType}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -226,7 +259,7 @@ export function useAiServices() {
    */
   const getServiceConfigsByProvider = useCallback(async (providerId: string): Promise<AiServiceConfig[]> => {
     try {
-      const response = await fetch(`/api/super-admin/ai-service-configs/by-provider/${providerId}`, {
+      const response = await fetch(`/api/super-admin/ai/service-configs/by-provider/${providerId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -277,7 +310,7 @@ export function useAiServices() {
    */
   const getServiceStats = useCallback(async () => {
     try {
-      const response = await fetch('/api/super-admin/ai-service-configs/stats', {
+      const response = await fetch('/api/super-admin/ai/service-configs/stats', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -330,7 +363,7 @@ export function useAiServices() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/super-admin/ai-service-configs/${id}/duplicate`, {
+      const response = await fetch(`/api/super-admin/ai/service-configs/${id}/duplicate`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
@@ -357,12 +390,98 @@ export function useAiServices() {
     }
   }, []);
 
-  /**
-   * Carrega configurações de serviços na inicialização
-   */
-  useEffect(() => {
-    listServiceConfigs();
+  // Atualização em massa (aplicando mesmo provider/model a vários serviços) - 1 única requisição
+  const updateManyServiceConfigsRef = React.useRef(false);
+  const wasLoadingRef = React.useRef(false);
+  const updateManyServiceConfigs = useCallback(async (
+    ids: string[],
+    partial: Partial<UpdateAiServiceConfigRequest>
+  ): Promise<void> => {
+    if (!ids || ids.length === 0) return;
+    
+    // Proteção contra múltiplas chamadas simultâneas
+    if (updateManyServiceConfigsRef.current) {
+      console.debug('updateManyServiceConfigs already in progress, skipping duplicate call');
+      return;
+    }
+
+    updateManyServiceConfigsRef.current = true;
+    wasLoadingRef.current = loadingRef.current; // Preservar estado anterior usando ref
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Fazer 1 única requisição de bulk update
+      const response = await fetch('/api/super-admin/ai/service-configs/bulk-update', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ids, data: partial })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorJson.message || errorMessage;
+        } catch {
+          if (errorText) errorMessage = errorText;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      const updatedConfigs: AiServiceConfig[] = result.data || [];
+
+      if (updatedConfigs.length > 0) {
+        // Atualizar lista local apenas uma vez usando função updater para evitar loops
+        setServiceConfigs((prev) => {
+          // Verificar se realmente mudou para evitar re-renders desnecessários
+          const map = new Map(prev.map((s) => [s.id, s] as const));
+          let hasChanges = false;
+          
+          updatedConfigs.forEach((updated) => {
+            const existing = map.get(updated.id);
+            if (!existing || JSON.stringify(existing) !== JSON.stringify(updated)) {
+              map.set(updated.id, updated);
+              hasChanges = true;
+            }
+          });
+          
+          // Só retornar novo array se houver mudanças
+          return hasChanges ? Array.from(map.values()) : prev;
+        });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to bulk update services');
+      throw err;
+    } finally {
+      setLoading(wasLoadingRef.current); // Restaurar estado anterior ao invés de sempre false
+      updateManyServiceConfigsRef.current = false;
+    }
+  }, []); // Sem dependências para manter callback estável
+
+  // Refresh debounced para evitar loops em operações em massa
+  const refresh = useCallback((delayMs: number = 250) => {
+    if (isRefreshingRef.current) return;
+    if (refreshTimerRef.current) {
+      window.clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+    refreshTimerRef.current = window.setTimeout(async () => {
+      isRefreshingRef.current = true;
+      try {
+        await listServiceConfigs();
+      } finally {
+        isRefreshingRef.current = false;
+      }
+    }, delayMs) as unknown as number;
   }, [listServiceConfigs]);
+
+  // Removido useEffect de inicialização - deve ser chamado explicitamente pelo componente
 
   return {
     // Estado
@@ -386,9 +505,10 @@ export function useAiServices() {
     updateServiceRateLimit,
     getServiceStats,
     getServiceConfigsByCategory,
+    updateManyServiceConfigs,
     
     // Utilitários
     clearError: () => setError(null),
-    refresh: () => listServiceConfigs()
+    refresh
   };
 }

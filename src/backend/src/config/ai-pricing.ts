@@ -1,6 +1,12 @@
 /**
  * Configuração de preços dos provedores de IA
  * Baseado nas documentações oficiais dos principais provedores
+ * 
+ * NOTA: Para a lista completa de modelos e preços atualizados, consulte
+ * ProviderTemplatesService.getAllTemplates() que contém todos os 31 provedores
+ * com preços atualizados em USD por 1K tokens.
+ * 
+ * Este arquivo mantém os modelos principais para cálculo de custos.
  */
 
 export interface PricingTier {
@@ -327,6 +333,248 @@ export const AI_PRICING_CONFIG: ProviderPricing[] = [
         }
       }
     ]
+  },
+  {
+    name: 'Mistral AI',
+    timezone: 'UTC',
+    models: [
+      {
+        model: 'mistral-large-latest',
+        provider: 'Mistral AI',
+        pricing: {
+          standard: {
+            inputTokensPerMillion: 2.70,
+            outputTokensPerMillion: 8.10,
+            currency: 'USD'
+          }
+        },
+        contextLength: 128000,
+        maxOutput: 8192,
+        features: {
+          jsonOutput: true,
+          functionCalling: true,
+          vision: false,
+          audio: false,
+          streaming: true
+        }
+      },
+      {
+        model: 'mistral-small-latest',
+        provider: 'Mistral AI',
+        pricing: {
+          standard: {
+            inputTokensPerMillion: 0.20,
+            outputTokensPerMillion: 0.60,
+            currency: 'USD'
+          }
+        },
+        contextLength: 128000,
+        maxOutput: 8192,
+        features: {
+          jsonOutput: true,
+          functionCalling: true,
+          vision: false,
+          audio: false,
+          streaming: true
+        }
+      }
+    ]
+  },
+  {
+    name: 'Cohere',
+    timezone: 'UTC',
+    models: [
+      {
+        model: 'command-r-plus',
+        provider: 'Cohere',
+        pricing: {
+          standard: {
+            inputTokensPerMillion: 3.00,
+            outputTokensPerMillion: 15.00,
+            currency: 'USD'
+          }
+        },
+        contextLength: 128000,
+        maxOutput: 4096,
+        features: {
+          jsonOutput: true,
+          functionCalling: true,
+          vision: false,
+          audio: false,
+          streaming: true
+        }
+      },
+      {
+        model: 'command-r',
+        provider: 'Cohere',
+        pricing: {
+          standard: {
+            inputTokensPerMillion: 0.50,
+            outputTokensPerMillion: 1.50,
+            currency: 'USD'
+          }
+        },
+        contextLength: 128000,
+        maxOutput: 4096,
+        features: {
+          jsonOutput: true,
+          functionCalling: true,
+          vision: false,
+          audio: false,
+          streaming: true
+        }
+      }
+    ]
+  },
+  {
+    name: 'xAI',
+    timezone: 'UTC',
+    models: [
+      {
+        model: 'grok-2-vision-1212',
+        provider: 'xAI',
+        pricing: {
+          standard: {
+            inputTokensPerMillion: 2.50,
+            outputTokensPerMillion: 10.00,
+            currency: 'USD'
+          }
+        },
+        contextLength: 131072,
+        maxOutput: 4096,
+        features: {
+          jsonOutput: true,
+          functionCalling: true,
+          vision: true,
+          audio: false,
+          streaming: true
+        }
+      },
+      {
+        model: 'grok-beta',
+        provider: 'xAI',
+        pricing: {
+          standard: {
+            inputTokensPerMillion: 1.00,
+            outputTokensPerMillion: 4.00,
+            currency: 'USD'
+          }
+        },
+        contextLength: 131072,
+        maxOutput: 4096,
+        features: {
+          jsonOutput: true,
+          functionCalling: true,
+          vision: false,
+          audio: false,
+          streaming: true
+        }
+      }
+    ]
+  },
+  {
+    name: 'Meta',
+    timezone: 'UTC',
+    models: [
+      {
+        model: 'llama-3.1-70b-instruct',
+        provider: 'Meta',
+        pricing: {
+          standard: {
+            inputTokensPerMillion: 0.59,
+            outputTokensPerMillion: 0.79,
+            currency: 'USD'
+          }
+        },
+        contextLength: 131072,
+        maxOutput: 8192,
+        features: {
+          jsonOutput: true,
+          functionCalling: false,
+          vision: false,
+          audio: false,
+          streaming: true
+        }
+      }
+    ]
+  },
+  {
+    name: 'Perplexity',
+    timezone: 'UTC',
+    models: [
+      {
+        model: 'pplx-70b-online',
+        provider: 'Perplexity',
+        pricing: {
+          standard: {
+            inputTokensPerMillion: 0.70,
+            outputTokensPerMillion: 2.80,
+            currency: 'USD'
+          }
+        },
+        contextLength: 131072,
+        maxOutput: 4096,
+        features: {
+          jsonOutput: false,
+          functionCalling: false,
+          vision: false,
+          audio: false,
+          streaming: true
+        }
+      }
+    ]
+  },
+  {
+    name: 'Amazon',
+    timezone: 'UTC',
+    models: [
+      {
+        model: 'amazon.titan-text-premier-v1:0',
+        provider: 'Amazon',
+        pricing: {
+          standard: {
+            inputTokensPerMillion: 1.25,
+            outputTokensPerMillion: 5.00,
+            currency: 'USD'
+          }
+        },
+        contextLength: 128000,
+        maxOutput: 8192,
+        features: {
+          jsonOutput: true,
+          functionCalling: true,
+          vision: false,
+          audio: false,
+          streaming: true
+        }
+      }
+    ]
+  },
+  {
+    name: 'Microsoft Azure',
+    timezone: 'UTC',
+    models: [
+      {
+        model: 'gpt-4o',
+        provider: 'Microsoft Azure',
+        pricing: {
+          standard: {
+            inputTokensPerMillion: 5.00,
+            outputTokensPerMillion: 15.00,
+            currency: 'USD'
+          }
+        },
+        contextLength: 128000,
+        maxOutput: 4096,
+        features: {
+          jsonOutput: true,
+          functionCalling: true,
+          vision: true,
+          audio: false,
+          streaming: true
+        }
+      }
+    ]
   }
 ];
 
@@ -431,4 +679,68 @@ export function getProviderStats() {
     hasDiscount: !!provider.discountHours,
     timezone: provider.timezone
   }));
+}
+
+/**
+ * Busca preços dos templates quando não encontrado neste arquivo
+ * Converte de preço por 1K tokens para por milhão de tokens
+ */
+export function getPricingFromTemplate(model: string, provider?: string): ModelPricing | null {
+  try {
+    // Importação dinâmica para evitar dependência circular
+    const { ProviderTemplatesService } = require('../services/provider-templates.service');
+    const templates = ProviderTemplatesService.getAllTemplates();
+    
+    const template = templates.find((t: any) => 
+      provider ? t.provider === provider : t.models.includes(model)
+    );
+    
+    if (!template) {
+      return null;
+    }
+    
+    const priceInfo = template.pricing.find((p: any) => p.model === model);
+    if (!priceInfo) {
+      return null;
+    }
+    
+    // Converter de USD por 1K tokens para USD por milhão de tokens
+    return {
+      model,
+      provider: template.name,
+      pricing: {
+        standard: {
+          inputTokensPerMillion: priceInfo.inputCost * 1000,
+          outputTokensPerMillion: priceInfo.outputCost * 1000,
+          currency: 'USD'
+        }
+      },
+      contextLength: 128000, // Default, pode ser ajustado
+      maxOutput: 4096, // Default
+      features: {
+        jsonOutput: template.capabilities.functionCalling || false,
+        functionCalling: template.capabilities.functionCalling || false,
+        vision: template.capabilities.vision || false,
+        audio: template.capabilities.audio || false,
+        streaming: template.capabilities.streaming || false
+      }
+    };
+  } catch (error) {
+    console.warn('Error fetching pricing from templates:', error);
+    return null;
+  }
+}
+
+/**
+ * Obtém preços com fallback para templates
+ */
+export function getModelPricingWithFallback(model: string, provider?: string): ModelPricing | null {
+  // Primeiro tenta buscar no arquivo local
+  const localPricing = getModelPricing(model, provider);
+  if (localPricing) {
+    return localPricing;
+  }
+  
+  // Se não encontrar, busca nos templates
+  return getPricingFromTemplate(model, provider);
 }

@@ -4,7 +4,16 @@
  * Tipos simplificados para o middleware Next.js
  */
 
-export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
+export const UserRoles = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  OWNER: 'OWNER',
+  ADMIN: 'ADMIN',
+  TRAINER: 'TRAINER',
+  NUTRITIONIST: 'NUTRITIONIST',
+  CLIENT: 'CLIENT',
+} as const;
+
+export type UserRole = keyof typeof UserRoles;
 
 export const DEFAULT_ROLE_REDIRECTS: Record<UserRole, string> = {
   SUPER_ADMIN: '/super-admin/dashboard',

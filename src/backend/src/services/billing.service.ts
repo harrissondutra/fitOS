@@ -11,7 +11,9 @@
 import Stripe from 'stripe';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 import { PrismaClient } from '@prisma/client';
+import { PrismaTenantWrapper } from './prisma-tenant-wrapper.service';
 import Redis from 'ioredis';
+import { PaymentCostTrackerService } from './payment-cost-tracker.service';
 
 interface BillingConfig {
   stripeSecretKey: string;
@@ -29,6 +31,7 @@ interface SubscriptionPlan {
   price: number;
   currency: string;
   interval: 'month' | 'year';
+  trialPeriodDays?: number;
   features: string[];
   limits: {
     users: number;
@@ -64,8 +67,9 @@ export class BillingService {
   private redis: Redis;
   private config: BillingConfig;
   private useMockData: boolean;
+  private paymentCostTracker: PaymentCostTrackerService;
 
-  constructor(private prisma: PrismaClient) {
+  constructor(private prisma: PrismaClient | PrismaTenantWrapper) {
     this.config = {
       stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
       stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
@@ -80,6 +84,9 @@ export class BillingService {
 
     // Initialize Redis
     this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
+    // Initialize Payment Cost Tracker
+    this.paymentCostTracker = new PaymentCostTrackerService();
 
     if (!this.useMockData) {
       // Initialize Stripe
@@ -107,7 +114,7 @@ export class BillingService {
    */
   async getAvailablePlans(): Promise<SubscriptionPlan[]> {
     const cacheKey = 'billing:plans:all';
-    
+
     try {
       // Tentar buscar do cache primeiro
       const cached = await this.redis.get(cacheKey);
@@ -120,11 +127,32 @@ export class BillingService {
 
     const plans: SubscriptionPlan[] = [
       {
+        id: 'free',
+        name: 'Gratuito',
+        price: 0,
+        currency: 'BRL',
+        interval: 'month',
+        features: [
+          '1 Cliente (Você mesmo)',
+          '1 Usuário',
+          '1GB de armazenamento',
+          'Funcionalidades Fitness (Treinos, Dietas)',
+          'Sem acesso administrativo'
+        ],
+        limits: {
+          users: 1,
+          clients: 1,
+          storage: 1,
+          apiCalls: 100
+        }
+      },
+      {
         id: 'starter',
         name: 'Starter',
         price: 99.90,
         currency: 'BRL',
         interval: 'month',
+        trialPeriodDays: 14,
         features: [
           'Até 50 clientes',
           '5 usuários',
@@ -145,6 +173,7 @@ export class BillingService {
         price: 199.90,
         currency: 'BRL',
         interval: 'month',
+        trialPeriodDays: 14,
         features: [
           'Até 200 clientes',
           '15 usuários',
@@ -167,6 +196,7 @@ export class BillingService {
         price: 399.90,
         currency: 'BRL',
         interval: 'month',
+        trialPeriodDays: 14,
         features: [
           'Clientes ilimitados',
           'Usuários ilimitados',
@@ -260,20 +290,26 @@ export class BillingService {
       });
 
       // Criar subscription
-      const subscription = await this.stripe.subscriptions.create({
+      const subscriptionParams: Stripe.SubscriptionCreateParams = {
         customer: customer.id,
         items: [{ price: price.id }],
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
         expand: ['latest_invoice.payment_intent']
-      });
+      };
+
+      if (plan.trialPeriodDays) {
+        subscriptionParams.trial_period_days = plan.trialPeriodDays;
+      }
+
+      const subscription = await this.stripe.subscriptions.create(subscriptionParams);
 
       const invoice = subscription.latest_invoice as Stripe.Invoice;
-      const paymentIntent = invoice.payment_intent as Stripe.PaymentIntent;
+      const paymentIntent = invoice?.payment_intent as Stripe.PaymentIntent;
 
       return {
         subscriptionId: subscription.id,
-        clientSecret: paymentIntent.client_secret!,
+        clientSecret: paymentIntent?.client_secret || '', // Pode ser vazio se estiver em trial
         customerId: customer.id
       };
     } catch (error) {
@@ -457,7 +493,7 @@ export class BillingService {
       );
 
       // Criar registro no banco
-      await this.prisma.subscription.create({
+      await (this.prisma as any).subscription.create({
         data: {
           tenantId: data.tenantId,
           planId: data.planId,
@@ -482,11 +518,11 @@ export class BillingService {
    * Atualizar status da assinatura
    */
   async updateSubscriptionStatus(subscriptionId: string, status: string, provider: 'stripe' | 'mercadopago') {
-    const whereClause = provider === 'stripe' 
+    const whereClause = provider === 'stripe'
       ? { stripeSubscriptionId: subscriptionId }
       : { mercadoPagoId: subscriptionId };
-    
-    const subscription = await this.prisma.subscription.findFirst({
+
+    const subscription = await (this.prisma as any).subscription.findFirst({
       where: whereClause
     });
 
@@ -494,7 +530,7 @@ export class BillingService {
       throw new Error('Assinatura não encontrada');
     }
 
-    const updatedSubscription = await this.prisma.subscription.update({
+    const updatedSubscription = await (this.prisma as any).subscription.update({
       where: { id: subscription.id },
       data: {
         status,
@@ -521,6 +557,31 @@ export class BillingService {
       }
     } catch (error) {
       console.warn('Erro ao invalidar cache do tenant:', error);
+    }
+  }
+
+  /**
+   * Ativar assinatura do tenant
+   */
+  private async activateTenantSubscription(tenantId: string, planId: string) {
+    try {
+      // Atualizar Tenant
+      await (this.prisma as any).tenant.update({
+        where: { id: tenantId },
+        data: {
+          plan: planId,
+          status: 'ACTIVE',
+          subscriptionStatus: 'ACTIVE'
+        }
+      });
+
+      // Invalidar cache
+      await this.invalidateTenantCache(tenantId);
+
+      console.log(`Tenant ${tenantId} activated with plan ${planId}`);
+    } catch (error) {
+      console.error(`Erro ao ativar tenant ${tenantId}:`, error);
+      throw error;
     }
   }
 
@@ -572,7 +633,7 @@ export class BillingService {
     try {
       if (data.type === 'payment') {
         const payment = await this.checkMercadoPagoPaymentStatus(data.data.id);
-        
+
         if (payment.status === 'approved') {
           await this.handleMercadoPagoPaymentSuccess(payment);
         } else if (payment.status === 'rejected') {
@@ -590,11 +651,90 @@ export class BillingService {
   private async handleStripePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     // Implementar lógica de sucesso do pagamento
     console.log('Pagamento Stripe aprovado:', paymentIntent.id);
+
+    // Rastrear custo da taxa de pagamento
+    try {
+      const paymentMethod = paymentIntent.payment_method_types?.[0] || 'card';
+      const amount = (paymentIntent.amount || 0) / 100; // Converter de centavos para valor real
+      const currency = paymentIntent.currency?.toUpperCase() || 'BRL';
+
+      await this.paymentCostTracker.trackPaymentFee({
+        provider: 'stripe',
+        paymentMethod: paymentMethod === 'card' ? 'card' : 'card', // Stripe geralmente usa card
+        amount,
+        currency,
+        paymentId: paymentIntent.id,
+        metadata: {
+          customerId: paymentIntent.customer,
+          description: paymentIntent.description,
+          metadata: paymentIntent.metadata,
+        },
+      });
+    } catch (error) {
+      console.error('Erro ao rastrear custo de pagamento Stripe:', error);
+      // Não lançar erro para não quebrar o fluxo
+    }
   }
 
   private async handleStripeInvoiceSuccess(invoice: Stripe.Invoice) {
     // Implementar lógica de fatura paga
     console.log('Fatura Stripe paga:', invoice.id);
+
+    try {
+      const subscriptionId = invoice.subscription as string;
+      if (subscriptionId) {
+        // Buscar assinatura local
+        const subscription = await (this.prisma as any).subscription.findFirst({
+          where: { stripeSubscriptionId: subscriptionId }
+        });
+
+        if (subscription) {
+          // Atualizar assinatura
+          await (this.prisma as any).subscription.update({
+            where: { id: subscription.id },
+            data: {
+              status: 'active',
+              currentPeriodStart: new Date(invoice.period_start * 1000),
+              currentPeriodEnd: new Date(invoice.period_end * 1000),
+              updatedAt: new Date()
+            }
+          });
+
+          // Ativar tenant
+          await this.activateTenantSubscription(subscription.tenantId, subscription.planId);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao processar sucesso de fatura Stripe:', error);
+    }
+
+    // Rastrear custo da taxa da fatura (se não foi rastreado no payment_intent)
+    try {
+      if (invoice.amount_paid && invoice.currency) {
+        const amount = invoice.amount_paid / 100; // Converter de centavos
+        const currency = invoice.currency.toUpperCase();
+
+        // Verificar se já foi rastreado via payment_intent
+        // Se não houver payment_intent, rastrear pela fatura
+        if (!invoice.payment_intent) {
+          await this.paymentCostTracker.trackPaymentFee({
+            provider: 'stripe',
+            paymentMethod: 'card',
+            amount,
+            currency,
+            paymentId: invoice.id,
+            metadata: {
+              customerId: invoice.customer,
+              subscriptionId: invoice.subscription,
+              invoiceNumber: invoice.number,
+            },
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao rastrear custo de fatura Stripe:', error);
+      // Não lançar erro para não quebrar o fluxo
+    }
   }
 
   private async handleStripeInvoiceFailed(invoice: Stripe.Invoice) {
@@ -605,6 +745,32 @@ export class BillingService {
   private async handleStripeSubscriptionUpdated(subscription: Stripe.Subscription) {
     // Implementar lógica de atualização da assinatura
     console.log('Assinatura Stripe atualizada:', subscription.id);
+
+    try {
+      const localSubscription = await (this.prisma as any).subscription.findFirst({
+        where: { stripeSubscriptionId: subscription.id }
+      });
+
+      if (localSubscription) {
+        await (this.prisma as any).subscription.update({
+          where: { id: localSubscription.id },
+          data: {
+            status: subscription.status,
+            currentPeriodStart: new Date(subscription.current_period_start * 1000),
+            currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            updatedAt: new Date()
+          }
+        });
+
+        // Se ativa, garantir que tenant está ativo
+        if (subscription.status === 'active') {
+          await this.activateTenantSubscription(localSubscription.tenantId, localSubscription.planId);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao processar atualização de assinatura Stripe:', error);
+    }
   }
 
   private async handleStripeSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -615,6 +781,66 @@ export class BillingService {
   private async handleMercadoPagoPaymentSuccess(payment: any) {
     // Implementar lógica de sucesso do pagamento Mercado Pago
     console.log('Pagamento Mercado Pago aprovado:', payment.id);
+
+    try {
+      // Buscar assinatura pelo ID do pagamento (armazenado como mercadoPagoId)
+      const subscription = await (this.prisma as any).subscription.findFirst({
+        where: { mercadoPagoId: payment.id.toString() }
+      });
+
+      if (subscription) {
+        await (this.prisma as any).subscription.update({
+          where: { id: subscription.id },
+          data: {
+            status: 'active',
+            updatedAt: new Date()
+          }
+        });
+
+        await this.activateTenantSubscription(subscription.tenantId, subscription.planId);
+      }
+    } catch (error) {
+      console.error('Erro ao processar sucesso de pagamento Mercado Pago:', error);
+    }
+
+    // Rastrear custo da taxa de pagamento
+    try {
+      const paymentMethodType = payment.payment_method_id || payment.payment_type_id || 'pix';
+      const amount = payment.transaction_amount || 0;
+      const currency = payment.currency_id?.toUpperCase() || 'BRL';
+
+      // Determinar método de pagamento
+      let paymentMethod: 'pix' | 'card' | 'debit_card' | 'credit_card' | 'ticket' = 'pix';
+      if (paymentMethodType === 'pix' || paymentMethodType === 'bank_transfer') {
+        paymentMethod = 'pix';
+      } else if (paymentMethodType === 'credit_card') {
+        paymentMethod = 'credit_card';
+      } else if (paymentMethodType === 'debit_card') {
+        paymentMethod = 'debit_card';
+      } else if (paymentMethodType === 'ticket') {
+        paymentMethod = 'ticket';
+      } else {
+        paymentMethod = 'card'; // Fallback
+      }
+
+      await this.paymentCostTracker.trackPaymentFee({
+        provider: 'mercadopago',
+        paymentMethod,
+        amount,
+        currency,
+        paymentId: payment.id?.toString() || payment.id,
+        metadata: {
+          status: payment.status,
+          statusDetail: payment.status_detail,
+          externalReference: payment.external_reference,
+          dateCreated: payment.date_created,
+          dateApproved: payment.date_approved,
+        },
+      });
+    } catch (error) {
+      console.error('Erro ao rastrear custo de pagamento Mercado Pago:', error);
+      // Não lançar erro para não quebrar o fluxo
+    }
   }
 
   private async handleMercadoPagoPaymentFailed(payment: any) {
@@ -628,7 +854,7 @@ export class BillingService {
    * Obter assinatura do tenant
    */
   async getSubscription(tenantId: string) {
-    const subscription = await this.prisma.subscription.findFirst({
+    const subscription = await (this.prisma as any).subscription.findFirst({
       where: { tenantId },
       include: {
         plan: true
@@ -667,7 +893,7 @@ export class BillingService {
    */
   async upgradePlan(tenantId: string, newPlanId: string, billingCycle?: string, userId?: string) {
     // Buscar plano atual
-    const currentSubscription = await this.prisma.subscription.findFirst({
+    const currentSubscription = await (this.prisma as any).subscription.findFirst({
       where: { tenantId },
       include: { plan: true }
     });
@@ -687,7 +913,7 @@ export class BillingService {
     // TODO: Implementar cálculo de prorata
 
     // Atualizar assinatura
-    const updatedSubscription = await this.prisma.subscription.update({
+    const updatedSubscription = await (this.prisma as any).subscription.update({
       where: { id: currentSubscription.id },
       data: {
         planId: newPlanId,
@@ -712,7 +938,7 @@ export class BillingService {
    * Cancelar assinatura
    */
   async cancelSubscription(tenantId: string, reason: string, feedback?: string, userId?: string) {
-    const subscription = await this.prisma.subscription.findFirst({
+    const subscription = await (this.prisma as any).subscription.findFirst({
       where: { tenantId }
     });
 
@@ -721,7 +947,7 @@ export class BillingService {
     }
 
     // Marcar para cancelar ao final do período
-    const updatedSubscription = await this.prisma.subscription.update({
+    const updatedSubscription = await (this.prisma as any).subscription.update({
       where: { id: subscription.id },
       data: {
         cancelAtPeriodEnd: true,
@@ -760,7 +986,7 @@ export class BillingService {
    * Obter métodos de pagamento do tenant
    */
   async getPaymentMethods(tenantId: string) {
-    const subscription = await this.prisma.subscription.findFirst({
+    const subscription = await (this.prisma as any).subscription.findFirst({
       where: { tenantId }
     });
 

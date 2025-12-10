@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import multer, { Multer } from 'multer';
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { GlobalLimitsService } from '../services/global-limits.service';
 import { IntegrationService } from '../services/integration.service';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const globalLimitsService = new GlobalLimitsService();
 const integrationService = new IntegrationService();
 

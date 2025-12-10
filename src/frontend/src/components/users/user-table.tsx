@@ -5,33 +5,33 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { 
-  MoreVertical, 
-  Edit, 
-  Trash2, 
-  UserCheck, 
-  UserX, 
+import {
+  MoreVertical,
+  Edit,
+  Trash2,
+  UserCheck,
+  UserX,
   Key,
   Crown,
   Users,
   User
 } from 'lucide-react';
-import { User as UserType, UserRole, UserStatus, UserTableProps } from '../../../../shared/types';
+import { User as UserType, UserRole, UserRoles, UserStatus, UserTableProps } from '../../../../shared/types';
 
 export function UserTable({
   users,
@@ -61,11 +61,14 @@ export function UserTable({
 
   const getRoleDisplayName = (role: UserRole) => {
     const roleNames: Record<UserRole, string> = {
-      OWNER: 'Proprietário',
-      ADMIN: 'Administrador',
-      TRAINER: 'Personal Trainer',
-      CLIENT: 'Cliente',
-      SUPER_ADMIN: 'Super Admin'
+      [UserRoles.OWNER]: 'Proprietário',
+      [UserRoles.ADMIN]: 'Administrador',
+      [UserRoles.TRAINER]: 'Personal Trainer',
+      [UserRoles.CLIENT]: 'Cliente',
+      [UserRoles.SUPER_ADMIN]: 'Super Admin',
+      [UserRoles.NUTRITIONIST]: 'Nutricionista',
+      [UserRoles.EMPLOYEE]: 'Funcionário',
+      [UserRoles.PROFESSIONAL]: 'Profissional'
     };
     return roleNames[role] || role;
   };
@@ -138,8 +141,12 @@ export function UserTable({
         </TableHeader>
         <TableBody>
           {users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell>
+            <TableRow
+              key={user.id}
+              className="cursor-pointer hover:bg-muted/50"
+              onClick={() => onEdit(user)}
+            >
+              <TableCell onClick={(e) => e.stopPropagation()}>
                 <Checkbox
                   checked={selectedUsers.includes(user.id)}
                   onCheckedChange={(checked) => onSelectUser(user.id, checked as boolean)}
@@ -179,7 +186,7 @@ export function UserTable({
                   {formatDate(user.createdAt)}
                 </div>
               </TableCell>
-              <TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm">
@@ -187,11 +194,21 @@ export function UserTable({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onEdit(user)}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(user);
+                      }}
+                    >
                       <Edit className="h-4 w-4 mr-2" />
                       Editar
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onToggleStatus(user)}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleStatus(user);
+                      }}
+                    >
                       {user.status === 'ACTIVE' ? (
                         <>
                           <UserX className="h-4 w-4 mr-2" />
@@ -204,13 +221,21 @@ export function UserTable({
                         </>
                       )}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onResetPassword(user)}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onResetPassword(user);
+                      }}
+                    >
                       <Key className="h-4 w-4 mr-2" />
                       Redefinir Senha
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={() => onDelete(user)}
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(user);
+                      }}
                       className="text-destructive"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />

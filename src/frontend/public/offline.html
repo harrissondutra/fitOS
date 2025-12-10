@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitOS - Offline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .offline-container {
+            text-align: center;
+            max-width: 500px;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .offline-icon {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 2rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+        }
+        
+        .offline-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #fff, #e0e7ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .offline-message {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+        
+        .retry-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            margin: 0.5rem;
+        }
+        
+        .retry-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .features {
+            margin-top: 2rem;
+            text-align: left;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+        
+        .feature-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 1rem;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+        }
+        
+        .connection-status {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ef4444;
+            margin-right: 0.5rem;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .online .status-indicator {
+            background: #10b981;
+            animation: none;
+        }
+        
+        @media (max-width: 600px) {
+            .offline-container {
+                margin: 1rem;
+                padding: 1.5rem;
+            }
+            
+            .offline-title {
+                font-size: 2rem;
+            }
+            
+            .offline-message {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="offline-icon">
+            📱
+        </div>
+        
+        <h1 class="offline-title">Você está offline</h1>
+        
+        <p class="offline-message">
+            Parece que você perdeu a conexão com a internet. 
+            Não se preocupe, você ainda pode usar algumas funcionalidades do FitOS!
+        </p>
+        
+        <div class="features">
+            <div class="feature-item">
+                <div class="feature-icon">✓</div>
+                <span>Visualizar dados já carregados</span>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">✓</div>
+                <span>Navegar entre páginas em cache</span>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">✓</div>
+                <span>Usar funcionalidades offline</span>
+            </div>
+        </div>
+        
+        <a href="/" class="retry-button" onclick="window.location.reload()">
+            🔄 Tentar novamente
+        </a>
+        
+        <button class="retry-button" onclick="checkConnection()">
+            📡 Verificar conexão
+        </button>
+        
+        <div class="connection-status" id="connectionStatus">
+            <span class="status-indicator"></span>
+            <span>Verificando conexão...</span>
+        </div>
+    </div>
+
+    <script>
+        // Verificar status da conexão
+        function checkConnection() {
+            const statusElement = document.getElementById('connectionStatus');
+            const indicator = statusElement.querySelector('.status-indicator');
+            const text = statusElement.querySelector('span:last-child');
+            
+            if (navigator.onLine) {
+                statusElement.classList.add('online');
+                text.textContent = 'Conectado! Recarregando...';
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                statusElement.classList.remove('online');
+                text.textContent = 'Ainda offline. Verifique sua conexão.';
+            }
+        }
+        
+        // Verificar conexão automaticamente
+        setInterval(checkConnection, 5000);
+        
+        // Escutar eventos de conexão
+        window.addEventListener('online', () => {
+            checkConnection();
+        });
+        
+        window.addEventListener('offline', () => {
+            checkConnection();
+        });
+        
+        // Verificar conexão inicial
+        checkConnection();
+        
+        // Service Worker messaging
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'CACHE_UPDATED') {
+                    console.log('Cache atualizado, recarregando...');
+                    window.location.reload();
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { ConditionalLayout } from '@/components/conditional-layout';
 import { PWAWrapper } from '@/components/pwa/PWAWrapper';
 import { ThemeInitializer } from '@/components/theme-initializer';
+import { FetchInterceptorProvider } from '@/components/fetch-interceptor-provider';
 
 // Forçar modo dinâmico globalmente
 export const dynamic = 'force-dynamic'
@@ -84,8 +85,7 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#3b82f6" />
         <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+
       </head>
       <body className={inter.className} suppressHydrationWarning>
         <ThemeProvider
@@ -94,20 +94,22 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange
         >
-        <AuthProvider>
-          <ThemeInitializer />
-          <PWAWrapper
-            enableInstallPrompt={true}
-            enableUpdateNotification={true}
-            enableOfflineIndicator={true}
-            showOfflineDetails={false}
-          >
-            <ConditionalLayout>
-              {children}
-            </ConditionalLayout>
-            <Toaster />
-          </PWAWrapper>
-        </AuthProvider>
+          <AuthProvider>
+            <FetchInterceptorProvider>
+              <ThemeInitializer />
+              <PWAWrapper
+                enableInstallPrompt={true}
+                enableUpdateNotification={true}
+                enableOfflineIndicator={true}
+                showOfflineDetails={false}
+              >
+                <ConditionalLayout>
+                  {children}
+                </ConditionalLayout>
+                <Toaster />
+              </PWAWrapper>
+            </FetchInterceptorProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

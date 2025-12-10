@@ -34,67 +34,72 @@ export default function AutomacaoPage() {
   const { getDashboard, getServices } = useCosts();
   const { toast } = useToast();
 
-  // Carregar dados
+    // Carregar dados
   const loadData = useCallback(async () => {
     setLoading(true);
-    
-    // Usar dados mockados diretamente para garantir que sempre há dados
-    const mockDashboard = {
-      totalCost: 22.80,
-      monthlyTrend: 0.8,
-      services: [
-        {
-          id: 'cron-jobs',
-          name: 'Cron Jobs',
-          cost: 8.50,
-          trend: 0.2,
-          status: 'active',
-          icon: Zap,
-          description: 'Tarefas agendadas automatizadas'
-        },
-        {
-          id: 'webhooks',
-          name: 'Webhooks',
-          cost: 6.30,
-          trend: 1.1,
-          status: 'active',
-          icon: Zap,
-          description: 'Notificações automáticas'
-        },
-        {
-          id: 'api-calls',
-          name: 'API Calls',
-          cost: 8.00,
-          trend: 0.5,
-          status: 'active',
-          icon: Zap,
-          description: 'Chamadas de API automatizadas'
-        }
-      ],
-      trends: [
-        { date: '2024-01-01', totalCost: 20, categories: { automation: 20 } },
-        { date: '2024-02-01', totalCost: 21, categories: { automation: 21 } },
-        { date: '2024-03-01', totalCost: 22, categories: { automation: 22 } },
-        { date: '2024-04-01', totalCost: 21, categories: { automation: 21 } },
-        { date: '2024-05-01', totalCost: 23, categories: { automation: 23 } },
-        { date: '2024-06-01', totalCost: 22, categories: { automation: 22 } }
-      ]
-    };
-    
-    // Simular carregamento
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    setDashboard(mockDashboard);
-    setServices(mockDashboard.services);
-    
-    toast({
-      title: 'Modo Demonstração',
-      description: 'Usando dados de exemplo para automação',
-      variant: 'default',
-    });
-    
-    setLoading(false);
-  }, [toast]);
+
+    try {
+      // Buscar dados reais do banco de dados
+      const [dashboardData, servicesData] = await Promise.all([
+        getDashboard(filters),
+        getServices({ category: 'automation', ...filters })
+      ]);
+
+      // Processar dados do dashboard
+      const automationCategory = dashboardData?.categories?.find(
+        (cat: any) => cat.name === 'automation' || cat.id === 'automation'
+      );
+
+      // Processar serviços de automação
+      const processedServices = (servicesData || []).map((service: any) => ({
+        id: service.id,
+        name: service.name,
+        cost: service.totalCost || 0,
+        trend: service.monthlyTrend || 0,
+        status: service.isActive ? 'active' : 'inactive',
+        icon: service.name?.toLowerCase().includes('n8n') ? Workflow :
+              service.name?.toLowerCase().includes('make') || service.name?.toLowerCase().includes('integromat') ? Bot :
+              service.name?.toLowerCase().includes('zapier') ? Zap : Zap,
+        description: service.description || ''
+      }));
+
+      // Processar trends de automação
+      const processedTrends = (dashboardData?.trends || []).map((trend: any) => ({
+        date: trend.date,
+        totalCost: trend.categories?.automation || 0,
+        categories: { automation: trend.categories?.automation || 0 }
+      }));
+
+      setDashboard({
+        totalCost: automationCategory?.totalCost || 0,
+        monthlyTrend: automationCategory?.variation || 0,
+        services: processedServices,
+        trends: processedTrends,
+        categories: dashboardData?.categories || []
+      });
+
+      setServices(processedServices);
+    } catch (error) {
+      console.error('Error loading automation costs:', error);
+      toast({
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível carregar os custos de automação',
+        variant: 'destructive',
+      });
+      
+      // Fallback para dados vazios em caso de erro
+      setDashboard({
+        totalCost: 0,
+        monthlyTrend: 0,
+        services: [],
+        trends: [],
+        categories: []
+      });
+      setServices([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [getDashboard, getServices, filters, toast]);
 
   useEffect(() => {
     loadData();
@@ -123,12 +128,15 @@ export default function AutomacaoPage() {
     return 'text-gray-500';
   };
 
-  // Filtrar dados de automação do dashboard
-  const automationCategory = dashboard?.categories?.find((cat: any) => cat.name === 'automation');
-  const automationTrends = dashboard?.trends?.map((trend: any) => ({
-    ...trend,
-    totalCost: trend.categories?.automation || 0,
-  })) || [];
+    // Extrair dados de automação do dashboard
+  const automationCategory = dashboard?.categories?.find(
+    (cat: any) => cat.name === 'automation' || cat.id === 'automation'
+  ) || {
+    totalCost: dashboard?.totalCost || 0,
+    variation: dashboard?.monthlyTrend || 0
+  };
+  
+  const automationTrends = dashboard?.trends || [];
 
   if (loading) {
     return (

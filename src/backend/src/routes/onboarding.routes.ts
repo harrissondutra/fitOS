@@ -9,7 +9,7 @@
  */
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { BillingService } from '../services/billing.service';
 import { TenantService } from '../services/tenant.service';
 import { OnboardingEmailService } from '../services/email/onboarding-email.service';
@@ -17,7 +17,7 @@ import { SubdomainValidator } from '../utils/subdomain-validator';
 import { z } from 'zod';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const billingService = new BillingService(prisma);
 const tenantService = new TenantService(prisma);
 const emailService = new OnboardingEmailService();
@@ -203,6 +203,10 @@ router.post('/create-tenant', async (req, res) => {
     });
 
     // Criar usuário proprietário
+    // Enterprise e Custom Plan → role = ADMIN (quem assina tem controle administrativo)
+    // Starter e Professional → role = ADMIN (padrão)
+    const ownerRole = (['enterprise', 'custom'].includes(data.planId)) ? 'ADMIN' : 'ADMIN';
+    
     const owner = await prisma.user.create({
       data: {
         email: data.ownerEmail,
@@ -210,7 +214,7 @@ router.post('/create-tenant', async (req, res) => {
         lastName: data.ownerName.split(' ').slice(1).join(' ') || '',
         name: data.ownerName,
         phone: data.ownerPhone,
-        role: 'owner',
+        role: ownerRole,
         tenantId: tenant.id,
         status: 'ACTIVE',
         profile: {

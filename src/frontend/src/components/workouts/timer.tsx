@@ -22,6 +22,24 @@ export function Timer({ seconds: initialSeconds, onComplete, autoStart = false }
   useEffect(() => {
     if (!isRunning || seconds <= 0) {
       if (seconds === 0 && onComplete) {
+        // Play notification sound
+        const audio = new Audio('/sounds/timer-alert.mp3');
+        audio.play().catch(() => {
+          // Fallback: usar Web Audio API se o arquivo não existir
+          const context = new AudioContext();
+          const oscillator = context.createOscillator();
+          const gainNode = context.createGain();
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(context.destination);
+          
+          oscillator.frequency.value = 800;
+          gainNode.gain.setValueAtTime(0.3, context.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.5);
+          
+          oscillator.start(context.currentTime);
+          oscillator.stop(context.currentTime + 0.5);
+        });
         onComplete();
       }
       return;

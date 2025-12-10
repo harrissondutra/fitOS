@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -196,7 +196,7 @@ const SERVICE_CATEGORIES: Record<string, { name: string; color: string; services
   }
 }
 
-export function ServiceCard({ 
+export const ServiceCard = React.memo(function ServiceCard({ 
   serviceConfig, 
   onEdit, 
   onToggle, 
@@ -206,28 +206,28 @@ export function ServiceCard({
 }: ServiceCardProps) {
   const [isToggling, setIsToggling] = useState(false)
 
-  const getCategory = (serviceType: AiServiceType) => {
+  const getCategory = useCallback((serviceType: AiServiceType) => {
     for (const [key, category] of Object.entries(SERVICE_CATEGORIES)) {
       if (category.services.includes(serviceType)) {
         return { key, ...category }
       }
     }
     return { key: 'custom', name: 'Customizado', color: 'bg-slate-100 text-slate-800', services: [] }
-  }
+  }, [])
 
   const category = getCategory(serviceConfig.serviceType)
   const icon = SERVICE_ICONS[serviceConfig.serviceType] || "⚙️"
 
-  const handleToggle = async () => {
+  const handleToggle = useCallback(async () => {
     setIsToggling(true)
     try {
       await onToggle(serviceConfig.id, !serviceConfig.isActive)
     } finally {
       setIsToggling(false)
     }
-  }
+  }, [serviceConfig.id, serviceConfig.isActive, onToggle])
 
-  const getServiceDescription = (serviceType: AiServiceType): string => {
+  const getServiceDescription = useCallback((serviceType: AiServiceType): string => {
     const descriptions: Record<AiServiceType, string> = {
       [AiServiceType.CHAT]: "Conversação geral com IA",
       [AiServiceType.MULTIAGENT_CHAT]: "Roteamento entre múltiplos agentes",
@@ -273,7 +273,26 @@ export function ServiceCard({
       [AiServiceType.CUSTOM]: "Serviços customizados"
     }
     return descriptions[serviceType] || "Serviço personalizado"
-  }
+  }, [])
+
+  const serviceDescription = getServiceDescription(serviceConfig.serviceType)
+
+  // Memoizar handlers de dropdown para evitar recriação
+  const handleTest = useCallback(() => {
+    onTest(serviceConfig.id)
+  }, [serviceConfig.id, onTest])
+
+  const handleEdit = useCallback(() => {
+    onEdit(serviceConfig)
+  }, [serviceConfig, onEdit])
+
+  const handleDuplicate = useCallback(() => {
+    onDuplicate(serviceConfig)
+  }, [serviceConfig, onDuplicate])
+
+  const handleDelete = useCallback(() => {
+    onDelete(serviceConfig.id)
+  }, [serviceConfig.id, onDelete])
 
   return (
     <Card className={`transition-all hover:shadow-md ${!serviceConfig.isActive ? 'opacity-60' : ''}`}>
@@ -284,7 +303,7 @@ export function ServiceCard({
             <div>
               <CardTitle className="text-base">{serviceConfig.serviceName}</CardTitle>
               <CardDescription className="text-sm">
-                {getServiceDescription(serviceConfig.serviceType)}
+                {serviceDescription}
               </CardDescription>
             </div>
           </div>
@@ -300,21 +319,21 @@ export function ServiceCard({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => onTest(serviceConfig.id)}>
+                <DropdownMenuItem onClick={handleTest}>
                   <Play className="mr-2 h-4 w-4" />
                   Testar Serviço
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onEdit(serviceConfig)}>
+                <DropdownMenuItem onClick={handleEdit}>
                   <Edit className="mr-2 h-4 w-4" />
                   Editar
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onDuplicate(serviceConfig)}>
+                <DropdownMenuItem onClick={handleDuplicate}>
                   <Copy className="mr-2 h-4 w-4" />
                   Duplicar
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
-                  onClick={() => onDelete(serviceConfig.id)}
+                  onClick={handleDelete}
                   className="text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -384,4 +403,16 @@ export function ServiceCard({
       </CardContent>
     </Card>
   )
-}
+}, (prevProps, nextProps) => {
+  // Comparação customizada para React.memo
+  return (
+    prevProps.serviceConfig.id === nextProps.serviceConfig.id &&
+    prevProps.serviceConfig.isActive === nextProps.serviceConfig.isActive &&
+    prevProps.serviceConfig.serviceName === nextProps.serviceConfig.serviceName &&
+    prevProps.serviceConfig.model === nextProps.serviceConfig.model &&
+    prevProps.serviceConfig.priority === nextProps.serviceConfig.priority &&
+    prevProps.serviceConfig.maxRequestsPerMinute === nextProps.serviceConfig.maxRequestsPerMinute &&
+    prevProps.serviceConfig.costPerRequest === nextProps.serviceConfig.costPerRequest &&
+    prevProps.serviceConfig.provider?.displayName === nextProps.serviceConfig.provider?.displayName
+  )
+})

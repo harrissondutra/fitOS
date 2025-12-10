@@ -12,10 +12,10 @@ export class SettingsService {
    */
   async getSystemSettings(tenantId: string): Promise<SystemSettings> {
     try {
-      const tenant = await this.prisma.tenant.findUnique({
+      const tenant = await this.withPrismaRetry(() => this.prisma.tenant.findUnique({
         where: { id: tenantId },
         select: { settings: true }
-      });
+      }));
 
       if (!tenant) {
         throw new Error('Tenant não encontrado');
@@ -67,10 +67,10 @@ export class SettingsService {
       const currentSettings = await this.getSystemSettings(tenantId);
       const updatedSettings = { ...currentSettings, ...settings };
 
-      await this.prisma.tenant.update({
+      await this.withPrismaRetry(() => this.prisma.tenant.update({
         where: { id: tenantId },
         data: { settings: updatedSettings }
-      });
+      }));
 
       logger.info(`System settings updated for tenant ${tenantId}`);
       return updatedSettings;
@@ -81,11 +81,41 @@ export class SettingsService {
   }
 
   /**
+   * Helper para retry em operações Prisma com tratamento de P2024 (pool timeout)
+   */
+  private async withPrismaRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        // P2024: Connection pool timeout - retry
+        if (error.code === 'P2024' && i < maxRetries - 1) {
+          logger.warn(`Prisma pool timeout (P2024), retrying in ${100 * (i + 1)}ms... Attempt ${i + 1}/${maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+          continue;
+        }
+        // P1001: Database unreachable - rethrow immediately
+        if (error.code === 'P1001') {
+          throw error;
+        }
+        // P1017: Connection closed - retry
+        if (error.code === 'P1017' && i < maxRetries - 1) {
+          logger.warn(`Prisma connection closed (P1017), retrying in ${300 * (i + 1)}ms... Attempt ${i + 1}/${maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, 300 * (i + 1)));
+          continue;
+        }
+        throw error; // Re-throw other errors or last retry failure
+      }
+    }
+    throw new Error('Max retries exceeded for Prisma operation');
+  }
+
+  /**
    * Buscar configurações de perfil do usuário
    */
   async getUserProfileSettings(userId: string): Promise<UserProfileSettings> {
     try {
-      const user = await this.prisma.user.findUnique({
+      const user = await this.withPrismaRetry(() => this.prisma.user.findUnique({
         where: { id: userId },
         select: {
           firstName: true,
@@ -95,7 +125,7 @@ export class SettingsService {
           image: true, // Foto de login social
           profile: true,
         }
-      });
+      }));
 
       if (!user) {
         throw new Error('Usuário não encontrado');
@@ -167,21 +197,21 @@ export class SettingsService {
 
       // Atualizar dados pessoais no User se necessário
       if (settings.personalData) {
-        await this.prisma.user.update({
+        await this.withPrismaRetry(() => this.prisma.user.update({
           where: { id: userId },
           data: {
             firstName: settings.personalData.firstName,
             lastName: settings.personalData.lastName,
             phone: settings.personalData.phone,
           }
-        });
+        }));
       }
 
       // Atualizar profile JSON
-      await this.prisma.user.update({
+      await this.withPrismaRetry(() => this.prisma.user.update({
         where: { id: userId },
         data: { profile: updatedSettings as any }
-      });
+      }));
 
       logger.info(`User profile settings updated for user ${userId}`);
       return updatedSettings;
@@ -218,10 +248,10 @@ export class SettingsService {
    */
   async syncSocialAvatar(userId: string, provider: 'google' | 'apple' | 'microsoft'): Promise<string> {
     try {
-      const user = await this.prisma.user.findUnique({
+      const user = await this.withPrismaRetry(() => this.prisma.user.findUnique({
         where: { id: userId },
         select: { image: true, email: true }
-      });
+      }));
 
       if (!user || !user.image) {
         throw new Error('Foto social não encontrada');

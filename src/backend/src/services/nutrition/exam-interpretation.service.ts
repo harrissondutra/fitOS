@@ -5,7 +5,7 @@
 
 import { logger } from '../../utils/logger';
 import { AiClientFactory } from '../ai-client.factory';
-import { AiServiceType } from '@/shared/types/ai.types';
+import { AiServiceType } from '../../../../shared/types/ai.types';
 
 export interface LabExamData {
   examType: string;
@@ -47,7 +47,7 @@ export class LabExamInterpretationService {
       );
 
       // 3. Parsear resposta
-      const interpretation = this.parseAIResponse(response);
+      const interpretation = this.parseAIResponse(response.content);
 
       logger.info('Lab exam interpreted successfully', {
         examType: data.examType,

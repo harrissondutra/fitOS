@@ -1,23 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { PlanLimitsService } from '../services/plan-limits.service';
 import { RequestWithTenant } from './tenant';
 import { logger } from '../utils/logger';
 // Tipos temporários para evitar erros de compilação após remoção da autenticação
 type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const planLimitsService = new PlanLimitsService(prisma);
 
-interface RequestWithTenantAndAuth extends RequestWithTenant {
-  user?: {
-    id: string;
-    email: string;
-    role: UserRole;
-    tenantId?: string;
-    name?: string;
-  };
-}
+type RequestWithTenantAndAuth = RequestWithTenant & { user?: any };
 
 /**
  * Middleware para verificar limite de workouts

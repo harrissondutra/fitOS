@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import { Request } from 'express';
+import { logger } from '../utils/logger';
 
 /**
  * WebhookValidatorService - Validação de webhooks recebidos
@@ -22,7 +23,7 @@ export class WebhookValidatorService {
     this.maxTimestampAge = maxTimestampAge;
 
     if (!this.webhookSecret) {
-      console.warn('⚠️ WEBHOOK_SECRET not configured - webhook validation disabled');
+      logger.warn('⚠️ WEBHOOK_SECRET not configured - webhook validation disabled');
     }
   }
 

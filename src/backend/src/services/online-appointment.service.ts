@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { CacheService } from '../config/redis.cache';
 import { ZoomIntegration } from '../integrations/zoom.integration';
 import { GoogleMeetIntegration } from '../integrations/google-meet.integration';
@@ -17,7 +18,7 @@ export class OnlineAppointmentService {
   private teamsIntegration: TeamsIntegration;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = getPrismaClient();
     this.cache = new CacheService();
     this.zoomIntegration = new ZoomIntegration();
     this.googleMeetIntegration = new GoogleMeetIntegration();

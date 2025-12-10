@@ -1,0 +1,45 @@
+{
+    "version": 2,
+    "builds": [
+        {
+            "src": "src/frontend/package.json",
+            "use": "@vercel/next"
+        },
+        {
+            "src": "src/backend/api/index.ts",
+            "use": "@vercel/node"
+        }
+    ],
+    "routes": [
+        {
+            "src": "/api/(.*)",
+            "dest": "src/backend/api/index.ts"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "src/frontend/$1"
+        }
+    ],
+    "crons": [
+        {
+            "path": "/api/cron/cache-cleanup",
+            "schedule": "0 2 * * *"
+        },
+        {
+            "path": "/api/cron/analytics-calculation",
+            "schedule": "30 2 * * *"
+        },
+        {
+            "path": "/api/cron/appointment-reminders",
+            "schedule": "0 * * * *"
+        },
+        {
+            "path": "/api/cron/churn-detection",
+            "schedule": "0 3 * * 0"
+        },
+        {
+            "path": "/api/cron/session-backup",
+            "schedule": "0 */6 * * *"
+        }
+    ]
+}

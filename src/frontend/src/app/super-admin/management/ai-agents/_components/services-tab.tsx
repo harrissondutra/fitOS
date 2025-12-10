@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,6 +28,9 @@ import { ServiceConfigModal } from "./service-config-modal"
 import { useAiServices } from "../_hooks/use-ai-services"
 import { useAiProviders } from "../_hooks/use-ai-providers"
 import { AiServiceConfig, AiServiceType } from "@/shared/types/ai.types"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button"
+import testBulkUpdateConversationServices from "../_utils/test-bulk-update"
 
 const SERVICE_CATEGORIES = {
   conversation: { name: "Conversação", color: "bg-blue-100 text-blue-800", count: 5 },
@@ -54,7 +57,8 @@ export function ServicesTab() {
     updateServiceConfig,
     deleteServiceConfig,
     duplicateServiceConfig,
-    refresh
+    refresh,
+    updateManyServiceConfigs
   } = useAiServices()
 
   const { providers } = useAiProviders()
@@ -64,78 +68,178 @@ export function ServicesTab() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all")
   const [showModal, setShowModal] = useState(false)
   const [selectedService, setSelectedService] = useState<AiServiceConfig | null>(null)
+  const hasLoadedRef = useRef(false)
+  const isFetchingRef = useRef(false)
 
-  // Load services on mount
-  useEffect(() => {
-    listServiceConfigs()
-  }, [listServiceConfigs])
+  // Seleção múltipla
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkProviderId, setBulkProviderId] = useState<string>("")
+  const [bulkModel, setBulkModel] = useState<string>("")
 
-  // Apply filters
-  useEffect(() => {
-    const filters: any = {}
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const isAllFilteredSelected = useMemo(() => {
+    if (filteredServices.length === 0) return false
+    return filteredServices.every(s => selectedIds.has(s.id))
+  }, [filteredServices, selectedIds])
+
+  const toggleSelectAllFiltered = useCallback(() => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      const allSelected = filteredServices.every(s => next.has(s.id))
+      if (allSelected) {
+        filteredServices.forEach(s => next.delete(s.id))
+      } else {
+        filteredServices.forEach(s => next.add(s.id))
+      }
+      return next
+    })
+  }, [filteredServices])
+
+  const canBulkApply = useMemo(() => selectedIds.size > 0 && (bulkProviderId || bulkModel), [selectedIds, bulkProviderId, bulkModel])
+
+  const handleBulkApply = useCallback(async () => {
+    const ids = Array.from(selectedIds)
+    const partial: any = {}
+    if (bulkProviderId) partial.providerId = bulkProviderId
+    if (bulkModel) partial.model = bulkModel
+    if (ids.length === 0 || Object.keys(partial).length === 0) return
     
-    if (searchTerm) filters.search = searchTerm
-    if (statusFilter !== "all") {
-      filters.isActive = statusFilter === "active"
+    // Limpar seleção ANTES de atualizar para evitar loops
+    setSelectedIds(new Set())
+    setBulkProviderId("")
+    setBulkModel("")
+    
+    try {
+      await updateManyServiceConfigs(ids, partial)
+    } catch (err) {
+      // Em caso de erro, restaurar seleção
+      setSelectedIds(new Set(ids))
+      console.error('Erro ao aplicar LLM em massa:', err)
     }
+  }, [selectedIds, bulkProviderId, bulkModel, updateManyServiceConfigs])
 
-    listServiceConfigs(filters, { page: 1, limit: 100 })
-  }, [searchTerm, statusFilter, listServiceConfigs])
+  // Load services on mount - apenas uma vez usando ref
+  useEffect(() => {
+    if (!hasLoadedRef.current && !isFetchingRef.current) {
+      isFetchingRef.current = true
+      // Usar Promise.resolve para garantir que é uma Promise
+      Promise.resolve(listServiceConfigs())
+        .catch(() => {
+          // Erro já é tratado dentro de listServiceConfigs
+        })
+        .finally(() => {
+          hasLoadedRef.current = true
+          isFetchingRef.current = false
+        })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Executa apenas no mount - listServiceConfigs é estável (useCallback vazio)
 
-  const handleCreateService = () => {
+  // Apply filters - com debounce e sem depender de listServiceConfigs para evitar loop
+  useEffect(() => {
+    // Skip se ainda não carregou pela primeira vez ou já está buscando
+    if (!hasLoadedRef.current || isFetchingRef.current) return
+
+    const timeoutId = setTimeout(() => {
+      if (isFetchingRef.current) return // Double check
+      
+      isFetchingRef.current = true
+      const filters: any = {}
+      
+      if (searchTerm) filters.search = searchTerm
+      if (statusFilter !== "all") {
+        filters.isActive = statusFilter === "active"
+      }
+
+      // Usar Promise.resolve para garantir que é uma Promise
+      Promise.resolve(listServiceConfigs(filters, { page: 1, limit: 100 }))
+        .catch(() => {
+          // Erro já é tratado dentro de listServiceConfigs
+        })
+        .finally(() => {
+          isFetchingRef.current = false
+        })
+    }, 300) // Debounce de 300ms
+
+    return () => clearTimeout(timeoutId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, statusFilter]) // listServiceConfigs é estável (useCallback vazio) - não causa loop
+
+  // Memoizar handlers para evitar recriação que causa re-renders infinitos
+  const handleCreateService = useCallback(() => {
     setSelectedService(null)
     setShowModal(true)
-  }
+  }, [])
 
-  const handleEditService = (service: AiServiceConfig) => {
+  const handleEditService = useCallback((service: AiServiceConfig) => {
     setSelectedService(service)
     setShowModal(true)
-  }
+  }, [])
 
-  const handleSaveService = async (data: any) => {
+  const handleSaveService = useCallback(async (data: any) => {
     if (selectedService) {
       await updateServiceConfig(selectedService.id, { id: selectedService.id, ...data })
     } else {
       await createServiceConfig(data)
     }
-    refresh()
-  }
+    // Evitar refresh imediato para não causar loops em massa
+    setShowModal(false)
+    setSelectedService(null)
+  }, [selectedService, updateServiceConfig, createServiceConfig])
 
-  const handleDeleteService = async (id: string) => {
+  const handleDeleteService = useCallback(async (id: string) => {
     if (confirm("Tem certeza que deseja remover este serviço?")) {
       await deleteServiceConfig(id)
-      refresh()
+      // Sem refresh para evitar re-render em cascata
     }
-  }
+  }, [deleteServiceConfig])
 
-  const handleDuplicateService = async (service: AiServiceConfig) => {
+  const handleDuplicateService = useCallback(async (service: AiServiceConfig) => {
     await duplicateServiceConfig(service.id, {
       newServiceName: `${service.serviceName} (Copy)`
     })
-    refresh()
-  }
+    // Sem refresh
+  }, [duplicateServiceConfig])
 
-  const handleToggleService = async (id: string, isActive: boolean) => {
+  const handleToggleService = useCallback(async (id: string, isActive: boolean) => {
     await updateServiceConfig(id, { id, isActive })
-    refresh()
-  }
+    // Sem refresh
+  }, [updateServiceConfig])
 
-  const handleTestService = async (id: string) => {
+  const handleTestService = useCallback(async (id: string) => {
     // TODO: Implement service testing
     console.log(`Testing service ${id}`)
-  }
+  }, [])
 
-  // Group services by category
-  const groupedServices = serviceConfigs.reduce((acc, service) => {
-    const category = getServiceCategory(service.serviceType)
-    if (!acc[category]) {
-      acc[category] = []
+  // Handler para teste automatizado de bulk update
+  const handleTestBulkUpdate = useCallback(async () => {
+    if (!confirm('🧪 Executar teste automatizado de bulk update?\n\nIsso irá alterar todos os serviços de conversação para Gemini e depois Groq.')) {
+      return
     }
-    acc[category].push(service)
-    return acc
-  }, {} as Record<string, AiServiceConfig[]>)
 
-  const getServiceCategory = (serviceType: AiServiceType): string => {
+    try {
+      console.clear()
+      console.log('🚀 Iniciando teste automatizado...')
+      await testBulkUpdateConversationServices()
+      // Recarregar lista após teste
+      await listServiceConfigs()
+      alert('✅ Teste concluído! Verifique o console para detalhes.')
+    } catch (error) {
+      console.error('❌ Erro no teste:', error)
+      alert(`❌ Erro no teste: ${error instanceof Error ? error.message : 'Erro desconhecido'}`)
+    }
+  }, [listServiceConfigs])
+
+  // Memoizar função getServiceCategory para evitar recriação
+  const getServiceCategory = useMemo(() => {
     const categoryMap: Record<AiServiceType, string> = {
       [AiServiceType.CHAT]: "conversation",
       [AiServiceType.MULTIAGENT_CHAT]: "conversation",
@@ -180,12 +284,52 @@ export function ServicesTab() {
       [AiServiceType.RAG_MEDICAL]: "rag",
       [AiServiceType.CUSTOM]: "custom"
     }
-    return categoryMap[serviceType] || "custom"
-  }
+    return (serviceType: AiServiceType): string => {
+      return categoryMap[serviceType] || "custom"
+    }
+  }, [])
 
-  const filteredServices = categoryFilter === "all" 
+  // Memoizar groupedServices para evitar recálculos desnecessários
+  // Usar stringify para comparar deep equality e evitar re-renders desnecessários
+  const serviceConfigsKey = useMemo(() => 
+    JSON.stringify(serviceConfigs.map(s => ({ id: s.id, providerId: s.providerId, model: s.model, isActive: s.isActive }))), 
+    [serviceConfigs]
+  )
+  
+  const groupedServices = useMemo(() => {
+    return serviceConfigs.reduce((acc, service) => {
+      const category = getServiceCategory(service.serviceType)
+      if (!acc[category]) {
+        acc[category] = []
+      }
+      acc[category].push(service)
+      return acc
+    }, {} as Record<string, AiServiceConfig[]>)
+  }, [serviceConfigsKey, getServiceCategory]) // Usar key ao invés de serviceConfigs diretamente
+
+  const filteredServices = useMemo(() => {
+    return categoryFilter === "all" 
     ? serviceConfigs 
     : groupedServices[categoryFilter] || []
+  }, [categoryFilter, serviceConfigs, groupedServices])
+
+  // Memoizar cálculos de estatísticas para evitar recálculos
+  const activeServicesCount = useMemo(() => 
+    serviceConfigs.filter(s => s.isActive).length, 
+    [serviceConfigs]
+  )
+  
+  const activeServicesPercentage = useMemo(() => 
+    serviceConfigs.length > 0 
+      ? Math.round((activeServicesCount / serviceConfigs.length) * 100) 
+      : 0, 
+    [activeServicesCount, serviceConfigs.length]
+  )
+  
+  const uniqueProvidersCount = useMemo(() => 
+    new Set(serviceConfigs.map(s => s.providerId)).size,
+    [serviceConfigs]
+  )
 
   if (loading && serviceConfigs.length === 0) {
     return (
@@ -244,11 +388,51 @@ export function ServicesTab() {
           </Select>
         </div>
 
-        <Button onClick={handleCreateService}>
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Serviço
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleTestBulkUpdate}
+            title="Teste automatizado: alterar todos os serviços de conversação para Gemini e Groq"
+          >
+            🧪 Testar Bulk Update
+          </Button>
+          <Button onClick={handleCreateService}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Serviço
+          </Button>
+        </div>
       </div>
+
+      {/* Bulk actions bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-3 p-3 border rounded-md">
+          <div className="flex items-center gap-2">
+            <Checkbox checked={isAllFilteredSelected} onCheckedChange={toggleSelectAllFiltered as any} />
+            <span className="text-sm text-muted-foreground">Selecionados: {selectedIds.size}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={bulkProviderId} onValueChange={setBulkProviderId}>
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="Selecionar Provedor" />
+              </SelectTrigger>
+              <SelectContent>
+                {providers.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.displayName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Modelo (opcional)"
+              value={bulkModel}
+              onChange={(e) => setBulkModel(e.target.value)}
+              className="w-56"
+            />
+            <Button disabled={!canBulkApply} onClick={handleBulkApply}>
+              Aplicar LLM
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -272,10 +456,10 @@ export function ServicesTab() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {serviceConfigs.filter(s => s.isActive).length}
+              {activeServicesCount}
             </div>
             <p className="text-xs text-muted-foreground">
-              {Math.round((serviceConfigs.filter(s => s.isActive).length / serviceConfigs.length) * 100)}% do total
+              {activeServicesPercentage}% do total
             </p>
           </CardContent>
         </Card>
@@ -302,7 +486,7 @@ export function ServicesTab() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {new Set(serviceConfigs.map(s => s.providerId)).size}
+              {uniqueProvidersCount}
             </div>
             <p className="text-xs text-muted-foreground">
               provedores em uso
@@ -352,15 +536,23 @@ export function ServicesTab() {
                     </div>
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {services.map((service) => (
-                        <ServiceCard
-                          key={service.id}
-                          serviceConfig={service}
-                          onEdit={handleEditService}
-                          onToggle={handleToggleService}
-                          onDuplicate={handleDuplicateService}
-                          onDelete={handleDeleteService}
-                          onTest={handleTestService}
-                        />
+                        <div key={service.id} className="flex items-start gap-3">
+                          <Checkbox
+                            checked={selectedIds.has(service.id)}
+                            onCheckedChange={() => toggleSelect(service.id)}
+                            className="mt-2"
+                          />
+                          <div className="flex-1">
+                            <ServiceCard
+                              serviceConfig={service}
+                              onEdit={handleEditService}
+                              onToggle={handleToggleService}
+                              onDuplicate={handleDuplicateService}
+                              onDelete={handleDeleteService}
+                              onTest={handleTestService}
+                            />
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -371,15 +563,23 @@ export function ServicesTab() {
             // Show filtered services
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredServices.map((service) => (
-                <ServiceCard
-                  key={service.id}
-                  serviceConfig={service}
-                  onEdit={handleEditService}
-                  onToggle={handleToggleService}
-                  onDuplicate={handleDuplicateService}
-                  onDelete={handleDeleteService}
-                  onTest={handleTestService}
-                />
+                <div key={service.id} className="flex items-start gap-3">
+                  <Checkbox
+                    checked={selectedIds.has(service.id)}
+                    onCheckedChange={() => toggleSelect(service.id)}
+                    className="mt-2"
+                  />
+                  <div className="flex-1">
+                    <ServiceCard
+                      serviceConfig={service}
+                      onEdit={handleEditService}
+                      onToggle={handleToggleService}
+                      onDuplicate={handleDuplicateService}
+                      onDelete={handleDeleteService}
+                      onTest={handleTestService}
+                    />
+                  </div>
+                </div>
               ))}
             </div>
           )}

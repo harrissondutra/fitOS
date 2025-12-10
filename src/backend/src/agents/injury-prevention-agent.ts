@@ -5,7 +5,7 @@
 
 import { logger } from '../utils/logger';
 import { AiClientFactory } from '../services/ai-client.factory';
-import { AiServiceType } from '@/shared/types/ai.types';
+import { AiServiceType } from '../../../shared/types/ai.types';
 
 export interface InjuryPreventionData {
   workoutHistory?: any[];
@@ -59,7 +59,7 @@ export class InjuryPreventionAgent {
       );
 
       // 3. Parsear resposta
-      const analysis = this.parseAIResponse(response);
+      const analysis = this.parseAIResponse(response.content);
 
       logger.info('Injury risk analyzed', {
         riskLevel: analysis.riskLevel,

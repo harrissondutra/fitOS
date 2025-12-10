@@ -7,12 +7,12 @@
  */
 
 import { AiClientFactory } from '../ai-client.factory';
-import { AiServiceType } from '../../../shared/types/ai.types';
+import { AiServiceType } from '../../../../shared/types/ai.types';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../../utils/logger';
 import { mealPlanService } from './meal-plan.service';
 
-const prisma = new PrismaClient();
+import { getPrismaClient } from '../../config/database';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -37,9 +37,18 @@ export interface NutritionCoachContext {
 
 export class AINutritionCoachService {
   private aiFactory: AiClientFactory;
+  private _prisma: ReturnType<typeof getPrismaClient> | null = null;
 
   constructor() {
     this.aiFactory = new AiClientFactory();
+  }
+
+  // Lazy getter para PrismaClient
+  private get prisma() {
+    if (!this._prisma) {
+      this._prisma = getPrismaClient();
+    }
+    return this._prisma;
   }
 
   /**
@@ -104,7 +113,7 @@ export class AINutritionCoachService {
   private async getClientContext(clientId: string): Promise<NutritionCoachContext> {
     try {
       // 1. Buscar cliente
-      const client = await prisma.nutritionClient.findUnique({
+      const client = await this.prisma.nutritionClient.findUnique({
         where: { id: clientId },
         include: {
           mealPlans: {
@@ -119,7 +128,7 @@ export class AINutritionCoachService {
       
       // 3. Buscar progresso do dia
       const today = new Date();
-      const summary = await prisma.foodDiaryEntry.aggregate({
+      const summary = await this.prisma.foodDiaryEntry.aggregate({
         where: {
           clientId,
           consumedAt: {
@@ -128,8 +137,7 @@ export class AINutritionCoachService {
           }
         },
         _sum: {
-          calories: true,
-          protein: true
+          calories: true
         }
       });
 
@@ -142,11 +150,11 @@ export class AINutritionCoachService {
         },
         currentProgress: {
           calories: summary._sum.calories || 0,
-          protein: summary._sum.protein || 0,
+          protein: 0,
           adherence: 0 // Calculado separadamente
         },
         dietaryRestrictions: (client?.dietaryRestrictions as string[]) || [],
-        preferences: (client?.preferences as string[]) || []
+        preferences: []
       };
     } catch (error) {
       logger.error('Error getting client context:', error);

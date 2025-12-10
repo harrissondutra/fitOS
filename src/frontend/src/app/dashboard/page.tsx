@@ -5,210 +5,495 @@ export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 export const runtime = 'nodejs'
 export const preferredRegion = 'auto'
-// Desabilitar pre-rendering estático para esta página
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-// import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import ModeToggle from '@/components/mode-toggle';
-import { toastUtils } from '@/lib/toast-utils';
-import { 
-  Dumbbell, 
-  Brain, 
-  Users, 
-  BarChart3, 
-  Zap, 
-  // ArrowRight, 
-  Play, 
-  Calendar, 
-  Target, 
-  TrendingUp 
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/use-auth';
+import { useWorkouts } from '@/hooks/use-workouts';
+import { useAnalytics } from '@/hooks/use-analytics';
+import {
+  Dumbbell,
+  Zap,
+  Calendar,
+  TrendingDown,
+  TrendingUp,
+  Target,
+  Flame,
+  Trophy,
+  Award,
+  Check,
+  Circle,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Area,
+  AreaChart,
+  ReferenceLine,
+  Cell
+} from 'recharts';
+import { format, subDays, startOfWeek, isAfter, isBefore } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import './animations.css';
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  const { user } = useAuth();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Buscar dados reais de workouts
+  const { treinos: workouts, loading: workoutsLoading } = useWorkouts({
+    filters: { clientId: user?.id },
+    enabled: !!user?.id
+  });
 
-  if (!mounted) {
-    return null;
+  // Buscar dados reais de analytics
+  const { analytics, loading: analyticsLoading } = useAnalytics({
+    clientId: user?.id,
+    enabled: !!user?.id
+  });
+
+  const loading = workoutsLoading || analyticsLoading;
+
+  // Calcular estatísticas reais dos dados
+  const dashboardStats = useMemo(() => {
+    if (!workouts || !analytics) {
+      return {
+        workoutsTotal: 0,
+        workoutsChange: 0,
+        caloriesBurned: 0,
+        caloriesChange: 0,
+        trainingTime: 0,
+        timeChange: 0,
+        weightCurrent: 0,
+        weightChange: 0,
+        weightGoal: 0,
+        streak: 0,
+        completedDays: []
+      };
+    }
+
+    // Total de treinos completados
+    const completedWorkouts = workouts.filter((w: any) => w.completed);
+    const totalWorkouts = completedWorkouts.length;
+
+    // Calorias queimadas
+    const totalCalories = completedWorkouts.reduce((sum: number, w: any) =>
+      sum + (w.caloriesBurned || 0), 0
+    );
+
+    // Tempo total de treino (em minutos)
+    const totalTime = completedWorkouts.reduce((sum: number, w: any) =>
+      sum + (w.duration || 0), 0
+    );
+
+    // Calcular streak (sequência de dias consecutivos)
+    const today = new Date();
+    let streak = 0;
+    let currentDate = new Date(today);
+
+    const workoutDates = new Set(
+      completedWorkouts.map((w: any) =>
+        format(new Date(w.completedAt || w.createdAt), 'yyyy-MM-dd')
+      )
+    );
+
+    while (workoutDates.has(format(currentDate, 'yyyy-MM-dd'))) {
+      streak++;
+      currentDate = subDays(currentDate, 1);
+    }
+
+    // Dias completados na semana atual (0=Dom, 1=Seg, ..., 6=Sáb)
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Começa na segunda
+    const completedDaysThisWeek = [];
+
+    for (let i = 0; i < 7; i++) {
+      const dayDate = subDays(new Date(), new Date().getDay() - 1 - i);
+      const dayStr = format(dayDate, 'yyyy-MM-dd');
+      if (workoutDates.has(dayStr)) {
+        completedDaysThisWeek.push(i);
+      }
+    }
+
+    // Peso atual e meta (do analytics ou user profile)
+    const weightCurrent = analytics?.currentWeight || user?.profile?.weight || 0;
+    const weightGoal = analytics?.goalWeight || user?.profile?.goalWeight || 0;
+    const weightChange = analytics?.weightChange || 0;
+
+    // Alterações percentuais (comparar com mês anterior)
+    const lastMonthWorkouts = analytics?.lastMonthWorkouts || 0;
+    const workoutsChange = lastMonthWorkouts > 0
+      ? Math.round(((totalWorkouts - lastMonthWorkouts) / lastMonthWorkouts) * 100)
+      : 0;
+
+    const lastMonthCalories = analytics?.lastMonthCalories || 0;
+    const caloriesChange = lastMonthCalories > 0
+      ? Math.round(((totalCalories - lastMonthCalories) / lastMonthCalories) * 100)
+      : 0;
+
+    const lastMonthTime = analytics?.lastMonthTime || 0;
+    const timeChange = lastMonthTime > 0
+      ? Math.round(((totalTime - lastMonthTime) / lastMonthTime) * 100)
+      : 0;
+
+    return {
+      workoutsTotal: totalWorkouts,
+      workoutsChange,
+      caloriesBurned: totalCalories,
+      caloriesChange,
+      trainingTime: totalTime,
+      timeChange,
+      weightCurrent,
+      weightChange,
+      weightGoal,
+      streak,
+      completedDays: completedDaysThisWeek
+    };
+  }, [workouts, analytics, user]);
+
+  // Mensagem motivacional dinâmica
+  const motivationalMessage = useMemo(() => {
+    if (dashboardStats.streak >= 7) {
+      return `🔥 Você está pegando fogo! ${dashboardStats.streak} dias seguidos!`;
+    }
+    if (dashboardStats.weightChange < 0) {
+      return `🎯 Incrível! Você já perdeu ${Math.abs(dashboardStats.weightChange).toFixed(1)}kg!`;
+    }
+    if (dashboardStats.completedDays.length >= 5) {
+      return "💪 Semana forte! Continue assim!";
+    }
+    return "👋 Pronto para mais um treino incrível?";
+  }, [dashboardStats]);
+
+  // Dados para gráfico de evolução de peso (últimos 30 dias do analytics)
+  const weightData = useMemo(() => {
+    if (!analytics?.weightHistory || analytics.weightHistory.length === 0) {
+      // Se não houver dados, retornar array vazio
+      return [];
+    }
+
+    return analytics.weightHistory.slice(-30).map((entry: any) => ({
+      date: format(new Date(entry.date), 'dd/MM', { locale: ptBR }),
+      weight: entry.weight
+    }));
+  }, [analytics]);
+
+  // Dados para gráfico de treinos por semana (últimas 4 semanas)
+  const workoutsData = useMemo(() => {
+    if (!workouts || workouts.length === 0) {
+      return [];
+    }
+
+    const weeks = [];
+    const today = new Date();
+
+    for (let i = 3; i >= 0; i--) {
+      const weekStart = subDays(today, (i + 1) * 7);
+      const weekEnd = subDays(today, i * 7);
+
+      const weekWorkouts = workouts.filter((w: any) => {
+        const workoutDate = new Date(w.completedAt || w.createdAt);
+        return isAfter(workoutDate, weekStart) && isBefore(workoutDate, weekEnd) && w.completed;
+      });
+
+      weeks.push({
+        week: `Sem ${4 - i}`,
+        workouts: weekWorkouts.length
+      });
+    }
+
+    return weeks;
+  }, [workouts]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 p-6">
+        <Skeleton className="h-20 w-full" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Bem-vindo ao seu painel de controle FitOS
-          </p>
+          <h1 className="text-3xl font-bold gradient-text">
+            Bem-vindo de volta, {user?.firstName || 'Usuário'}!
+          </h1>
+          <p className="text-muted-foreground mt-1">{motivationalMessage}</p>
         </div>
-        <div className="flex items-center space-x-4">
-          <ModeToggle />
-          <Button variant="ghost" onClick={() => router.push('/auth/login')}>
-            Sair
-          </Button>
-        </div>
+        {dashboardStats.streak > 0 && (
+          <Badge variant="outline" className="h-fit px-4 py-2 bg-orange-500/10 border-orange-500/20">
+            <Flame className="w-4 h-4 mr-2 text-orange-500" />
+            Sequência: {dashboardStats.streak} dias
+          </Badge>
+        )}
       </div>
 
-      {/* Main Content */}
-      <div className="space-y-6">
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Treinos */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-500/10 via-purple-500/5 to-pink-500/10 border-blue-200/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 stagger-1">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Dumbbell className="w-4 h-4 text-blue-500" />
+              Treinos Completos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              {dashboardStats.workoutsTotal}
+            </div>
+            {dashboardStats.workoutsChange !== 0 && (
+              <Badge className={`mt-2 border-0 ${dashboardStats.workoutsChange > 0 ? 'bg-green-500/10 text-green-700' : 'bg-red-500/10 text-red-700'}`}>
+                {dashboardStats.workoutsChange > 0 ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                {Math.abs(dashboardStats.workoutsChange)}% vs mês passado
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Treinos Hoje</CardTitle>
-              <Dumbbell className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">
-                +0% em relação ao mês passado
+        {/* Card 2: Calorias */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-orange-500/10 via-red-500/5 to-pink-500/10 border-orange-200/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 stagger-2">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-400/20 to-red-400/20 rounded-full blur-3xl" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Zap className="w-4 h-4 text-orange-500" />
+              Calorias Queimadas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+              {(dashboardStats.caloriesBurned / 1000).toFixed(1)}k
+            </div>
+            {dashboardStats.caloriesChange !== 0 && (
+              <Badge className={`mt-2 border-0 ${dashboardStats.caloriesChange > 0 ? 'bg-green-500/10 text-green-700' : 'bg-red-500/10 text-red-700'}`}>
+                {dashboardStats.caloriesChange > 0 ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                {Math.abs(dashboardStats.caloriesChange)}% vs mês passado
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Tempo */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-green-500/10 via-emerald-500/5 to-teal-500/10 border-green-200/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 stagger-3">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400/20 to-emerald-400/20 rounded-full blur-3xl" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-green-500" />
+              Tempo de Treino
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+              {Math.floor(dashboardStats.trainingTime / 60)}h
+            </div>
+            {dashboardStats.timeChange !== 0 && (
+              <Badge className={`mt-2 border-0 ${dashboardStats.timeChange > 0 ? 'bg-green-500/10 text-green-700' : 'bg-red-500/10 text-red-700'}`}>
+                {dashboardStats.timeChange > 0 ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                {Math.abs(dashboardStats.timeChange)}% vs mês passado
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Peso */}
+        <Card className="relative overflow-hidden bg-gradient-to-br from-purple-500/10 via-pink-500/5 to-rose-500/10 border-purple-200/20 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 stagger-4">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-400/20 to-pink-400/20 rounded-full blur-3xl" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-purple-500" />
+              Peso Atual
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              {dashboardStats.weightCurrent > 0 ? `${dashboardStats.weightCurrent.toFixed(1)}kg` : '--'}
+            </div>
+            {dashboardStats.weightGoal > 0 && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Meta: {dashboardStats.weightGoal}kg {dashboardStats.weightChange !== 0 && `(${dashboardStats.weightChange > 0 ? '+' : ''}${dashboardStats.weightChange.toFixed(1)}kg)`}
               </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Calorias Queimadas</CardTitle>
-              <Zap className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">
-                +0% em relação ao mês passado
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tempo de Treino</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0min</div>
-              <p className="text-xs text-muted-foreground">
-                +0% em relação ao mês passado
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Objetivos</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0/5</div>
-              <p className="text-xs text-muted-foreground">
-                +0% em relação ao mês passado
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ações Rápidas</CardTitle>
-              <CardDescription>
-                Comece seu treino ou explore recursos
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button className="w-full" onClick={() => toastUtils.comingSoon('Treinos personalizados')}>
-                <Play className="mr-2 h-4 w-4" />
-                Iniciar Treino
-              </Button>
-              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
-                <Brain className="mr-2 h-4 w-4" />
-                Recomendações IA
-              </Button>
-              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
-                <BarChart3 className="mr-2 h-4 w-4" />
-                Ver Estatísticas
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Próximos Passos</CardTitle>
-              <CardDescription>
-                Configure sua conta para começar
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-primary rounded-full"></div>
-                <span className="text-sm">Complete seu perfil</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-muted rounded-full"></div>
-                <span className="text-sm text-muted-foreground">Configure seus objetivos</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-muted rounded-full"></div>
-                <span className="text-sm text-muted-foreground">Adicione suas medidas</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Features Preview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center space-x-2">
-                <Brain className="h-5 w-5 text-blue-500" />
-                <CardTitle>Personal Trainer IA</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <CardDescription>
-                Receba recomendações personalizadas de treinos alimentadas por IA.
-              </CardDescription>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center space-x-2">
-                <Users className="h-5 w-5 text-green-500" />
-                <CardTitle>Multi-Inquilino</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <CardDescription>
-                Perfeito para academias e personal trainers.
-              </CardDescription>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="h-5 w-5 text-purple-500" />
-                <CardTitle>Analytics</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <CardDescription>
-                Acompanhe seu progresso com insights detalhados.
-              </CardDescription>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Charts */}
+      {(weightData.length > 0 || workoutsData.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Weight Chart */}
+          {weightData.length > 0 && (
+            <Card className="animate-slide-up">
+              <CardHeader>
+                <CardTitle>Evolução de Peso</CardTitle>
+                <CardDescription>
+                  Últimos {weightData.length} dias
+                  {dashboardStats.weightGoal > 0 && ` • Meta: ${dashboardStats.weightGoal}kg`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <AreaChart data={weightData}>
+                    <defs>
+                      <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="opacity-50" />
+                    <XAxis dataKey="date" stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                    <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} domain={['dataMin - 2', 'dataMax + 2']} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="weight"
+                      stroke="#8b5cf6"
+                      strokeWidth={3}
+                      fill="url(#weightGradient)"
+                      animationDuration={1500}
+                    />
+                    {dashboardStats.weightGoal > 0 && (
+                      <ReferenceLine
+                        y={dashboardStats.weightGoal}
+                        stroke="#10b981"
+                        strokeDasharray="5 5"
+                        label={{ value: 'Meta', fill: '#10b981', fontSize: 12 }}
+                      />
+                    )}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Workouts Chart */}
+          {workoutsData.length > 0 && (
+            <Card className="animate-slide-up">
+              <CardHeader>
+                <CardTitle>Treinos por Semana</CardTitle>
+                <CardDescription>Últimas 4 semanas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={workoutsData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="opacity-50" />
+                    <XAxis dataKey="week" stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                    <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Bar
+                      dataKey="workouts"
+                      radius={[8, 8, 0, 0]}
+                      animationDuration={1000}
+                    >
+                      {workoutsData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.workouts >= 5 ? "#10b981" : "#f59e0b"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Weekly Streak */}
+      {dashboardStats.completedDays.length > 0 && (
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 animate-slide-up">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-500" />
+              Sequência Semanal
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-around items-center">
+              {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((day, idx) => (
+                <div key={day} className="flex flex-col items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-medium">{day}</span>
+                  {dashboardStats.completedDays.includes(idx) ? (
+                    <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center animate-bounce-in shadow-lg">
+                      <Check className="w-6 h-6 text-white" />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center">
+                      <Circle className="w-6 h-6 text-gray-300" />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 text-center">
+              <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20 px-4 py-2">
+                <TrendingUp className="w-4 h-4 mr-2" />
+                {dashboardStats.completedDays.length}/7 treinos • Continue assim! 🔥
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Achievements */}
+      {(dashboardStats.streak > 0 || dashboardStats.workoutsTotal > 0 || Math.abs(dashboardStats.weightChange) > 0) && (
+        <Card className="animate-slide-up">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-yellow-500" />
+              Conquistas Recentes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {dashboardStats.streak > 0 && (
+                <Badge className="px-4 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:scale-110 transition-transform cursor-pointer whitespace-nowrap">
+                  <Trophy className="w-4 h-4 mr-2" />
+                  {dashboardStats.streak} dias seguidos
+                </Badge>
+              )}
+              {dashboardStats.workoutsTotal > 0 && (
+                <Badge className="px-4 py-3 bg-gradient-to-r from-blue-400 to-purple-500 text-white hover:scale-110 transition-transform cursor-pointer whitespace-nowrap">
+                  <Award className="w-4 h-4 mr-2" />
+                  {dashboardStats.workoutsTotal} treinos
+                </Badge>
+              )}
+              {Math.abs(dashboardStats.weightChange) > 0 && (
+                <Badge className="px-4 py-3 bg-gradient-to-r from-green-400 to-teal-500 text-white hover:scale-110 transition-transform cursor-pointer whitespace-nowrap">
+                  <TrendingDown className="w-4 h-4 mr-2" />
+                  {Math.abs(dashboardStats.weightChange).toFixed(1)}kg {dashboardStats.weightChange < 0 ? 'perdidos' : 'ganhos'}
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

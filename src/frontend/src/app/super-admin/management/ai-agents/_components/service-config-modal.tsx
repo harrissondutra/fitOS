@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -456,9 +456,19 @@ export function ServiceConfigModal({
 
   const [error, setError] = useState<string | null>(null)
 
-  // Initialize form data when modal opens
+  // Initialize form data when modal opens - usar ref para evitar loops
+  const prevIsOpenRef = React.useRef(false);
+  const prevServiceConfigIdRef = React.useRef<string | undefined>(undefined);
+  
   useEffect(() => {
-    if (isOpen) {
+    // Só inicializar quando modal abrir (mudança de false para true) ou quando serviceConfig mudar
+    const isOpening = !prevIsOpenRef.current && isOpen;
+    const serviceConfigChanged = serviceConfig?.id !== prevServiceConfigIdRef.current;
+    
+    if (isOpen && (isOpening || serviceConfigChanged)) {
+      prevIsOpenRef.current = isOpen;
+      prevServiceConfigIdRef.current = serviceConfig?.id;
+      
       if (serviceConfig) {
         // Edit mode
         setFormData({
@@ -472,6 +482,7 @@ export function ServiceConfigModal({
           maxRequestsPerMinute: serviceConfig.maxRequestsPerMinute || 60,
           costPerRequest: serviceConfig.costPerRequest || 0.001
         })
+        prevServiceTypeRef.current = serviceConfig.serviceType;
       } else {
         // Create mode - reset to defaults
         setFormData({
@@ -485,25 +496,51 @@ export function ServiceConfigModal({
           maxRequestsPerMinute: 60,
           costPerRequest: 0.001
         })
+        prevServiceTypeRef.current = AiServiceType.CHAT;
       }
       setError(null)
+      isUpdatingRef.current = false;
+    }
+    
+    if (!isOpen) {
+      prevIsOpenRef.current = false;
     }
   }, [isOpen, serviceConfig])
 
-  // Update form when service type changes
+  // Update form when service type changes - usar ref para evitar loops
+  const prevServiceTypeRef = React.useRef<string | undefined>(undefined);
+  const isUpdatingRef = React.useRef(false);
+  
   useEffect(() => {
-    if (formData.serviceType) {
+    // Proteção contra loops: só atualizar se realmente mudou e não está atualizando
+    if (isUpdatingRef.current) return;
+    
+    if (formData.serviceType && formData.serviceType !== prevServiceTypeRef.current) {
+      isUpdatingRef.current = true;
+      prevServiceTypeRef.current = formData.serviceType;
       const template = SERVICE_TEMPLATES[formData.serviceType]
       if (template) {
-        setFormData(prev => ({
-          ...prev,
-          serviceName: prev.serviceName || template.name,
-          model: prev.model || template.defaultModel,
-          priority: prev.priority || template.defaultPriority,
-          maxRequestsPerMinute: prev.maxRequestsPerMinute || template.defaultRateLimit,
-          costPerRequest: prev.costPerRequest || template.defaultCost,
-          config: prev.config || template.config
-        }))
+        setFormData(prev => {
+          // Só atualizar campos vazios para não sobrescrever dados do usuário
+          const shouldUpdate = !prev.serviceName || !prev.model || !prev.providerId;
+          if (!shouldUpdate) {
+            isUpdatingRef.current = false;
+            return prev;
+          }
+          
+          isUpdatingRef.current = false;
+          return {
+            ...prev,
+            serviceName: prev.serviceName || template.name,
+            model: prev.model || template.defaultModel,
+            priority: prev.priority || template.defaultPriority,
+            maxRequestsPerMinute: prev.maxRequestsPerMinute || template.defaultRateLimit,
+            costPerRequest: prev.costPerRequest || template.defaultCost,
+            config: prev.config && Object.keys(prev.config).length > 0 ? prev.config : template.config
+          }
+        })
+      } else {
+        isUpdatingRef.current = false;
       }
     }
   }, [formData.serviceType])

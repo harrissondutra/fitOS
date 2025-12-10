@@ -10,10 +10,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { 
-  User, 
-  LoginRequest, 
-  SignupRequest, 
+import {
+  User,
+  LoginRequest,
+  SignupRequest,
   AuthResponse,
   DEFAULT_ROLE_REDIRECTS,
   AUTH_CONSTANTS
@@ -29,7 +29,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isInitialized: boolean;
-  
+
   // Ações
   login: (credentials: LoginRequest) => Promise<boolean>;
   signup: (data: SignupRequest) => Promise<boolean>;
@@ -40,7 +40,7 @@ interface AuthContextType {
   resetPassword: (token: string, password: string, confirmPassword: string) => Promise<boolean>;
   fetchMe: () => Promise<User | null>;
   setAuthData: (data: { accessToken: string; refreshToken: string; isAuthenticated: boolean }) => void;
-  
+
   // Utilitários
   hasRole: (roles: string[]) => boolean;
   canAccess: (requiredRoles: string[]) => boolean;
@@ -63,13 +63,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter();
-  
+
   // Estado
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
-  
+
   // Atividade do usuário
   const [lastActivity, setLastActivity] = useState<number>(Date.now());
   const [activityTimer, setActivityTimer] = useState<any | null>(null);
@@ -79,19 +79,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // ============================================================================
 
   const saveTokens = useCallback((accessToken: string, refreshToken: string) => {
-    console.log('💾 Salvando tokens:', { 
-      accessToken: accessToken?.substring(0, 20) + '...', 
+    console.log('💾 Salvando tokens:', {
+      accessToken: accessToken?.substring(0, 20) + '...',
       refreshToken: refreshToken?.substring(0, 20) + '...'
     });
-    
+
     // Salvar no localStorage
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
-    
+
     // Salvar em cookies para o middleware (sem SameSite para evitar problemas)
     document.cookie = `accessToken=${accessToken}; path=/; max-age=3600`;
     document.cookie = `refreshToken=${refreshToken}; path=/; max-age=604800`;
-    
+
     console.log('✅ Tokens salvos com sucesso');
     console.log('🍪 Cookies definidos:', document.cookie);
   }, []);
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
-    
+
     // Limpar cookies
     document.cookie = 'accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     document.cookie = 'refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
@@ -115,31 +115,60 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return null;
       }
 
+      const tenantId = localStorage.getItem('tenantId') || process.env.NEXT_PUBLIC_TENANT_ID || 'sistema';
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/me`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
+          ...(tenantId ? { 'X-Tenant-Id': String(tenantId) } : {}),
         },
         credentials: 'include',
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
+        if (response.status === 401 || response.status === 403) {
+          // Tentar parsear resposta de erro para verificar mensagem específica
+          let errorMessage = '';
+          try {
+            const errJson = await response.clone().json();
+            errorMessage = errJson?.message || errJson?.error || '';
+          } catch { }
+
+          const isTokenExpired = errorMessage === 'TOKEN_EXPIRED' ||
+            errorMessage?.includes('expired') ||
+            errorMessage?.includes('expirou') ||
+            response.status === 401;
+
           console.log('🔍 fetchMe - Token inválido ou expirado, limpando dados de autenticação');
-          // Limpar dados de autenticação inválidos
+
+          // Limpar todos os dados de autenticação
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
+          localStorage.removeItem('fitos_tokens');
           localStorage.removeItem('user');
+          localStorage.removeItem('tenantId');
           setUser(null);
           setIsAuthenticated(false);
+
+          // Redirecionar para login se for token expirado
+          if (isTokenExpired && typeof window !== 'undefined') {
+            window.location.href = '/auth/login';
+          }
+
           return null;
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let serverMsg = '';
+        try {
+          const errJson = await response.json();
+          serverMsg = errJson?.message || errJson?.error || '';
+        } catch { }
+        console.warn('fetchMe not ok:', response.status, serverMsg);
+        return null;
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         console.log('🔍 fetchMe - Dados do usuário obtidos:', data.user);
         return data.user;
@@ -159,13 +188,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Chamar API de logout
       const accessToken = localStorage.getItem('accessToken');
       if (accessToken) {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/logout`, {
+        const tenantId = localStorage.getItem('tenantId') || process.env.NEXT_PUBLIC_TENANT_ID || 'sistema';
+        const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/logout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
+            ...(tenantId ? { 'X-Tenant-Id': String(tenantId) } : {}),
           },
         });
+        if (!resp.ok) {
+          // Não bloquear logout local por falha remota
+          try { await resp.json(); } catch { }
+        }
       }
     } catch (error) {
       console.error('Erro no logout:', error);
@@ -174,16 +209,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(null);
       setIsAuthenticated(false);
       clearTokens();
-      
+
       // Parar timer de atividade
       if (activityTimer) {
         clearInterval(activityTimer);
         setActivityTimer(null);
       }
-      
+
       // Redirecionar para login
       router.push('/auth/login');
-      
+
       toast.success('Logout realizado com sucesso');
     }
   }, [router, clearTokens, activityTimer]); // Incluído activityTimer
@@ -191,7 +226,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const checkInactivity = useCallback(() => {
     const now = Date.now();
     const timeSinceLastActivity = now - lastActivity;
-    
+
     if (timeSinceLastActivity > AUTH_CONSTANTS.SESSION_TIMEOUT) {
       toast.warning('Sessão expirada', {
         description: 'Você foi desconectado por inatividade'
@@ -218,42 +253,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = useCallback(async (credentials: LoginRequest): Promise<boolean> => {
     try {
       setIsLoading(true);
-      
-      const apiUrl = 'http://localhost:3001';
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       console.log('🔗 Tentando conectar com:', `${apiUrl}/api/auth/login`);
       console.log('📤 Dados enviados:', credentials);
-      
+
+      const tenantId = localStorage.getItem('tenantId') || process.env.NEXT_PUBLIC_TENANT_ID || 'sistema';
       const response = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          ...(tenantId ? { 'X-Tenant-Id': String(tenantId) } : {}),
         },
         mode: 'cors',
         credentials: 'include',
         body: JSON.stringify(credentials),
       });
-      
+
       console.log('📥 Resposta recebida:', response.status, response.statusText);
-      
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let serverMsg = '';
+        try {
+          const errJson = await response.json();
+          serverMsg = errJson?.message || errJson?.error || '';
+        } catch { }
+        const statusMsg = response.status === 503
+          ? 'Serviço temporariamente indisponível. Tente novamente em instantes.'
+          : response.status === 429
+            ? 'Muitas tentativas. Aguarde e tente novamente.'
+            : `Erro do servidor (status ${response.status}).`;
+        const composed = serverMsg ? `${statusMsg} ${serverMsg}` : statusMsg;
+        throw new Error(composed);
       }
 
       const data: AuthResponse = await response.json();
 
       if (data.success) {
         console.log('✅ Login bem-sucedido!', data.user);
-        
+
         // Salvar dados
         setUser(data.user);
         setIsAuthenticated(true);
         saveTokens(data.accessToken, data.refreshToken);
         setLastActivity(Date.now());
-        
+
         // Salvar usuário no localStorage
         localStorage.setItem('user', JSON.stringify(data.user));
-        
+
         console.log('🔔 Mostrando toast de sucesso...');
         toast.success('Login realizado com sucesso!', {
           description: `Bem-vindo, ${data.user.firstName || data.user.email}!`
@@ -262,15 +310,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Atualizar estado de autenticação
         setUser(data.user);
         setIsAuthenticated(true);
-        
+
         // Redirecionar após um pequeno delay para garantir que os cookies sejam definidos
         const redirectPath = getRedirectPathByRole(data.user.role);
         console.log('🔄 Redirecionando para:', redirectPath);
-        
+
         setTimeout(() => {
           router.push(redirectPath);
         }, 100);
-        
+
         return true;
       } else {
         toast.error('Erro no login', {
@@ -282,19 +330,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('❌ Erro no login:', error);
       console.error('❌ Tipo do erro:', typeof error);
       console.error('❌ Mensagem do erro:', error instanceof Error ? error.message : String(error));
-      
+
       let errorMessage = 'Erro de conexão. Verifique se o servidor está rodando.';
-      
+
       if (error instanceof Error) {
         if (error.message.includes('Failed to fetch')) {
           errorMessage = 'Não foi possível conectar ao servidor. Verifique se o backend está rodando na porta 3001.';
-        } else if (error.message.includes('HTTP error')) {
-          errorMessage = 'Erro do servidor. Tente novamente.';
+        } else if (error.message.includes('temporariamente indisponível') || error.message.includes('503')) {
+          errorMessage = error.message;
+        } else if (error.message.toLowerCase().includes('erro do servidor') || /status\s*\d+/.test(error.message)) {
+          errorMessage = error.message;
         } else {
           errorMessage = error.message;
         }
       }
-      
+
       toast.error('Erro no login', {
         description: errorMessage
       });
@@ -307,14 +357,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signup = useCallback(async (data: SignupRequest): Promise<boolean> => {
     try {
       setIsLoading(true);
-      
+
+      const tenantId = localStorage.getItem('tenantId') || process.env.NEXT_PUBLIC_TENANT_ID || 'sistema';
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(tenantId ? { 'X-Tenant-Id': String(tenantId) } : {}),
         },
         body: JSON.stringify(data),
       });
+
+      if (!response.ok) {
+        let serverMsg = '';
+        try {
+          const errJson = await response.json();
+          serverMsg = errJson?.message || errJson?.error || '';
+        } catch { }
+        const statusMsg = response.status === 429
+          ? 'Muitas tentativas. Aguarde e tente novamente.'
+          : response.status === 503
+            ? 'Serviço temporariamente indisponível. Tente novamente em instantes.'
+            : `Erro do servidor (status ${response.status}).`;
+        toast.error('Erro no cadastro', { description: serverMsg || statusMsg });
+        return false;
+      }
 
       const result: AuthResponse = await response.json();
 
@@ -324,14 +391,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setIsAuthenticated(true);
         saveTokens(result.accessToken, result.refreshToken);
         setLastActivity(Date.now());
-        
+
         toast.success('Conta criada com sucesso!', {
           description: `Bem-vindo ao FitOS, ${result.user.firstName}!`
         });
 
-        // Redirecionar
-        router.push('/dashboard');
-        
+        // Verificar se requer validação de email
+        if (!result.requiresEmailVerification) {
+          router.push('/dashboard');
+        }
+
         return true;
       } else {
         toast.error('Erro no cadastro', {
@@ -356,22 +425,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('🔍 refreshToken: Iniciando renovação de token');
       const refreshTokenValue = localStorage.getItem('refreshToken');
       console.log('🔍 refreshToken: Refresh token existe:', refreshTokenValue ? 'sim' : 'não');
-      
+
       if (!refreshTokenValue) {
         console.log('🔍 refreshToken: Nenhum refresh token encontrado');
         return false;
       }
 
       console.log('🔍 refreshToken: Fazendo requisição para renovar token');
+      const tenantId = localStorage.getItem('tenantId') || process.env.NEXT_PUBLIC_TENANT_ID || 'sistema';
       const response = await fetch('/api/auth/refresh', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(tenantId ? { 'X-Tenant-Id': String(tenantId) } : {}),
         },
         body: JSON.stringify({ refreshToken: refreshTokenValue }),
       });
 
       console.log('🔍 refreshToken: Resposta recebida:', response.status);
+      if (!response.ok) {
+        let serverMsg = '';
+        try { const j = await response.json(); serverMsg = j?.message || j?.error || ''; } catch { }
+        console.warn('refreshToken falhou:', response.status, serverMsg);
+        await logout();
+        return false;
+      }
       const data = await response.json();
       console.log('🔍 refreshToken: Dados da resposta:', data);
 
@@ -427,12 +505,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const forgotPassword = useCallback(async (email: string): Promise<boolean> => {
     try {
       setIsLoading(true);
-      
+
+      const tenantId = localStorage.getItem('tenantId') || process.env.NEXT_PUBLIC_TENANT_ID || 'sistema';
       const response = await fetch('/api/auth/forgot-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          ...(tenantId ? { 'X-Tenant-Id': String(tenantId) } : {}),
         },
         mode: 'cors',
         credentials: 'include',
@@ -440,11 +520,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let serverMsg = '';
+        try {
+          const errJson = await response.json();
+          serverMsg = errJson?.message || errJson?.error || '';
+        } catch { }
+        const statusMsg = response.status === 429
+          ? 'Muitas tentativas. Aguarde e tente novamente.'
+          : response.status === 503
+            ? 'Serviço temporariamente indisponível. Tente novamente em instantes.'
+            : `Erro do servidor (status ${response.status}).`;
+        toast.error('Erro', { description: serverMsg || statusMsg });
+        return false;
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         toast.success('Email enviado', {
           description: 'Verifique sua caixa de entrada para redefinir sua senha.'
@@ -470,19 +561,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const resetPassword = useCallback(async (token: string, password: string, confirmPassword: string): Promise<boolean> => {
     try {
       setIsLoading(true);
-      
+
       if (password !== confirmPassword) {
         toast.error('Erro', {
           description: 'As senhas não coincidem'
         });
         return false;
       }
-      
+
+      const tenantId = localStorage.getItem('tenantId') || process.env.NEXT_PUBLIC_TENANT_ID || 'sistema';
       const response = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          ...(tenantId ? { 'X-Tenant-Id': String(tenantId) } : {}),
         },
         mode: 'cors',
         credentials: 'include',
@@ -490,11 +583,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let serverMsg = '';
+        try {
+          const errJson = await response.json();
+          serverMsg = errJson?.message || errJson?.error || '';
+        } catch { }
+        const statusMsg = response.status === 429
+          ? 'Muitas tentativas. Aguarde e tente novamente.'
+          : response.status === 503
+            ? 'Serviço temporariamente indisponível. Tente novamente em instantes.'
+            : `Erro do servidor (status ${response.status}).`;
+        toast.error('Erro', { description: serverMsg || statusMsg });
+        return false;
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         toast.success('Senha redefinida', {
           description: 'Sua senha foi redefinida com sucesso. Você pode fazer login agora.'
@@ -536,7 +640,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error('Erro ao carregar usuário do localStorage:', error);
     }
-    
+
     setIsInitialized(true);
     setIsLoading(false);
   }, []);
@@ -554,7 +658,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const events = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'];
       let lastActivityTime = 0;
       const THROTTLE_MS = 1000; // Throttle de 1 segundo
-      
+
       const handleActivity = () => {
         const now = Date.now();
         if (now - lastActivityTime > THROTTLE_MS) {
@@ -595,10 +699,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Armazenar tokens no localStorage
     localStorage.setItem('accessToken', data.accessToken);
     localStorage.setItem('refreshToken', data.refreshToken);
-    
+
     // Atualizar estado
     setIsAuthenticated(data.isAuthenticated);
-    
+
     // Não buscar dados do usuário aqui para evitar loop infinito
     // Os dados serão carregados na inicialização
   }, []); // Sem dependências para evitar loop infinito
@@ -613,7 +717,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated,
     isLoading,
     isInitialized,
-    
+
     // Ações
     login,
     signup,
@@ -624,7 +728,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     resetPassword,
     fetchMe,
     setAuthData,
-    
+
     // Utilitários
     hasRole,
     canAccess,
@@ -652,7 +756,7 @@ export function useAuth(): AuthContextType {
 
 export function useRequireAuth(): AuthContextType {
   const auth = useAuth();
-  
+
   useEffect(() => {
     if (auth.isInitialized && !auth.isAuthenticated) {
       auth.logout();

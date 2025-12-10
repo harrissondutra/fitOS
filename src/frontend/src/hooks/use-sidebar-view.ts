@@ -25,9 +25,17 @@ const STORAGE_KEY = 'sidebar_view_preference';
 export function useSidebarView(): UseSidebarViewReturn {
   const router = useRouter();
   const [view, setViewState] = useState<SidebarView>('standard');
+  const [hasMounted, setHasMounted] = useState(false);
 
-  // Carregar preferência salva do localStorage
+  // Marcar como montado no cliente
   useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  // Carregar preferência salva do localStorage apenas no cliente
+  useEffect(() => {
+    if (!hasMounted) return;
+    
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved && (saved === 'standard' || saved === 'admin')) {
@@ -36,7 +44,7 @@ export function useSidebarView(): UseSidebarViewReturn {
     } catch (error) {
       console.warn('Erro ao carregar preferência da sidebar:', error);
     }
-  }, []);
+  }, [hasMounted]);
 
   // Função para definir nova visão
   const setView = useCallback((newView: SidebarView) => {

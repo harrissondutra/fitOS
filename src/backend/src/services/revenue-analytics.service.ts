@@ -1,7 +1,8 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export interface RevenueMetrics {
   mrr: number;

@@ -1,13 +1,15 @@
 import { Router } from 'express';
 import { NotificationService } from '../services/notification.service';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { body, param, query, validationResult } from 'express-validator';
+// import { getTenantPrisma } from '../utils/prisma'; // caminho removido/obsoleto
+import { getTenantPrismaWrapper } from '../utils/prisma-tenant-helper';
 
 const router = Router();
 const notificationService = new NotificationService();
-const prisma = new PrismaClient();
-const authMiddleware = getAuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 
 // Middleware de autenticação para todas as rotas
 router.use(authMiddleware.requireAuth);
@@ -38,6 +40,7 @@ router.get(
         ...req.query
       };
 
+      // Passar tenantId para permitir consultas isoladas quando for persistido
       const result = await notificationService.getNotifications(filters);
 
       if (!result.success) {
@@ -101,8 +104,7 @@ router.put(
   async (req: any, res) => {
     try {
       const result = await notificationService.markAllAsRead(
-        req.user.id,
-        req.user.tenantId
+        req.user.id
       );
 
       if (!result.success) {
@@ -160,15 +162,14 @@ router.get(
   async (req: any, res) => {
     try {
       const result = await notificationService.getNotificationStats(
-        req.user.id,
-        req.user.tenantId
+        req.user.id
       );
 
       if (!result.success) {
         return res.status(400).json({ error: result.error });
       }
 
-      res.json({ stats: result.stats });
+      res.json({ stats: result.data });
     } catch (error: any) {
       console.error('Erro ao obter estatísticas de notificações:', error);
       res.status(500).json({ error: 'Erro interno do servidor' });

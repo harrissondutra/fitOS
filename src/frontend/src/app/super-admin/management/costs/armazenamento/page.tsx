@@ -35,85 +35,87 @@ export default function ArmazenamentoPage() {
     categoryId: 'storage'
   });
 
-  const { loading: costsLoading, getDashboard } = useCosts();
+    const { getDashboard, getServices } = useCosts();
   const { toast } = useToast();
 
   // Carregar dados
   const loadData = useCallback(async () => {
     setLoading(true);
-    
-    // Simular carregamento
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Usar dados mockados quando a API falhar ou timeout
-    const mockDashboard = {
-      totalCost: 1250.50,
-      monthlyTrend: 12.5,
-      services: [
-        {
-          id: 'cloudinary',
-          name: 'Cloudinary',
-          cost: 450.30,
-          trend: 8.2,
-          status: 'active',
-          icon: Image,
-          description: 'Armazenamento e transformação de imagens'
-        },
-        {
-          id: 'aws-s3',
-          name: 'AWS S3',
-          cost: 320.80,
-          trend: -2.1,
-          status: 'active',
-          icon: Cloud,
-          description: 'Armazenamento de arquivos e backups'
-        },
-        {
-          id: 'database',
-          name: 'Database Storage',
-          cost: 479.40,
-          trend: 15.3,
-          status: 'active',
-          icon: Database,
-          description: 'Armazenamento de dados do banco'
-        }
-      ],
-      trends: [
-        { date: '2024-01-01', totalCost: 800, categories: { storage: 800 } },
-        { date: '2024-02-01', totalCost: 950, categories: { storage: 950 } },
-        { date: '2024-03-01', totalCost: 1100, categories: { storage: 1100 } },
-        { date: '2024-04-01', totalCost: 1050, categories: { storage: 1050 } },
-        { date: '2024-05-01', totalCost: 1200, categories: { storage: 1200 } },
-        { date: '2024-06-01', totalCost: 1250, categories: { storage: 1250 } }
-      ]
-    };
-    
-    setDashboard(mockDashboard);
-    setServices(mockDashboard.services);
-    
-    toast({
-      title: 'Modo Demonstração',
-      description: 'Usando dados de exemplo para armazenamento',
-      variant: 'default',
-    });
-    
-    setLoading(false);
-  }, [toast]);
+
+    try {
+      // Buscar dados reais do banco de dados
+      const [dashboardData, servicesData] = await Promise.all([
+        getDashboard(filters),
+        getServices({ category: 'storage', ...filters })
+      ]);
+
+      // Processar dados do dashboard
+      const storageCategory = dashboardData?.categories?.find(
+        (cat: any) => cat.name === 'storage' || cat.id === 'storage'
+      );
+
+      // Processar serviços de armazenamento
+      const processedServices = (servicesData || []).map((service: any) => ({
+        id: service.id,
+        name: service.name,
+        cost: service.totalCost || 0,
+        trend: service.monthlyTrend || 0,
+        status: service.isActive ? 'active' : 'inactive',
+        icon: service.name?.toLowerCase().includes('cloudinary') ? Image :
+              service.name?.toLowerCase().includes('aws') || service.name?.toLowerCase().includes('s3') ? Cloud :
+              service.name?.toLowerCase().includes('database') ? Database : Image,
+        description: service.description || ''
+      }));
+
+      // Processar trends de armazenamento
+      const processedTrends = (dashboardData?.trends || []).map((trend: any) => ({
+        date: trend.date,
+        totalCost: trend.categories?.storage || 0,
+        categories: { storage: trend.categories?.storage || 0 }
+      }));
+
+      setDashboard({
+        totalCost: storageCategory?.totalCost || 0,
+        monthlyTrend: storageCategory?.variation || 0,
+        services: processedServices,
+        trends: processedTrends,
+        categories: dashboardData?.categories || []
+      });
+
+      setServices(processedServices);
+    } catch (error) {
+      console.error('Error loading storage costs:', error);
+      toast({
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível carregar os custos de armazenamento',
+        variant: 'destructive',
+      });
+      
+      // Fallback para dados vazios em caso de erro
+      setDashboard({
+        totalCost: 0,
+        monthlyTrend: 0,
+        services: [],
+        trends: [],
+        categories: []
+      });
+      setServices([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [getDashboard, getServices, filters, toast]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
   const handleRefresh = useCallback(async () => {
-    setLoading(true);
-    // Simular refresh dos dados
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setLoading(false);
+    await loadData();
     toast({
       title: "Dados atualizados",
       description: "Os custos de armazenamento foram atualizados com sucesso."
     });
-  }, [toast]);
+  }, [loadData, toast]);
 
   const handleAddService = useCallback((serviceData: any) => {
     // Lógica para adicionar novo serviço

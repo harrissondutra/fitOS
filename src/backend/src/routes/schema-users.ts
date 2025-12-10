@@ -9,12 +9,14 @@ import { validateUserLimit } from '../middleware/validateUserLimit';
 const router = Router();
 
 // Exemplo de rota para criar um usuário dentro do schema do tenant
+import { VALID_ROLES, UserRoles } from '../constants/roles';
+
 router.post('/users',
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   body('firstName').trim().isLength({ min: 1 }).withMessage('First name is required'),
   body('lastName').trim().isLength({ min: 1 }).withMessage('Last name is required'),
-  body('role').isIn(['MEMBER', 'TRAINER', 'ADMIN', 'OWNER']).withMessage('Invalid role'),
+  body('role').isIn(VALID_ROLES).withMessage('Invalid role'),
   validateUserLimit, // NOVO: Validar limite de usuários
   asyncHandler(async (req: RequestWithSchemaTenant, res: Response) => {
     const errors = validationResult(req);
@@ -58,7 +60,7 @@ router.post('/users',
         firstName,
         lastName,
         phone,
-        role: role || 'MEMBER',
+        role: role || UserRoles.CLIENT,
         status: 'ACTIVE',
         profile: {},
         tenant: {

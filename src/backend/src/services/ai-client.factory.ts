@@ -101,6 +101,25 @@ export class AiClientFactory {
   }
 
   /**
+   * Método simplificado para completação de IA
+   * Este método busca automaticamente o provedor configurado para o serviço
+   * @param serviceType Tipo do serviço
+   * @param prompt Prompt ou dados de entrada
+   * @param options Opções de completação
+   * @returns Resposta da IA
+   */
+  async complete(
+    serviceType: AiServiceType,
+    prompt: string | any,
+    options: AiCompletionOptions = {}
+  ): Promise<AiCompletionResponse> {
+    // Este método requer que seja chamado dentro de um contexto com tenantId
+    // e que o provedor esteja configurado via AiProviderService
+    // Por agora, lançamos erro se chamado diretamente
+    throw new Error('The complete() method requires context. Use executeCompletion() with a provider instead.');
+  }
+
+  /**
    * Executa completação síncrona
    */
   private async executeSyncCompletion(

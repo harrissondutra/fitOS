@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SystemSettings } from '@/shared/types/settings';
 import { toast } from 'sonner';
-import { authenticatedApiRequest, API_ENDPOINTS } from '@/lib/api-url';
+import { authenticatedApiRequest, API_ENDPOINTS } from '@/lib/api';
 
 export function useSystemSettings() {
   const [settings, setSettings] = useState<SystemSettings | null>(null);

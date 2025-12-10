@@ -47,6 +47,22 @@ export function SignupForm({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Validation Logic
+  const isPasswordValid =
+    formData.password.length >= 8 &&
+    /[A-Z]/.test(formData.password) &&
+    /[a-z]/.test(formData.password) &&
+    /[0-9]/.test(formData.password) &&
+    /[^A-Za-z0-9]/.test(formData.password);
+
+  const isFormValid =
+    formData.firstName.length > 0 &&
+    formData.lastName.length > 0 &&
+    formData.email.length > 0 &&
+    isPasswordValid &&
+    formData.password === formData.confirmPassword &&
+    formData.acceptTerms;
+
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
@@ -56,12 +72,12 @@ export function SignupForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validações básicas
     if (formData.password !== formData.confirmPassword) {
       return;
     }
-    
+
     if (!formData.acceptTerms) {
       return;
     }
@@ -154,13 +170,22 @@ export function SignupForm({
               <div className="grid gap-2">
                 <Label htmlFor="password">Senha</Label>
                 <div className="relative">
-                  <Input 
-                    id="password" 
-                    type={showPassword ? "text" : "password"} 
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={(e) => handleInputChange("password", e.target.value)}
                     required
                     disabled={isLoading}
+                    className={
+                      formData.password && (
+                        formData.password.length < 8 ||
+                        !/[A-Z]/.test(formData.password) ||
+                        !/[a-z]/.test(formData.password) ||
+                        !/[0-9]/.test(formData.password) ||
+                        !/[^A-Za-z0-9]/.test(formData.password)
+                      ) ? "border-red-500 focus-visible:ring-red-500" : ""
+                    }
                   />
                   <Button
                     type="button"
@@ -177,18 +202,63 @@ export function SignupForm({
                     )}
                   </Button>
                 </div>
+
+                {/* Password Requirements Checklist */}
+                <div className="text-xs space-y-1 mt-1 p-2 bg-muted/50 rounded-md">
+                  <p className="font-medium mb-1.5 text-muted-foreground">Sua senha deve ter:</p>
+
+                  <div className="flex items-center gap-2">
+                    <div className={cn("h-1.5 w-1.5 rounded-full transition-colors", formData.password.length >= 8 ? "bg-green-500" : "bg-gray-300")} />
+                    <span className={cn("transition-colors", formData.password.length >= 8 ? "text-green-600" : "text-muted-foreground")}>
+                      Mínimo de 8 caracteres
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className={cn("h-1.5 w-1.5 rounded-full transition-colors", /[A-Z]/.test(formData.password) ? "bg-green-500" : "bg-gray-300")} />
+                    <span className={cn("transition-colors", /[A-Z]/.test(formData.password) ? "text-green-600" : "text-muted-foreground")}>
+                      Letra maiúscula
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className={cn("h-1.5 w-1.5 rounded-full transition-colors", /[a-z]/.test(formData.password) ? "bg-green-500" : "bg-gray-300")} />
+                    <span className={cn("transition-colors", /[a-z]/.test(formData.password) ? "text-green-600" : "text-muted-foreground")}>
+                      Letra minúscula
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className={cn("h-1.5 w-1.5 rounded-full transition-colors", /[0-9]/.test(formData.password) ? "bg-green-500" : "bg-gray-300")} />
+                    <span className={cn("transition-colors", /[0-9]/.test(formData.password) ? "text-green-600" : "text-muted-foreground")}>
+                      Número
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className={cn("h-1.5 w-1.5 rounded-full transition-colors", /[^A-Za-z0-9]/.test(formData.password) ? "bg-green-500" : "bg-gray-300")} />
+                    <span className={cn("transition-colors", /[^A-Za-z0-9]/.test(formData.password) ? "text-green-600" : "text-muted-foreground")}>
+                      Caractere especial (!@#$...)
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="confirmPassword">Confirmar Senha</Label>
                 <div className="relative">
-                  <Input 
-                    id="confirmPassword" 
-                    type={showConfirmPassword ? "text" : "password"} 
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
                     value={formData.confirmPassword}
                     onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
                     required
                     disabled={isLoading}
+                    className={
+                      formData.confirmPassword && formData.password !== formData.confirmPassword
+                        ? "border-red-500 focus-visible:ring-red-500"
+                        : ""
+                    }
                   />
                   <Button
                     type="button"
@@ -205,6 +275,9 @@ export function SignupForm({
                     )}
                   </Button>
                 </div>
+                {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                  <p className="text-xs text-red-500">As senhas não coincidem</p>
+                )}
               </div>
 
               <div className="flex items-center space-x-2">
@@ -226,7 +299,7 @@ export function SignupForm({
                 </Label>
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={isLoading || !isFormValid}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -242,9 +315,9 @@ export function SignupForm({
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
+                <Button
+                  variant="outline"
+                  className="w-full"
                   type="button"
                   onClick={() => handleSocialClick('apple')}
                   disabled={isLoading}
@@ -257,9 +330,9 @@ export function SignupForm({
                   </svg>
                   <span className="sr-only">Cadastro com Apple</span>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
+                <Button
+                  variant="outline"
+                  className="w-full"
                   type="button"
                   onClick={() => handleSocialClick('google')}
                   disabled={isLoading}
@@ -272,9 +345,9 @@ export function SignupForm({
                   </svg>
                   <span className="sr-only">Cadastro com Google</span>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
+                <Button
+                  variant="outline"
+                  className="w-full"
                   type="button"
                   onClick={() => handleSocialClick('microsoft')}
                   disabled={isLoading}

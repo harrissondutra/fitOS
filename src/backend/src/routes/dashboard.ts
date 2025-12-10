@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/permissions';
 
 const router = Router();
-const prisma = new PrismaClient();
-const authMiddleware = getAuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 
 // Middleware de autenticação para todas as rotas
 router.use(authMiddleware.requireAuth);
@@ -36,7 +36,7 @@ router.get('/stats', requireRole(['OWNER', 'ADMIN', 'TRAINER']), async (req, res
     }
 
     // Filtro por profissional se for TRAINER
-    const professionalFilter = req.user?.role === 'TRAINER' ? { professionalId: userId } : {};
+    const professionalFilter = (req.user?.role as any) === 'TRAINER' ? { professionalId: userId } : {};
 
     // Estatísticas de agendamentos
     const appointments = await prisma.appointment.findMany({
@@ -181,7 +181,7 @@ router.get('/activity', requireRole(['OWNER', 'ADMIN', 'TRAINER']), async (req, 
     const userId = req.user?.id;
 
     // Filtro por profissional se for TRAINER
-    const professionalFilter = req.user?.role === 'TRAINER' ? { professionalId: userId } : {};
+    const professionalFilter = (req.user?.role as any) === 'TRAINER' ? { professionalId: userId } : {};
 
     // Buscar atividades recentes de diferentes fontes
     const recentAppointments = await prisma.appointment.findMany({
@@ -257,7 +257,7 @@ router.get('/upcoming-appointments', requireRole(['OWNER', 'ADMIN', 'TRAINER']),
     const userId = req.user?.id;
 
     // Filtro por profissional se for TRAINER
-    const professionalFilter = req.user?.role === 'TRAINER' ? { professionalId: userId } : {};
+    const professionalFilter = (req.user?.role as any) === 'TRAINER' ? { professionalId: userId } : {};
 
     const upcomingAppointments = await prisma.appointment.findMany({
       where: {
@@ -305,7 +305,7 @@ router.get('/overdue-tasks', requireRole(['OWNER', 'ADMIN', 'TRAINER']), async (
     const userId = req.user?.id;
 
     // Filtro por profissional se for TRAINER
-    const professionalFilter = req.user?.role === 'TRAINER' ? { professionalId: userId } : {};
+    const professionalFilter = (req.user?.role as any) === 'TRAINER' ? { professionalId: userId } : {};
 
     const overdueTasks = await prisma.cRMTask.findMany({
       where: {

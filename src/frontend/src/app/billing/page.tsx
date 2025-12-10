@@ -6,19 +6,22 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSubscription } from '@/hooks/use-subscription';
-import { usePermissions } from '@/hooks/use-permissions';
+import { useAuth } from '@/hooks/use-auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, CreditCard, TrendingUp, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils/currency';
+import { UserRoles } from '@/shared/types/auth.types';
 
 export default function BillingPage() {
   const { subscription, isLoading, error } = useSubscription();
-  const { hasPermission } = usePermissions();
+  const { user } = useAuth();
   const router = useRouter();
 
   // Verificar permissões (SUPER_ADMIN, OWNER, ADMIN)
-  if (!hasPermission(['SUPER_ADMIN', 'OWNER', 'ADMIN'])) {
+  const hasPermission = user && [UserRoles.SUPER_ADMIN, UserRoles.OWNER, UserRoles.ADMIN].includes(user.role as any);
+
+  if (!hasPermission) {
     return (
       <div className="container mx-auto py-12">
         <Alert variant="destructive">
@@ -71,11 +74,11 @@ export default function BillingPage() {
         </div>
         <Badge
           variant={
-            subscription.status === 'active' 
-              ? 'default' 
+            subscription.status === 'active'
+              ? 'default'
               : subscription.status === 'past_due'
-              ? 'destructive'
-              : 'secondary'
+                ? 'destructive'
+                : 'secondary'
           }
         >
           {subscription.status}
@@ -94,7 +97,7 @@ export default function BillingPage() {
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground">Valor</p>
               <p className="text-2xl font-bold">
-                {formatCurrency(subscription.price, 'BRL')}
+                {formatCurrency(subscription.price)}
               </p>
               <p className="text-sm text-muted-foreground">
                 / {subscription.billingPeriod === 'monthly' ? 'mês' : 'ano'}
@@ -122,7 +125,7 @@ export default function BillingPage() {
           {/* Usage Limits */}
           <div className="space-y-4">
             <h3 className="font-semibold">Uso da Assinatura</h3>
-            
+
             <div className="space-y-3">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">

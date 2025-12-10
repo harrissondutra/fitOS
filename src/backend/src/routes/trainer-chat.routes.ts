@@ -1,28 +1,32 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { TrainerClientChatService } from '../services/trainer-chat.service';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authenticateToken } from '../middleware/auth.middleware';
 import { tenantMiddleware } from '../middleware/tenant.middleware';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
 import { body, param } from 'express-validator';
+import { UserRole } from '../../../shared/types/auth.types';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const chatService = new TrainerClientChatService(prisma);
 
 // Extend Request interface
 interface RequestWithTenantAndAuth extends RequestWithTenant {
   user?: {
     id: string;
-    role: string;
+    email: string;
+    role: UserRole;
+    tenantId?: string;
+    name?: string;
   };
 }
 
 // POST /api/trainer-chat/message - Enviar mensagem
 router.post(
   '/message',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [
     body('receiverId').notEmpty().withMessage('Receiver ID is required'),
@@ -49,7 +53,7 @@ router.post(
 // GET /api/trainer-chat/conversation/:userId - Buscar conversa
 router.get(
   '/conversation/:userId',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('userId').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
@@ -67,7 +71,7 @@ router.get(
 // GET /api/trainer-chat/conversations - Listar conversas
 router.get(
   '/conversations',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
     const conversations = await chatService.getConversations(req.user!.id, req.tenantId);
@@ -82,7 +86,7 @@ router.get(
 // GET /api/trainer-chat/unread-count - Contar mensagens não lidas
 router.get(
   '/unread-count',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
     const unreadCount = await chatService.getUnreadCount(req.user!.id, req.tenantId);
@@ -97,7 +101,7 @@ router.get(
 // PUT /api/trainer-chat/read/:senderId - Marcar como lido
 router.put(
   '/read/:senderId',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('senderId').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {

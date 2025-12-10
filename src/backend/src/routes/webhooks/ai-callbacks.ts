@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database';
 import { webhookValidator } from '../../services/webhook-validator.service';
 import { aiClientFactory } from '../../services/ai-client.factory';
 import { aiProviderService } from '../../services/ai-provider.service';
@@ -12,7 +12,7 @@ import {
 import { asyncHandler } from '../../utils/async-handler';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 /**
  * POST /api/webhooks/ai-callbacks/:providerId

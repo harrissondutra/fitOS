@@ -1,4 +1,5 @@
 import { PrismaClient, User } from '@prisma/client';
+import { PrismaTenantWrapper } from './prisma-tenant-wrapper.service';
 // Tipos temporários para evitar erros de compilação após remoção da autenticação
 type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
 type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DELETED';
@@ -7,7 +8,7 @@ import { logger } from '../utils/logger';
 import { UserFilters, UserBulkAction, CSVImportResult, UserFormData } from '../../../shared/types';
 
 export class UserService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: PrismaClient | PrismaTenantWrapper) {} // Aceita PrismaClient ou PrismaTenantWrapper
 
   /**
    * Listar usuários com filtros e paginação

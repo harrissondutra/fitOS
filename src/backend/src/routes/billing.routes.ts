@@ -11,16 +11,13 @@
  */
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { tenantMiddleware } from '../middleware/tenant.middleware';
-import { BillingService } from '../services/billing.service';
 import { logger } from '../utils/logger';
+import { createBillingService } from '../utils/service-factory';
 import { z } from 'zod';
 
 const router = Router();
-const prisma = new PrismaClient();
-const billingService = new BillingService(prisma);
 
 // Schemas de validação
 const upgradeSchema = z.object({
@@ -56,6 +53,8 @@ router.get('/subscription',
         });
       }
 
+      // Usar service com wrapper para garantir isolamento multi-tenant
+      const billingService = await createBillingService(req);
       const subscription = await billingService.getSubscription(tenantId);
 
       if (!subscription) {
@@ -96,6 +95,8 @@ router.get('/invoices',
         });
       }
 
+      // Usar service com wrapper para garantir isolamento multi-tenant
+      const billingService = await createBillingService(req);
       const invoices = await billingService.getInvoices(tenantId, {
         page,
         limit
@@ -130,6 +131,8 @@ router.get('/payment-methods',
         });
       }
 
+      // Usar service com wrapper para garantir isolamento multi-tenant
+      const billingService = await createBillingService(req);
       const paymentMethods = await billingService.getPaymentMethods(tenantId);
 
       res.json({
@@ -164,6 +167,8 @@ router.post('/upgrade',
 
       const validated = upgradeSchema.parse(req.body);
 
+      // Usar service com wrapper para garantir isolamento multi-tenant
+      const billingService = await createBillingService(req);
       const result = await billingService.upgradePlan(
         tenantId,
         validated.newPlanId,
@@ -210,6 +215,8 @@ router.post('/downgrade',
 
       const validated = downgradeSchema.parse(req.body);
 
+      // Usar service com wrapper para garantir isolamento multi-tenant
+      const billingService = await createBillingService(req);
       const result = await billingService.downgradePlan(
         tenantId,
         validated.newPlanId,
@@ -255,6 +262,8 @@ router.post('/cancel',
 
       const validated = cancelSchema.parse(req.body);
 
+      // Usar service com wrapper para garantir isolamento multi-tenant
+      const billingService = await createBillingService(req);
       const result = await billingService.cancelSubscription(
         tenantId,
         validated.reason,

@@ -5,15 +5,15 @@
 
 import { Router } from 'express';
 import { body, query, validationResult } from 'express-validator';
-import { PrismaClient } from '@prisma/client';
-import { AuthMiddleware } from '../middleware/auth.middleware';
+import { getPrismaClient } from '../config/database';
+import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/permissions';
 import { asyncHandler } from '../utils/async-handler';
-import { NutritionAddonService } from '../services/nutrition-addon.service';
+import nutritionAddonService, { NutritionAddonService } from '../services/nutrition-addon.service';
 
 const router = Router();
-const prisma = new PrismaClient();
-const authMiddleware = new AuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 
 // Middleware de autenticação
 router.use(authMiddleware.requireAuth);
@@ -24,7 +24,7 @@ router.use(authMiddleware.requireAuth);
  */
 router.get('/plans', async (req, res) => {
   try {
-    const plans = NutritionAddonService.listPlans();
+    const plans = nutritionAddonService.listPlans();
     res.json({ success: true, data: plans });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
@@ -39,7 +39,7 @@ router.get('/my-subscription',
   requireRole(['NUTRITIONIST', 'ADMIN', 'OWNER', 'SUPER_ADMIN']),
   async (req: any, res) => {
     try {
-      const subscription = await NutritionAddonService.getActiveSubscription(
+      const subscription = await nutritionAddonService.getActiveSubscription(
         req.tenantId,
         req.user.id
       );
@@ -87,7 +87,7 @@ router.post('/trial',
   requireRole(['NUTRITIONIST', 'ADMIN', 'OWNER', 'SUPER_ADMIN']),
   async (req: any, res) => {
     try {
-      const trial = await NutritionAddonService.createTrial(
+      const trial = await nutritionAddonService.createTrial(
         req.tenantId,
         req.user.id
       );
@@ -107,7 +107,7 @@ router.delete('/cancel/:subscriptionId',
   requireRole(['NUTRITIONIST', 'ADMIN', 'OWNER', 'SUPER_ADMIN']),
   async (req: any, res) => {
     try {
-      await NutritionAddonService.cancelSubscription(req.params.subscriptionId);
+      await nutritionAddonService.cancelSubscription(req.params.subscriptionId);
       
       res.json({ success: true, message: 'Assinatura cancelada com sucesso' });
     } catch (error: any) {

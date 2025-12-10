@@ -2,15 +2,16 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
-import { PrismaClient } from '@prisma/client';
+// removed UserRole import to avoid conflicts; role is treated as any in Request type
+import { getPrismaClient } from '../config/database';
 import { ExerciseService, ExerciseFilters, ExerciseFormData } from '../services/exercise.service';
 import { body, validationResult, query } from 'express-validator';
+import { createExerciseService } from '../utils/service-factory';
 
-type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
+import { UserRoles, UserRole } from '../constants/roles';
 
-// PrismaClient global compartilhado
-const prisma = new PrismaClient();
-const exerciseService = new ExerciseService(prisma);
+// PrismaClient global compartilhado (fallback para rotas sem tenant context)
+const prisma = getPrismaClient();
 
 const router = Router();
 
@@ -19,7 +20,7 @@ interface RequestWithTenantAndAuth extends RequestWithTenant {
   user?: {
     id: string;
     email: string;
-    role: UserRole;
+    role: any; // aceitar roles legadas
     tenantId?: string;
     name?: string;
   };
@@ -87,6 +88,8 @@ router.get('/',
       sortOrder: req.query.sortOrder as any
     };
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
     const result = await exerciseService.getExercises(filters, tenantId || 'default', req.user.role);
 
     return res.json({
@@ -97,17 +100,10 @@ router.get('/',
 );
 
 // Get exercise by ID
-router.get('/:id', 
+router.get('/:id',
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
     const { id } = req.params;
-    
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Authentication required' }
-      });
-    }
-    
+
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -125,7 +121,9 @@ router.get('/:id',
       });
     }
 
-    const exercise = await exerciseService.getExerciseById(id, tenantId || 'default', req.user.role);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
+    const exercise = await exerciseService.getExerciseById(id, tenantId || 'default');
 
     if (!exercise) {
       return res.status(404).json({
@@ -192,6 +190,8 @@ router.post('/',
       });
     }
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
     const exerciseData: ExerciseFormData = req.body;
     const exercise = await exerciseService.createExercise(exerciseData, tenantId || 'default', req.user.id);
 
@@ -237,21 +237,7 @@ router.put('/:id',
       });
     }
 
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Authentication required' }
-      });
-    }
-
     const { id } = req.params;
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Authentication required' }
-      });
-    }
-
     const tenantId = req.tenantId || req.user?.tenantId;
 
     // SUPER_ADMIN pode acessar sem tenantId específico
@@ -262,8 +248,10 @@ router.put('/:id',
       });
     }
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
     const exerciseData: Partial<ExerciseFormData> = req.body;
-    const exercise = await exerciseService.updateExercise(id, exerciseData, tenantId || 'default', req.user.id);
+    const exercise = await exerciseService.updateExercise(id, exerciseData, tenantId || 'default');
 
     return res.json({
       success: true,
@@ -283,13 +271,6 @@ router.delete('/:id',
     }
 
     const { id } = req.params;
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Authentication required' }
-      });
-    }
-
     const tenantId = req.tenantId || req.user?.tenantId;
 
     // SUPER_ADMIN pode acessar sem tenantId específico
@@ -300,7 +281,9 @@ router.delete('/:id',
       });
     }
 
-    await exerciseService.deleteExercise(id, tenantId || 'default', req.user.id);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
+    await exerciseService.deleteExercise(id, tenantId || 'default');
 
     return res.json({
       success: true,
@@ -345,7 +328,9 @@ router.post('/:id/clone',
       });
     }
 
-    const exercise = await exerciseService.cloneExercise(id, newName, tenantId || 'default', req.user.id);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
+    const exercise = await exerciseService.cloneExercise(id, tenantId || 'default');
 
     return res.status(201).json({
       success: true,
@@ -374,7 +359,9 @@ router.get('/meta/categories',
       });
     }
 
-    const categories = await exerciseService.getCategories(tenantId!);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
+    const categories = await exerciseService.getCategories(tenantId || 'default');
 
     return res.json({
       success: true,
@@ -403,7 +390,9 @@ router.get('/meta/muscle-groups',
       });
     }
 
-    const muscleGroups = await exerciseService.getMuscleGroups(tenantId!);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
+    const muscleGroups = await exerciseService.getMuscleGroups(tenantId || 'default');
 
     return res.json({
       success: true,
@@ -432,7 +421,9 @@ router.get('/meta/equipment',
       });
     }
 
-    const equipment = await exerciseService.getEquipment(tenantId!);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
+    const equipment = await exerciseService.getEquipment(tenantId || 'default');
 
     return res.json({
       success: true,
@@ -462,7 +453,9 @@ router.get('/category/:category',
       });
     }
 
-    const exercises = await exerciseService.getExercisesByCategory(category, tenantId || 'default', req.user.role);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
+    const exercises = await exerciseService.getExercisesByCategory(category, tenantId || 'default');
 
     return res.json({
       success: true,
@@ -492,7 +485,9 @@ router.get('/muscle-group/:muscleGroup',
       });
     }
 
-    const exercises = await exerciseService.getExercisesByMuscleGroup(muscleGroup, tenantId || 'default', req.user.role);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
+    const exercises = await exerciseService.getExercisesByMuscleGroup(muscleGroup, tenantId || 'default');
 
     return res.json({
       success: true,
@@ -520,8 +515,10 @@ router.get('/export/csv',
       });
     }
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const exerciseService = await createExerciseService(req);
     const exerciseIds = req.query.exerciseIds ? (req.query.exerciseIds as string).split(',') : [];
-    const exercises = await exerciseService.exportExercisesToCSV(exerciseIds, tenantId!);
+    const exercises = await exerciseService.exportExercisesToCSV(tenantId || 'default');
 
     return res.json({
       success: true,

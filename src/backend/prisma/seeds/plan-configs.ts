@@ -19,7 +19,7 @@ export async function seedPlanConfigs() {
     // Criar planos base
     await prisma.planConfig.createMany({
       data: [
-        // Plano para Pessoa Física
+        // Plano para Pessoa Física (Gratuito)
         {
           plan: 'individual',
           displayName: 'Pessoa Física',
@@ -31,7 +31,7 @@ export async function seedPlanConfigs() {
             trainer: 0,
             client: 0
           },
-          price: 29.00,
+          price: 0.00,
           extraSlotPrice: {},
           features: {
             aiAgents: false,

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste de Autenticação FitOS</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        button { padding: 10px 20px; margin: 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9; }
+        .success { border-color: #28a745; background: #d4edda; }
+        .error { border-color: #dc3545; background: #f8d7da; }
+        .info { border-color: #17a2b8; background: #d1ecf1; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Teste de Autenticação FitOS</h1>
+        
+        <div>
+            <h3>1. Testar Login</h3>
+            <button onclick="testLogin()">Fazer Login</button>
+        </div>
+        
+        <div>
+            <h3>2. Testar Redirecionamento</h3>
+            <button onclick="testRedirect()">Testar Redirecionamento</button>
+        </div>
+        
+        <div>
+            <h3>3. Verificar Cookies</h3>
+            <button onclick="checkCookies()">Verificar Cookies</button>
+        </div>
+        
+        <div>
+            <h3>4. Testar Token</h3>
+            <button onclick="testToken()">Testar Token</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let accessToken = null;
+        let refreshToken = null;
+        
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result ${type}"><pre>${message}</pre></div>`;
+        }
+        
+        async function testLogin() {
+            showResult('🔄 Testando login...', 'info');
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'harrissondutra@gmail.com',
+                        password: 'Admin@1234'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    accessToken = data.accessToken;
+                    refreshToken = data.refreshToken;
+                    
+                    // Salvar tokens em cookies
+                    document.cookie = `accessToken=${accessToken}; path=/; max-age=3600`;
+                    document.cookie = `refreshToken=${refreshToken}; path=/; max-age=604800`;
+                    
+                    showResult(`✅ Login bem-sucedido!
+                    
+Usuário: ${data.user.firstName} ${data.user.lastName}
+Role: ${data.user.role}
+Redirect: ${data.redirectTo}
+
+Token (primeiros 50 chars): ${accessToken.substring(0, 50)}...
+
+Cookies definidos:
+${document.cookie}`, 'success');
+                } else {
+                    showResult(`❌ Erro no login: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Erro de conexão: ${error.message}`, 'error');
+            }
+        }
+        
+        function testRedirect() {
+            if (!accessToken) {
+                showResult('❌ Faça login primeiro!', 'error');
+                return;
+            }
+            
+            showResult('🔄 Testando redirecionamento...', 'info');
+            
+            // Simular redirecionamento
+            setTimeout(() => {
+                window.location.href = '/super-admin/dashboard';
+            }, 1000);
+        }
+        
+        function checkCookies() {
+            const cookies = document.cookie;
+            showResult(`🍪 Cookies atuais:
+            
+${cookies || 'Nenhum cookie encontrado'}
+
+Cookies individuais:
+${cookies.split(';').map(c => c.trim()).join('\n')}`, 'info');
+        }
+        
+        function testToken() {
+            if (!accessToken) {
+                showResult('❌ Faça login primeiro!', 'error');
+                return;
+            }
+            
+            try {
+                const payload = JSON.parse(atob(accessToken.split('.')[1]));
+                const now = Math.floor(Date.now() / 1000);
+                const isValid = payload.exp > now;
+                
+                showResult(`🔍 Análise do Token:
+                
+Exp: ${payload.exp}
+Now: ${now}
+Válido: ${isValid ? '✅ Sim' : '❌ Não'}
+Expira em: ${payload.exp - now} segundos
+
+Payload:
+${JSON.stringify(payload, null, 2)}`, isValid ? 'success' : 'error');
+            } catch (error) {
+                showResult(`❌ Erro ao analisar token: ${error.message}`, 'error');
+            }
+        }
+        
+        // Verificar cookies ao carregar
+        window.onload = function() {
+            checkCookies();
+        };
+    </script>
+</body>
+</html>

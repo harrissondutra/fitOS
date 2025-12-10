@@ -341,3 +341,5 @@ export async function manualSync(): Promise<SyncStatus> {
   return await syncService.syncPendingEntries();
 }
 
+
+

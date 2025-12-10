@@ -14,6 +14,7 @@ import { logger } from '../utils/logger';
 import { redisService } from './redis.service';
 import { sessionService } from './session.service';
 import { presenceService } from './presence.service';
+import { costSyncJobs } from './cost-sync-jobs.service';
 
 export interface ScheduledJob {
   id: string;
@@ -99,6 +100,24 @@ export class SchedulerService {
       cron: '0 4 * * 1', // 4:00 AM on Mondays
       enabled: true,
       data: { type: 'performance-report' }
+    });
+
+    // Sincronização diária de custos de storage (Cloudinary) - às 3h
+    this.addJob('cost-sync-storage', {
+      id: 'cost-sync-storage',
+      name: 'Daily Storage Costs Sync',
+      cron: '0 3 * * *', // 3:00 AM daily
+      enabled: true,
+      data: { type: 'cost-sync-storage' }
+    });
+
+    // Sincronização mensal de custos de database - primeiro dia do mês às 4h
+    this.addJob('cost-sync-database', {
+      id: 'cost-sync-database',
+      name: 'Monthly Database Costs Sync',
+      cron: '0 4 1 * *', // 4:00 AM on the 1st of every month
+      enabled: true,
+      data: { type: 'cost-sync-database' }
     });
 
     logger.info('✅ Scheduler service initialized with scheduled jobs');
@@ -207,6 +226,12 @@ export class SchedulerService {
           break;
         case 'performance-report':
           await this.executePerformanceReport();
+          break;
+        case 'cost-sync-storage':
+          await this.executeCostSyncStorage();
+          break;
+        case 'cost-sync-database':
+          await this.executeCostSyncDatabase();
           break;
         default:
           logger.warn(`Unknown job type: ${job.data.type}`);
@@ -338,6 +363,30 @@ export class SchedulerService {
       logger.info('Performance report job added to queue');
     } catch (error) {
       logger.error('Error during performance report:', error);
+    }
+  }
+
+  /**
+   * Executar sincronização diária de custos de storage
+   */
+  private async executeCostSyncStorage(): Promise<void> {
+    try {
+      await costSyncJobs.syncDailyStorageCosts();
+      logger.info('Daily storage costs sync completed');
+    } catch (error) {
+      logger.error('Error during storage costs sync:', error);
+    }
+  }
+
+  /**
+   * Executar sincronização mensal de custos de database
+   */
+  private async executeCostSyncDatabase(): Promise<void> {
+    try {
+      await costSyncJobs.syncMonthlyDatabaseCosts();
+      logger.info('Monthly database costs sync completed');
+    } catch (error) {
+      logger.error('Error during database costs sync:', error);
     }
   }
 

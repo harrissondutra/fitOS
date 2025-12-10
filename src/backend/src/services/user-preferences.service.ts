@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 type PrismaUserPreferences = any;
 import { CacheService } from '../config/redis.cache';
 import { CreateUserPreferencesDto, UpdateUserPreferencesDto, PersonalizedWorkout, WorkoutRecommendation } from '../../../shared/types/sprint6';
@@ -9,7 +10,7 @@ export class UserPreferencesService {
   private cache: CacheService;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = getPrismaClient();
     this.cache = new CacheService();
   }
 

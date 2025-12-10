@@ -1,17 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { UserRole } from '../../../shared/types/auth.types';
+import { getPrismaClient } from '../config/database';
 
-const prisma = new PrismaClient();
-
-// Tipos de roles
-export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
+// Usar o UserRole compartilhado
 
 // Interface para Request com usuário
 interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email: string;
-    role: UserRole;
+    role: any;
     tenantId?: string;
     name?: string;
   };
@@ -24,9 +23,11 @@ interface AuthenticatedRequest extends Request {
  * Middleware para verificar se o usuário tem uma das roles permitidas
  * SUPER_ADMIN sempre tem acesso total
  */
-export const requireRole = (allowedRoles: UserRole[]) => {
+type AllowedRole = UserRole | 'OWNER' | 'TRAINER' | 'NUTRITIONIST';
+
+export const requireRole = (allowedRoles: AllowedRole[]) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    const userRole = req.user?.role;
+  const userRole = req.user?.role as any;
     
     // SUPER_ADMIN sempre tem acesso total
     if (userRole === 'SUPER_ADMIN') {
@@ -66,7 +67,7 @@ export const canAccessResource = async (
     }
     
     // TRAINER acessa apenas seus recursos
-    if (userRole === 'TRAINER') {
+    if (String(userRole) === 'TRAINER') {
       return await checkTrainerOwnership(resourceId, resourceType, userId, userTenantId);
     }
     
@@ -91,6 +92,7 @@ async function checkTenantOwnership(
   userTenantId: string
 ): Promise<boolean> {
   try {
+    const prisma = getPrismaClient(); // Lazy evaluation
     switch (resourceType) {
       case 'appointment': {
         const appointment = await prisma.appointment.findUnique({
@@ -159,6 +161,7 @@ async function checkTrainerOwnership(
   userTenantId: string
 ): Promise<boolean> {
   try {
+    const prisma = getPrismaClient(); // Lazy evaluation
     switch (resourceType) {
       case 'appointment': {
         const appointment = await prisma.appointment.findUnique({
@@ -240,6 +243,7 @@ async function checkClientOwnership(
   userTenantId: string
 ): Promise<boolean> {
   try {
+    const prisma = getPrismaClient(); // Lazy evaluation
     // Primeiro, verifica se o usuário tem um cliente associado
     const client = await prisma.client.findFirst({
       where: {
@@ -340,6 +344,7 @@ export const canCreateForClient = async (
   userTenantId: string
 ): Promise<boolean> => {
   try {
+    const prisma = getPrismaClient(); // Lazy evaluation
     // SUPER_ADMIN pode criar para qualquer cliente
     if (userRole === 'SUPER_ADMIN') return true;
     
@@ -353,7 +358,7 @@ export const canCreateForClient = async (
     }
     
     // TRAINER pode criar apenas para seus clientes atribuídos
-    if (userRole === 'TRAINER') {
+    if (String(userRole) === 'TRAINER') {
       const clientTrainer = await prisma.clientTrainer.findFirst({
         where: {
           clientId: clientId,

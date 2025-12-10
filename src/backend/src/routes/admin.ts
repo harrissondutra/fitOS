@@ -1,10 +1,10 @@
 import { Router, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { asyncHandler } from '../utils/asyncHandler';
 import { PlanLimitsService } from '../services/plan-limits.service';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const planLimitsService = new PlanLimitsService(prisma);
 
 // Extend Request interface to include tenantId

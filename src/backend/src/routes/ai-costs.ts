@@ -7,11 +7,13 @@ import { aiCostTrackingService } from '../services/ai-cost-tracking.service';
 import { getAllModels, getProviderStats } from '../config/ai-pricing';
 
 const router = Router();
-const prisma = getPrismaClient();
 
-// Apply authentication middleware to all routes in this router
-const authMiddleware = getAuthMiddleware(prisma);
-router.use(authMiddleware.requireAuth());
+// Apply authentication middleware to all routes in this router (lazy evaluation)
+router.use((req, res, next) => {
+  const prisma = getPrismaClient();
+  const authMiddleware = getAuthMiddleware();
+  authMiddleware.requireAuth()(req, res, next);
+});
 router.use(requireSuperAdmin);
 
 // GET /api/super-admin/ai-costs/summary
@@ -132,6 +134,7 @@ router.get('/models', asyncHandler(async (req, res) => {
 // GET /api/super-admin/ai-costs/alerts
 // Obtém alertas de custos
 router.get('/alerts', asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { clientId, alertType, isActive = 'true' } = req.query;
 
   const where: any = {};
@@ -284,6 +287,7 @@ router.post('/track', asyncHandler(async (req, res) => {
 // PUT /api/super-admin/ai-costs/alerts/:alertId/dismiss
 // Dispensa um alerta
 router.put('/alerts/:alertId/dismiss', asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { alertId } = req.params;
 
   const alert = await prisma.costAlert.update({

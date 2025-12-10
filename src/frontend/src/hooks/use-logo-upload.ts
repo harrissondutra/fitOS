@@ -1,7 +1,7 @@
 import React from 'react';
 import { useImageUpload } from './use-image-upload';
 import { toast } from 'sonner';
-import { authenticatedApiRequest, API_ENDPOINTS } from '@/lib/api-url';
+import { authenticatedApiRequest, API_ENDPOINTS } from '@/lib/api';
 
 export function useLogoUpload() {
   const {

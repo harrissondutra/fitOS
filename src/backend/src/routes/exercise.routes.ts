@@ -1,28 +1,32 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { ExerciseService } from '../services/exercise.service';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authenticateToken } from '../middleware/auth.middleware';
 import { tenantMiddleware } from '../middleware/tenant.middleware';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
 import { body, query, param } from 'express-validator';
+import { UserRole } from '../../../shared/types/auth.types';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const exerciseService = new ExerciseService(prisma);
 
 // Extend Request interface
 interface RequestWithTenantAndAuth extends RequestWithTenant {
   user?: {
     id: string;
-    role: string;
+    email: string;
+    role: UserRole;
+    tenantId?: string;
+    name?: string;
   };
 }
 
 // GET /api/exercises - Listar exercícios
 router.get(
   '/',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [
     query('search').optional().isString(),
@@ -54,7 +58,7 @@ router.get(
 // GET /api/exercises/:id - Buscar exercício por ID
 router.get(
   '/:id',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('id').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
@@ -79,7 +83,7 @@ router.get(
 // POST /api/exercises - Criar exercício
 router.post(
   '/',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [
     body('name').notEmpty().withMessage('Name is required'),
@@ -104,7 +108,7 @@ router.post(
 // PUT /api/exercises/:id - Atualizar exercício
 router.put(
   '/:id',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('id').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
@@ -122,7 +126,7 @@ router.put(
 // DELETE /api/exercises/:id - Deletar exercício
 router.delete(
   '/:id',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('id').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {

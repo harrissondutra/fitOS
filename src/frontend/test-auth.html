@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste de Autenticação</title>
+</head>
+<body>
+    <h1>Teste de Autenticação FitOS</h1>
+    <button onclick="testLogin()">Testar Login</button>
+    <div id="result"></div>
+
+    <script>
+        async function testLogin() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testando...';
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'harrissondutra@gmail.com',
+                        password: 'Admin@1234'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <h3>✅ Login bem-sucedido!</h3>
+                        <p><strong>Usuário:</strong> ${data.user.firstName} ${data.user.lastName}</p>
+                        <p><strong>Role:</strong> ${data.user.role}</p>
+                        <p><strong>Token:</strong> ${data.accessToken.substring(0, 50)}...</p>
+                        <p><strong>Redirect:</strong> ${data.redirectTo}</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<h3>❌ Erro no login:</h3><p>${data.message}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<h3>❌ Erro de conexão:</h3><p>${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

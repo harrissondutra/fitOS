@@ -6,8 +6,9 @@
 import axios from 'axios';
 import { logger } from '../../utils/logger';
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 /**
  * Buscar alimento por código de barras
@@ -98,4 +99,7 @@ export async function saveFoodFromExternalSource(food: any) {
     throw error;
   }
 }
+
+
+
 

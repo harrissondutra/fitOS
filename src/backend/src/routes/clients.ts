@@ -2,8 +2,9 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { ClientService, ClientFilters, ClientFormData } from '../services/client.service';
+import { createClientService } from '../utils/service-factory';
 import { ActivityLogService } from '../services/activity-log.service';
 import { checkClientLimit, trackUsage } from '../middleware/plan-limits.middleware';
 import { body, validationResult, query } from 'express-validator';
@@ -11,9 +12,8 @@ import { body, validationResult, query } from 'express-validator';
 // Tipos temporários para evitar erros de compilação após remoção da autenticação
 type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
 
-// PrismaClient global compartilhado
-const prisma = new PrismaClient();
-const clientService = new ClientService(prisma);
+// PrismaClient global (mantido para logs e operações diretas)
+const prisma = getPrismaClient();
 const activityLogService = new ActivityLogService(prisma);
 
 const router = Router();
@@ -23,7 +23,7 @@ interface RequestWithTenantAndAuth extends RequestWithTenant {
   user?: {
     id: string;
     email: string;
-    role: UserRole;
+    role: any; // aceitar roles legadas
     tenantId?: string;
     name?: string;
   };
@@ -87,6 +87,7 @@ router.get('/',
       sortOrder: req.query.sortOrder as any
     };
 
+    const clientService = await createClientService(req);
     const result = await clientService.getClients(filters, tenantId || 'default', req.user.role, req.user.id);
 
     return res.json({
@@ -120,6 +121,8 @@ router.get('/:id',
       });
     }
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const clientService = await createClientService(req);
     const client = await clientService.getClientById(id, tenantId || 'default', req.user.role, req.user.id);
 
     if (!client) {
@@ -163,15 +166,17 @@ router.post('/',
     }
 
     const tenantId = req.tenantId || req.user?.tenantId;
-    if (!tenantId!) {
+    if (!tenantId) {
       return res.status(401).json({
         success: false,
         error: { message: 'Tenant not found' }
       });
     }
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const clientService = await createClientService(req);
     const clientData: ClientFormData = req.body;
-    const client = await clientService.createClient(clientData, tenantId!, req.user!.id);
+    const client = await clientService.createClient(clientData, tenantId, req.user!.id);
 
     // Log activity
     await activityLogService.logClientActivity(
@@ -217,15 +222,17 @@ router.put('/:id',
     const { id } = req.params;
     const tenantId = req.tenantId || req.user?.tenantId;
 
-    if (!tenantId!) {
+    if (!tenantId) {
       return res.status(401).json({
         success: false,
         error: { message: 'Tenant not found' }
       });
     }
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const clientService = await createClientService(req);
     const clientData: Partial<ClientFormData> = req.body;
-    const client = await clientService.updateClient(id, clientData, tenantId!, req.user!.id, req.user!.role, req.user!.id);
+    const client = await clientService.updateClient(id, clientData, tenantId, req.user!.id, req.user!.role, req.user!.id);
 
     // Log activity
     await activityLogService.logClientActivity(
@@ -250,17 +257,20 @@ router.delete('/:id',
     const { id } = req.params;
     const tenantId = req.tenantId || req.user?.tenantId;
 
-    if (!tenantId!) {
+    if (!tenantId) {
       return res.status(401).json({
         success: false,
         error: { message: 'Tenant not found' }
       });
     }
 
-    // Get client info before deletion for logging
-    const client = await clientService.getClientById(id, tenantId!, req.user!.role, req.user!.id);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const clientService = await createClientService(req);
     
-    await clientService.deleteClient(id, tenantId!, req.user!.id, req.user!.role, req.user!.id);
+    // Get client info before deletion for logging
+    const client = await clientService.getClientById(id, tenantId, req.user!.role, req.user!.id);
+    
+    await clientService.deleteClient(id, tenantId, req.user!.id, req.user!.role, req.user!.id);
 
     // Log activity
     if (client) {
@@ -302,14 +312,16 @@ router.post('/:id/assign-trainer',
     const { trainerId } = req.body;
     const tenantId = req.tenantId || req.user?.tenantId;
 
-    if (!tenantId!) {
+    if (!tenantId) {
       return res.status(401).json({
         success: false,
         error: { message: 'Tenant not found' }
       });
     }
 
-    await clientService.assignTrainer(clientId, trainerId, tenantId!, req.user!.id);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const clientService = await createClientService(req);
+    await clientService.assignTrainer(clientId, trainerId, tenantId, req.user!.id);
 
     // Log activity
     await activityLogService.logClientActivity(
@@ -334,14 +346,16 @@ router.delete('/:id/trainer/:trainerId',
     const { id: clientId, trainerId } = req.params;
     const tenantId = req.tenantId || req.user?.tenantId;
 
-    if (!tenantId!) {
+    if (!tenantId) {
       return res.status(401).json({
         success: false,
         error: { message: 'Tenant not found' }
       });
     }
 
-    await clientService.unassignTrainer(clientId, trainerId, tenantId!, req.user!.id);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const clientService = await createClientService(req);
+    await clientService.unassignTrainer(clientId, trainerId, tenantId, req.user!.id);
 
     // Log activity
     await activityLogService.logClientActivity(
@@ -366,12 +380,15 @@ router.get('/trainer/:trainerId',
     const { trainerId } = req.params;
     const tenantId = req.tenantId || req.user?.tenantId;
 
-    if (!tenantId!) {
+    if (!tenantId) {
       return res.status(401).json({
         success: false,
         error: { message: 'Tenant not found' }
       });
     }
+
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const clientService = await createClientService(req);
 
     // Verificar se o usuário pode acessar estes membros
     if (req.user!.role === 'TRAINER' && req.user!.id !== trainerId) {
@@ -381,7 +398,7 @@ router.get('/trainer/:trainerId',
       });
     }
 
-    const clients = await clientService.getClientsByTrainer(trainerId, tenantId!);
+    const clients = await clientService.getClientsByTrainer(trainerId, tenantId);
 
     return res.json({
       success: true,
@@ -397,14 +414,16 @@ router.get('/:id/progress',
     const { id: clientId } = req.params;
     const tenantId = req.tenantId || req.user?.tenantId;
 
-    if (!tenantId!) {
+    if (!tenantId) {
       return res.status(401).json({
         success: false,
         error: { message: 'Tenant not found' }
       });
     }
 
-    const progress = await clientService.getClientProgress(clientId, tenantId!, req.user!.role, req.user!.id);
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const clientService = await createClientService(req);
+    const progress = await clientService.getClientProgress(clientId, tenantId, req.user!.role, req.user!.id);
 
     return res.json({
       success: true,
@@ -455,15 +474,17 @@ router.get('/:id/history',
 router.get('/export/csv',
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
     const tenantId = req.tenantId || req.user?.tenantId;
-    if (!tenantId!) {
+    if (!tenantId) {
       return res.status(401).json({
         success: false,
         error: { message: 'Tenant not found' }
       });
     }
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const clientService = await createClientService(req);
     const clientIds = req.query.clientIds ? (req.query.clientIds as string).split(',') : [];
-    const clients = await clientService.exportClientsToCSV(clientIds, tenantId!);
+    const clients = await clientService.exportClientsToCSV(clientIds, tenantId);
 
     return res.json({
       success: true,

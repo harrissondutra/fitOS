@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export interface LogActionData {
   tenantId: string;

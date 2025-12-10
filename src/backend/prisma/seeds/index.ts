@@ -1,5 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { seedPlanConfigs } from './plan-configs';
+import { seedSidebarConfigs } from './sidebar-default-configs.seed';
+import { main as aiServiceConfigsSeed } from './ai-service-configs.seed';
+import { main as superuserSeed } from './superuser.seed';
 
 const prisma = new PrismaClient();
 
@@ -15,6 +18,10 @@ async function main() {
     // Seed plan configurations
     await seedPlanConfigs();
 
+    // Seed sidebar configurations
+    console.log('🎨 Seeding sidebar configurations...');
+    await seedSidebarConfigs();
+
     // Seed AI providers (run first)
     console.log('🤖 Seeding AI providers...');
     const aiProvidersSeed = await import('./ai-providers.seed');
@@ -22,9 +29,10 @@ async function main() {
 
     // Seed AI service configs (run after providers)
     console.log('⚙️ Seeding AI service configs...');
-    const aiServiceConfigsSeed = await import('./ai-service-configs.seed');
-    await aiServiceConfigsSeed.main();
-
+    await aiServiceConfigsSeed();
+    // Seed superuser after all other seeds
+    console.log('👑 Seeding superuser...');
+    await superuserSeed();
     console.log('✅ Database seeding completed successfully');
   } catch (error) {
     console.error('❌ Database seeding failed:', error);

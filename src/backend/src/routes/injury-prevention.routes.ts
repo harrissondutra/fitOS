@@ -5,12 +5,12 @@
 
 import { Router } from 'express';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import injuryPreventionAgent from '../agents/injury-prevention-agent';
 import { requireNutritionAddon } from '../middleware/nutrition-addon-check';
 
-const prisma = new PrismaClient();
-const authMiddleware = getAuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 const router = Router();
 
 /**
@@ -56,4 +56,7 @@ router.post('/analyze',
 );
 
 export default router;
+
+
+
 

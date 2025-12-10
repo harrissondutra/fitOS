@@ -7,6 +7,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database';
 import { RedisService } from '../redis.service';
 import { logger } from '../../utils/logger';
 
@@ -73,7 +74,7 @@ export class AutomationWorkflowService {
   private redis: RedisService;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = getPrismaClient();
     this.redis = new RedisService();
   }
 

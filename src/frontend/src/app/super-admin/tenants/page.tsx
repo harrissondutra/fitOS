@@ -341,7 +341,11 @@ export default function TenantsPage() {
                   </TableRow>
                 ) : (
                   tenants.map((tenant) => (
-                    <TableRow key={tenant.id}>
+                    <TableRow 
+                      key={tenant.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => router.push(`/super-admin/tenants/${tenant.id}`)}
+                    >
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Building2 className="h-8 w-8 text-muted-foreground" />
@@ -397,7 +401,7 @@ export default function TenantsPage() {
                           {new Date(tenant.createdAt).toLocaleDateString('pt-BR')}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -408,19 +412,19 @@ export default function TenantsPage() {
                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem asChild>
-                              <Link href={`/super-admin/tenants/${tenant.id}`}>
+                              <Link href={`/super-admin/tenants/${tenant.id}`} onClick={(e) => e.stopPropagation()}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 Ver detalhes
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                              <Link href={`/super-admin/tenants/${tenant.id}/edit`}>
+                              <Link href={`/super-admin/tenants/${tenant.id}/edit`} onClick={(e) => e.stopPropagation()}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                              <Link href={`/super-admin/tenants/${tenant.id}/custom-plan`}>
+                              <Link href={`/super-admin/tenants/${tenant.id}/custom-plan`} onClick={(e) => e.stopPropagation()}>
                                 <Settings className="mr-2 h-4 w-4" />
                                 Plano customizado
                               </Link>

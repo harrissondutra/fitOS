@@ -1,12 +1,13 @@
 import { Router } from 'express';
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { getPrismaClient } from '../../config/database';
 import { revenueAnalyticsService } from '../../services/revenue-analytics.service';
 import { customerHealthService } from '../../services/customer-health.service';
 import { userEngagementService } from '../../services/user-engagement.service';
 import { requireSuperAdmin } from '../../middleware/superAdmin';
 // import { authenticateToken } from '../../middleware/auth.middleware';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 const router = Router();
 

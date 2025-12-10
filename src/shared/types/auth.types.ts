@@ -9,9 +9,20 @@
 // TIPOS DE USUÁRIO E ROLES
 // ============================================================================
 
-export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
+export const UserRoles = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  OWNER: 'OWNER',
+  ADMIN: 'ADMIN',
+  TRAINER: 'TRAINER',
+  NUTRITIONIST: 'NUTRITIONIST',
+  CLIENT: 'CLIENT',
+  EMPLOYEE: 'EMPLOYEE',
+  PROFESSIONAL: 'PROFESSIONAL', // Legacy/Category
+} as const;
 
-export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING';
+export type UserRole = keyof typeof UserRoles;
+
+export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING' | 'DELETED';
 
 export type SidebarView = 'standard' | 'admin';
 
@@ -85,6 +96,7 @@ export interface AuthResponse {
   refreshToken: string;
   expiresIn: number;
   message?: string;
+  requiresEmailVerification?: boolean;
 }
 
 export interface LoginResponse extends AuthResponse {
@@ -171,6 +183,7 @@ export interface AuthMiddlewareOptions {
   requiredRole?: UserRole[];
   allowInactive?: boolean;
   requireEmailVerification?: boolean;
+  checkSessionActivity?: boolean; // Se false, pula verificação de sessão (útil para SUPER_ADMIN)
 }
 
 export interface PermissionCheck {
@@ -211,7 +224,7 @@ export interface AuthError {
   details?: Record<string, any>;
 }
 
-export type AuthErrorCode = 
+export type AuthErrorCode =
   | 'INVALID_CREDENTIALS'
   | 'USER_NOT_FOUND'
   | 'USER_INACTIVE'
@@ -263,12 +276,14 @@ export type RoleRedirectConfig = {
 }
 
 export const DEFAULT_ROLE_REDIRECTS: RoleRedirectConfig = {
-  SUPER_ADMIN: '/super-admin/dashboard',
-  OWNER: '/admin/dashboard',
-  ADMIN: '/admin/dashboard',
-  TRAINER: '/trainer/dashboard',
-  NUTRITIONIST: '/nutritionist/dashboard',
-  CLIENT: '/client/workouts'
+  [UserRoles.SUPER_ADMIN]: '/super-admin/dashboard',
+  [UserRoles.OWNER]: '/admin/dashboard',
+  [UserRoles.ADMIN]: '/admin/dashboard',
+  [UserRoles.TRAINER]: '/trainer/dashboard',
+  [UserRoles.NUTRITIONIST]: '/nutritionist/dashboard',
+  [UserRoles.CLIENT]: '/client/workouts',
+  [UserRoles.EMPLOYEE]: '/dashboard',
+  [UserRoles.PROFESSIONAL]: '/professional/dashboard'
 };
 
 // ============================================================================
@@ -326,21 +341,21 @@ export interface AuthWebhookPayload {
 // UTILITÁRIOS DE TIPO
 // ============================================================================
 
-export type AuthResponseType = 
-  | LoginResponse 
-  | SignupResponse 
-  | RefreshTokenResponse 
-  | LogoutResponse 
-  | ForgotPasswordResponse 
-  | ResetPasswordResponse 
+export type AuthResponseType =
+  | LoginResponse
+  | SignupResponse
+  | RefreshTokenResponse
+  | LogoutResponse
+  | ForgotPasswordResponse
+  | ResetPasswordResponse
   | VerifyEmailResponse;
 
-export type AuthRequestType = 
-  | LoginRequest 
-  | SignupRequest 
-  | ForgotPasswordRequest 
-  | ResetPasswordRequest 
-  | RefreshTokenRequest 
+export type AuthRequestType =
+  | LoginRequest
+  | SignupRequest
+  | ForgotPasswordRequest
+  | ResetPasswordRequest
+  | RefreshTokenRequest
   | VerifyEmailRequest;
 
 // ============================================================================
@@ -353,26 +368,29 @@ export const AUTH_CONSTANTS = {
   REFRESH_TOKEN_TIMEOUT: 7 * 24 * 60 * 60 * 1000, // 7 dias
   ACTIVITY_PING_INTERVAL: 5 * 60 * 1000, // 5 minutos
   INACTIVITY_WARNING: 5 * 60 * 1000, // 5 minutos antes do logout
-  
+
   // Configurações de senha
   PASSWORD_MIN_LENGTH: 8,
   PASSWORD_MAX_LENGTH: 128,
-  
+
   // Limites de rate limiting
   MAX_LOGIN_ATTEMPTS: 5,
   LOCKOUT_DURATION: 15 * 60 * 1000, // 15 minutos
-  
+
   // Configurações de token
   JWT_ISSUER: 'fitos',
   JWT_AUDIENCE: 'fitos-app',
-  
+
   // Roles hierárquicas
   ROLE_HIERARCHY: {
-    SUPER_ADMIN: 5,
-    OWNER: 4,
-    ADMIN: 3,
-    TRAINER: 2,
-    CLIENT: 1
+    [UserRoles.SUPER_ADMIN]: 6,
+    [UserRoles.OWNER]: 5,
+    [UserRoles.ADMIN]: 4,
+    [UserRoles.PROFESSIONAL]: 3,
+    [UserRoles.NUTRITIONIST]: 3,
+    [UserRoles.TRAINER]: 2,
+    [UserRoles.EMPLOYEE]: 2,
+    [UserRoles.CLIENT]: 1
   }
 } as const;
 
@@ -380,7 +398,7 @@ export const AUTH_CONSTANTS = {
 // HELPERS DE TIPO
 // ============================================================================
 
-export type RequireAtLeastOne<T, Keys extends keyof T = keyof T> = 
+export type RequireAtLeastOne<T, Keys extends keyof T = keyof T> =
   Pick<T, Exclude<keyof T, Keys>> & {
     [K in Keys]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<Keys, K>>>;
   }[Keys];

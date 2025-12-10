@@ -117,6 +117,25 @@ function generateBreadcrumbItems(pathname: string) {
 export function BreadcrumbNav() {
   const pathname = usePathname()
   const [open, setOpen] = React.useState(false)
+  const [hasMounted, setHasMounted] = React.useState(false)
+
+  // Evitar mismatch de hidratação: só usar pathname após mount
+  React.useEffect(() => {
+    setHasMounted(true)
+  }, [])
+
+  // Se ainda não montou, retornar um placeholder simples
+  if (!hasMounted) {
+    return (
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbPage>...</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    )
+  }
   
   const items = generateBreadcrumbItems(pathname || '')
   const ITEMS_TO_DISPLAY = 2

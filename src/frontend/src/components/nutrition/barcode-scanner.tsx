@@ -156,3 +156,6 @@ export function BarcodeScanner({ onScanComplete }: { onScanComplete: (product: a
   );
 }
 
+
+
+

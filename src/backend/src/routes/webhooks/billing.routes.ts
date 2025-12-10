@@ -9,15 +9,15 @@
  */
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database';
 import { BillingService } from '../../services/billing.service';
 import Stripe from 'stripe';
-import Redis from 'ioredis';
+import { getRedisClient } from '../../config/redis';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const billingService = new BillingService(prisma);
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const redis = getRedisClient();
 
 // ========== STRIPE WEBHOOKS ==========
 

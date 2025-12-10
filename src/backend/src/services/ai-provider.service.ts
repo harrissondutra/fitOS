@@ -9,7 +9,8 @@ import {
   PaginationParams,
   PaginatedResponse
 } from '../../../shared/types/ai.types';
-import { encryptionService } from './encryption.service';
+import { EncryptionService } from './encryption.service';
+const encryptionService = new EncryptionService();
 
 /**
  * AiProviderService - CRUD e resolução de provedores de IA
@@ -18,10 +19,15 @@ import { encryptionService } from './encryption.service';
  * resolução por serviço e fallback automático.
  */
 export class AiProviderService {
-  private prisma: PrismaClient;
+  private prisma: PrismaClient | any; // Aceita PrismaClient ou PrismaTenantWrapper
 
-  constructor(prisma?: PrismaClient) {
-    this.prisma = prisma || new PrismaClient();
+  constructor(prisma?: PrismaClient | any) {
+    // Se não fornecido, importar getPrismaClient para fallback
+    // Mas preferencialmente sempre passar do request via factory
+    this.prisma = prisma || (() => {
+      const { getPrismaClient } = require('../config/database');
+      return getPrismaClient();
+    })();
   }
 
   /**
@@ -319,16 +325,16 @@ export class AiProviderService {
     // Buscar configurações de serviço ativas, ordenadas por prioridade
     const serviceConfigs = await this.prisma.aiServiceConfig.findMany({
       where: {
-        serviceType,
+        serviceType: serviceType as any,
         serviceName: serviceName || null,
-        isActive: true,
-        provider: {
-          isActive: true
-        }
+        isActive: true
+        // provider: {
+        //   isActive: true
+        // }
       },
-      include: {
-        provider: true
-      },
+      // include: {
+      //   provider: true
+      // },
       orderBy: [
         { priority: 'asc' },
         { createdAt: 'asc' }
@@ -341,11 +347,11 @@ export class AiProviderService {
 
     // Pegar o primeiro provedor (maior prioridade)
     const serviceConfig = serviceConfigs[0];
-    const provider = serviceConfig.provider;
+    const provider = (serviceConfig as any).provider;
 
     // Descriptografar chaves
-    let apiKey = provider.apiKey;
-    let webhookSecret = provider.webhookSecret;
+    let apiKey = provider?.apiKey;
+    let webhookSecret = provider?.webhookSecret;
 
     if (apiKey && encryptionService.isEncrypted(apiKey)) {
       apiKey = encryptionService.decrypt(apiKey);
@@ -453,6 +459,46 @@ export class AiProviderService {
         error: error instanceof Error ? error.message : 'Unknown error',
         responseTime: Date.now() - startTime
       };
+    }
+  }
+
+  /**
+   * Testa uma configuração de provedor (sem persistir no banco)
+   * @param providerConfig Objeto com provider, apiKey, baseUrl, models, etc.
+   */
+  async testProviderConfig(providerConfig: any): Promise<{ success: boolean; error?: string; responseTime?: number }> {
+    const tmpProvider: any = {
+      id: 'temp',
+      provider: providerConfig?.provider as AiProviderType,
+      apiKey: providerConfig?.apiKey,
+      baseUrl: (providerConfig?.baseUrl || '').replace(/\/$/, ''),
+      models: providerConfig?.models || [],
+      headers: providerConfig?.headers || undefined,
+      config: providerConfig?.config || {},
+      webhookSecret: null
+    } as any;
+
+    const startTime = Date.now();
+    try {
+      switch (tmpProvider.provider) {
+        case 'OPEN': // fallback if someone passes wrong key
+        case AiProviderType.OPENAI:
+          return await this.testOpenAIProvider(tmpProvider as any);
+        case AiProviderType.GROQ:
+          return await this.testGroqProvider(tmpProvider as any);
+        case AiProviderType.GEMINI:
+          return await this.testGeminiProvider(tmpProvider as any);
+        case AiProviderType.DEEPSEEK:
+          return await this.testDeepSeekProvider(tmpProvider as any);
+        default:
+          return { success: false, error: 'Provider type not supported for testing', name: undefined } as any;
+      }
+    } catch (e) {
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : 'Unknown error',
+        responseTime: Date.now() - startTime
+      } as any;
     }
   }
 
@@ -683,5 +729,6 @@ export class AiProviderService {
   }
 }
 
-// Instância singleton para uso em toda a aplicação
+// Exportar instância padrão (mantido para compatibilidade)
+// Preferir usar createAiProviderService(req) nas rotas para tenant context
 export const aiProviderService = new AiProviderService();

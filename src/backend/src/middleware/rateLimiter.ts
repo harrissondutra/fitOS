@@ -111,14 +111,23 @@ function createHybridRateLimiter(redisLimiter: any, windowMs: number, max: numbe
         }
       }
 
-      // Pular rate limiting para SUPER_ADMIN (fallback)
+      // Pular rate limiting para SUPER_ADMIN (fallback com verificação melhorada)
       const userRole = (req as any).user?.role;
+      const userId = (req as any).user?.id;
+      
       if (userRole === 'SUPER_ADMIN') {
         logger.debug('Rate limiting bypassed for SUPER_ADMIN', {
           ip: req.ip,
           url: req.url,
           method: req.method,
-          userRole
+          userRole,
+          userId
+        });
+        // Adicionar header indicando bypass para SUPER_ADMIN
+        res.set({
+          'X-RateLimit-Bypass': 'SUPER_ADMIN',
+          'X-RateLimit-Limit': 'unlimited',
+          'X-RateLimit-Remaining': 'unlimited'
         });
         return next();
       }
@@ -288,6 +297,28 @@ export const webhookRateLimiter = createCustomRateLimiter(
 export const roleBasedRateLimiter = (roleLimits: Record<string, { windowMs: number; max: number }>) => {
   return async (req: Request, res: Response, next: Function) => {
     try {
+      // Whitelist de rotas críticas para UX
+      const path = req.url || req.path || '';
+      if (path.startsWith('/api/settings/profile') || path.startsWith('/api/sidebar/config')) {
+        return next();
+      }
+
+      // Bypass por JWT (antes do auth middleware popular req.user)
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(token, config.jwt.secret);
+          if (decoded.role === 'SUPER_ADMIN') {
+            res.set({ 'X-RateLimit-Bypass': 'SUPER_ADMIN' });
+            return next();
+          }
+        } catch (_) {
+          // Ignorar erros de JWT e seguir com lógica padrão
+        }
+      }
+
       const userRole = (req as any).user?.role || 'CLIENT';
       
       // SUPER_ADMIN não tem nenhum limite de rate limiting
@@ -298,6 +329,7 @@ export const roleBasedRateLimiter = (roleLimits: Record<string, { windowMs: numb
           method: req.method,
           userRole
         });
+        res.set({ 'X-RateLimit-Bypass': 'SUPER_ADMIN' });
         return next();
       }
       

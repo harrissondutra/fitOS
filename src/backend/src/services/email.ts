@@ -43,13 +43,17 @@ class EmailService {
         secure: false, // Gmail usa STARTTLS na porta 587
         auth: {
           user: config.email.auth.user,
-          pass: config.email.auth.pass, // App Password do Gmail
+          pass: config.email.auth.pass,
         },
         tls: {
-          rejectUnauthorized: false, // Para desenvolvimento
-          ciphers: 'SSLv3'
+          rejectUnauthorized: false,
         },
-        // Configurações específicas para Gmail
+        // Configurações para reduzir chance de SPAM em envios simples
+        headers: {
+          'X-Priority': '3', // Normal
+          'X-MSMail-Priority': 'Normal',
+          'Importance': 'Normal',
+        },
         pool: true,
         maxConnections: 1,
         maxMessages: 3,
@@ -92,7 +96,7 @@ class EmailService {
 
       const result = await this.transporter.sendMail(mailOptions);
       logger.info('Email sent successfully', { messageId: result.messageId });
-      
+
       // Rastrear custo do email
       try {
         const recipientCount = Array.isArray(options.to) ? options.to.length : 1;
@@ -108,7 +112,7 @@ class EmailService {
       } catch (error) {
         logger.warn('Failed to track email usage:', error);
       }
-      
+
       return true;
     } catch (error) {
       logger.error('Failed to send email:', error);
@@ -356,6 +360,113 @@ class EmailService {
 
   async sendWorkoutReminderEmail(to: string, userName: string, workoutName: string, workoutTime: string): Promise<boolean> {
     const template = this.getWorkoutReminderEmailTemplate(userName, workoutName, workoutTime);
+    return this.sendEmail({
+      to,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+    });
+  }
+  getVerificationEmailTemplate(userName: string, verifyUrl: string): EmailTemplate {
+    return {
+      subject: 'Confirme seu email - FitOS ✅',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Confirme seu email - FitOS</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+            .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 40px 20px; text-align: center; }
+            .header h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+            .header p { margin: 10px 0 0; font-size: 16px; opacity: 0.9; }
+            .content { padding: 40px 30px; text-align: center; }
+            .content h2 { color: #1f2937; margin-top: 0; }
+            .content p { color: #4b5563; font-size: 16px; margin-bottom: 25px; }
+            .button { display: inline-block; background: #10b981; color: white; padding: 14px 32px; text-decoration: none; border-radius: 50px; font-weight: 600; font-size: 16px; transition: background-color 0.3s ease; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); }
+            .button:hover { background: #059669; }
+            .features { background-color: #f9fafb; padding: 30px; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; text-align: left; }
+            .feature-item { display: flex; align-items: start; margin-bottom: 15px; }
+            .feature-icon { color: #10b981; margin-right: 15px; font-size: 20px; }
+            .feature-text h3 { margin: 0 0 5px; font-size: 16px; color: #1f2937; }
+            .feature-text p { margin: 0; font-size: 14px; color: #6b7280; }
+            .footer { background-color: #ececec; padding: 20px; text-align: center; color: #6b7280; font-size: 12px; }
+            .social-links { margin-bottom: 15px; }
+            .social-links a { margin: 0 10px; color: #6b7280; text-decoration: none; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>FitOS</h1>
+              <p>O Sistema Operacional do seu Fitness</p>
+            </div>
+            
+            <div class="content">
+              <h2>Quase lá, ${userName}! 👋</h2>
+              <p>Estamos muito felizes em ter você conosco! Para garantir a segurança da sua conta e liberar seu acesso completo, precisamos apenas que você confirme seu email.</p>
+              
+              <a href="${verifyUrl}" class="button">Confirmar meu Email e Escolher Plano</a>
+              
+              <p style="margin-top: 30px; font-size: 14px; color: #9ca3af;">Ou copie e cole o link abaixo no seu navegador:<br>${verifyUrl}</p>
+            </div>
+
+            <div class="features">
+              <div class="feature-item">
+                <span class="feature-icon">🚀</span>
+                <div class="feature-text">
+                  <h3>Comece Grátis</h3>
+                  <p>Explore nossa plataforma com o plano gratuito para sempre.</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">🧠</span>
+                <div class="feature-text">
+                  <h3>IA Inteligente</h3>
+                  <p>Treinos e dietas personalizados pela nossa inteligência artificial.</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">📊</span>
+                <div class="feature-text">
+                  <h3>Gestão Completa</h3>
+                  <p>Tudo o que você precisa para gerenciar sua saúde ou negócio fitness.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="footer">
+              <p>Enviado com ❤️ pela equipe FitOS</p>
+              <p>© 2024 FitOS. Todos os direitos reservados.</p>
+              <p>Se você não criou esta conta, nenhuma ação é necessária.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+        Confirme seu email - FitOS ✅
+        
+        Olá, ${userName}! 👋
+        
+        Estamos muito felizes em ter você conosco! Para garantir a segurança da sua conta, confirme seu email clicando no link abaixo:
+        
+        ${verifyUrl}
+        
+        Ao confirmar, você será redirecionado para escolher seu plano (inclusive o plano Gratuito!).
+        
+        Se você não criou esta conta, pode ignorar este email.
+        
+        © 2024 FitOS_Team
+      `,
+    };
+  }
+
+  async sendVerificationEmail(to: string, userName: string, verifyUrl: string): Promise<boolean> {
+    const template = this.getVerificationEmailTemplate(userName, verifyUrl);
     return this.sendEmail({
       to,
       subject: template.subject,

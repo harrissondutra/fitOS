@@ -14,10 +14,10 @@
 
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { 
-  LoginRequest, 
-  SignupRequest, 
-  ForgotPasswordRequest, 
+import {
+  LoginRequest,
+  SignupRequest,
+  ForgotPasswordRequest,
   ResetPasswordRequest,
   RefreshTokenRequest,
   VerifyEmailRequest,
@@ -35,6 +35,7 @@ import {
 import { getAuthService } from '../services/auth.service';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { GoogleCalendarService } from '../services/google-calendar.service';
+import { emailService } from '../services/email';
 
 export class AuthRoutes {
   private router: Router;
@@ -43,65 +44,114 @@ export class AuthRoutes {
   private authMiddleware: ReturnType<typeof getAuthMiddleware>;
   private googleCalendarService: GoogleCalendarService;
 
-  constructor(prisma: PrismaClient) {
+  // Pequeno utilitário de retry para erros transitórios de pool (P2024)
+  private async withPrismaRetry<T>(operation: () => Promise<T>, retries: number = 3): Promise<T> {
+    let lastErr: any;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        return await operation();
+      } catch (err: any) {
+        const code = err?.code || err?.meta?.code;
+        // Prisma P2024: Timed out fetching a new connection from the connection pool
+        if (code === 'P2024') {
+          const backoffMs = attempt * 100; // backoff exponencial simples
+          await new Promise((r) => setTimeout(r, backoffMs));
+          lastErr = err;
+          continue; // tentar novamente
+        }
+        throw err; // outros erros: propagar
+      }
+    }
+    throw lastErr || new Error('Database operation failed after retries');
+  }
+
+  private jsonSafe(res: Response, payload: any, status: number = 200): void {
+    const safe = JSON.parse(
+      JSON.stringify(payload, (_k, v) => (typeof v === 'bigint' ? v.toString() : v))
+    );
+    res.status(status).json(safe);
+  }
+
+  constructor(prisma?: PrismaClient) {
     this.router = Router();
-    this.prisma = prisma;
-    this.authService = getAuthService(prisma);
-    this.authMiddleware = getAuthMiddleware(prisma);
+
+    // Lazy evaluation: obter PrismaClient apenas quando necessário
+    const getPrismaClientLazy = () => {
+      if (prisma) return prisma;
+      const { getPrismaClient } = require('../config/database');
+      return getPrismaClient();
+    };
+
+    // Usar lazy getter para prisma
+    Object.defineProperty(this, 'prisma', {
+      get: () => {
+        if (!this['_prisma']) {
+          this['_prisma'] = getPrismaClientLazy();
+        }
+        return this['_prisma'];
+      },
+      enumerable: true,
+      configurable: true
+    });
+
+    // Inicializar serviços com lazy getters - eles só usarão prisma quando necessário
+    // Passar função lazy para evitar criar conexão agora
+    this.authService = getAuthService(prisma); // Passa prisma opcional, o serviço usa lazy se não fornecido
+    this.authMiddleware = getAuthMiddleware(); // Passa prisma opcional, o middleware usa lazy se não fornecido
     this.googleCalendarService = new GoogleCalendarService();
-    
+
     this.setupRoutes();
   }
 
   private setupRoutes(): void {
     // Rotas públicas
-    this.router.post('/login', 
+    this.router.post('/login',
       this.authMiddleware.validateLoginData,
       this.authMiddleware.rateLimitLogin(),
       this.login.bind(this)
     );
-    
-    this.router.post('/signup', 
+
+    this.router.post('/signup',
       this.authMiddleware.validateSignupData,
       this.signup.bind(this)
     );
-    
-    this.router.post('/forgot-password', 
+
+    this.router.post('/forgot-password',
       this.forgotPassword.bind(this)
     );
-    
-    this.router.post('/reset-password', 
+
+    this.router.post('/reset-password',
       this.resetPassword.bind(this)
     );
-    
-    this.router.post('/verify-email', 
+
+    this.router.post('/verify-email',
       this.verifyEmail.bind(this)
     );
-    
-    this.router.post('/refresh', 
+
+    this.router.post('/refresh',
       this.refreshToken.bind(this)
     );
 
     // Rotas de autenticação Google
-    this.router.get('/google', 
+    this.router.get('/google',
       this.googleAuth.bind(this)
     );
-    
-    this.router.get('/google/callback', 
+
+    this.router.get('/google/callback',
       this.googleCallback.bind(this)
     );
 
-    this.router.post('/google/create-user', 
+    this.router.post('/google/create-user',
       this.googleCreateUser.bind(this)
     );
 
     // Rotas protegidas
-    this.router.post('/logout', 
+    this.router.post('/logout',
       this.authMiddleware.requireAuth(),
       this.logout.bind(this)
     );
-    
-    this.router.get('/me', 
+
+    this.router.get('/me',
       this.authMiddleware.requireAuth(),
       this.getMe.bind(this)
     );
@@ -117,15 +167,16 @@ export class AuthRoutes {
    */
   private async login(req: Request, res: Response): Promise<void> {
     try {
-      const { email, password, rememberMe }: LoginRequest = req.body;
+      const { email, password, rememberMe } = req.body as any;
+      const deviceFingerprint = (req.body as any).deviceFingerprint;
 
       // Buscar usuário por email
-      const user = await this.prisma.user.findUnique({
-        where: { email: email.toLowerCase() },
-        include: {
-          tenant: true
-        }
-      });
+      const user = await this.withPrismaRetry(() =>
+        this.prisma.user.findUnique({
+          where: { email: email.toLowerCase() },
+          include: { tenant: true }
+        })
+      );
 
       if (!user) {
         res.status(401).json({
@@ -157,12 +208,13 @@ export class AuthRoutes {
         return;
       }
 
-      // Criar sessão
+      // Criar sessão com device fingerprint (se fornecido)
       const session = await this.authService.createSession(
         user.id,
         user.tenantId || 'default-tenant',
         req.ip,
-        req.get('User-Agent')
+        req.get('User-Agent'),
+        deviceFingerprint // Passar fingerprint
       );
 
       // Gerar tokens
@@ -170,10 +222,12 @@ export class AuthRoutes {
       const refreshTokenData = await this.authService.createRefreshToken(user.id);
 
       // Atualizar último login
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: { lastLogin: new Date() }
-      });
+      await this.withPrismaRetry(() =>
+        this.prisma.user.update({
+          where: { id: user.id },
+          data: { lastLogin: new Date() }
+        })
+      );
 
       // Determinar redirecionamento baseado na role
       const redirectTo = DEFAULT_ROLE_REDIRECTS[user.role as keyof typeof DEFAULT_ROLE_REDIRECTS];
@@ -188,7 +242,7 @@ export class AuthRoutes {
         message: 'Login realizado com sucesso'
       };
 
-      res.json(response);
+      this.jsonSafe(res, response);
     } catch (error) {
       console.error('Erro no login:', error);
       res.status(500).json({
@@ -277,6 +331,29 @@ export class AuthRoutes {
       const accessToken = this.authService.generateAccessToken(newUser as User);
       const refreshTokenData = await this.authService.createRefreshToken(newUser.id);
 
+      // Gerar e enviar token de verificação de email
+      const verificationToken = this.authService.generateAccessToken(newUser as User); // Pode usar JWT como token de verificação também
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+
+      await this.prisma.verification.create({
+        data: {
+          id: `verify_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          identifier: email.toLowerCase(),
+          value: verificationToken,
+          expiresAt
+        }
+      });
+
+      const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000';
+      const verifyUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
+
+      try {
+        await emailService.sendVerificationEmail(email, firstName, verifyUrl);
+      } catch (emailError) {
+        console.error('Falha ao enviar email de verificação:', emailError);
+        // Não falhar o signup se o email falhar, mas logar erro
+      }
+
       const response: SignupResponse = {
         success: true,
         user: newUser as User,
@@ -287,7 +364,7 @@ export class AuthRoutes {
         message: 'Usuário criado com sucesso'
       };
 
-      res.status(201).json(response);
+      this.jsonSafe(res, response, 201);
     } catch (error) {
       console.error('Erro no signup:', error);
       res.status(500).json({
@@ -340,7 +417,7 @@ export class AuthRoutes {
       // Por enquanto, apenas logar o token
       console.log(`Token de reset para ${email}: ${resetToken}`);
 
-      res.json(response);
+      this.jsonSafe(res, response);
     } catch (error) {
       console.error('Erro no forgot-password:', error);
       res.status(500).json({
@@ -436,7 +513,7 @@ export class AuthRoutes {
         message: 'Senha redefinida com sucesso'
       };
 
-      res.json(response);
+      this.jsonSafe(res, response);
     } catch (error) {
       console.error('Erro no reset-password:', error);
       res.status(500).json({
@@ -648,7 +725,7 @@ export class AuthRoutes {
         return;
       }
 
-      res.json({
+      this.jsonSafe(res, {
         success: true,
         user: fullUser as User
       });
@@ -669,7 +746,7 @@ export class AuthRoutes {
   private async googleAuth(req: Request, res: Response): Promise<void> {
     try {
       const { tenantId } = req.query;
-      
+
       if (!tenantId) {
         res.status(400).json({
           success: false,
@@ -681,8 +758,8 @@ export class AuthRoutes {
 
       // Gerar URL de autorização do Google
       const authUrl = this.googleCalendarService.getAuthUrl('temp', tenantId as string);
-      
-      res.json({
+
+      this.jsonSafe(res, {
         success: true,
         authUrl
       });
@@ -715,7 +792,7 @@ export class AuthRoutes {
 
       // Processar callback do Google
       const result = await this.googleCalendarService.handleCallback(code as string, state as string);
-      
+
       if (!result.success) {
         res.status(400).json({
           success: false,
@@ -755,14 +832,14 @@ export class AuthRoutes {
       // Gerar tokens
       const accessToken = this.authService.generateAccessToken(user as User);
       const refreshToken = this.authService.generateRefreshToken(user as User);
-      
+
       // Salvar refresh token
       await this.authService.createRefreshToken(user.id);
 
       // Redirecionar para o frontend com tokens
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const redirectUrl = `${frontendUrl}/auth/google-success?token=${accessToken}&refresh=${refreshToken}`;
-      
+
       res.redirect(redirectUrl);
     } catch (error) {
       console.error('Erro no callback do Google:', error);
@@ -845,7 +922,7 @@ export class AuthRoutes {
       // Gerar tokens
       const accessToken = this.authService.generateAccessToken(newUser as User);
       const refreshToken = this.authService.generateRefreshToken(newUser as User);
-      
+
       // Salvar refresh token
       await this.authService.createRefreshToken(newUser.id);
 
@@ -858,7 +935,7 @@ export class AuthRoutes {
         redirectTo: DEFAULT_ROLE_REDIRECTS[newUser.role || 'CLIENT'] || '/dashboard'
       };
 
-      res.json(response);
+      this.jsonSafe(res, response);
     } catch (error) {
       console.error('Erro ao criar usuário via Google:', error);
       res.status(500).json({
@@ -881,9 +958,18 @@ export class AuthRoutes {
 // Instância singleton das rotas
 let authRoutesInstance: AuthRoutes | null = null;
 
-export function getAuthRoutes(prisma: PrismaClient): AuthRoutes {
-  if (!authRoutesInstance) {
-    authRoutesInstance = new AuthRoutes(prisma);
+// Lazy getter para garantir que PrismaClient seja obtido apenas quando necessário
+function getPrismaClientLazy(): PrismaClient {
+  const { getPrismaClient } = require('../config/database');
+  return getPrismaClient();
+}
+
+export function getAuthRoutes(prisma?: PrismaClient): AuthRoutes {
+  // Se já existe instância, retornar ela (pode estar com PrismaClient diferente)
+  // Criar nova instância sempre que prisma for diferente, ou se não existir instância
+  if (!authRoutesInstance || (prisma && authRoutesInstance['prisma'] !== prisma)) {
+    const prismaInstance = prisma || getPrismaClientLazy();
+    authRoutesInstance = new AuthRoutes(prismaInstance);
   }
   return authRoutesInstance;
 }

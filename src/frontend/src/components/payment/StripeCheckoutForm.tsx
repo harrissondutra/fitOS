@@ -151,6 +151,8 @@ function CheckoutForm({ planId, amount, onSuccess }: StripeCheckoutFormProps) {
   );
 }
 
+export { CheckoutForm as StripeCheckoutForm };
+
 export function StripeCheckoutFormWrapper({ 
   stripePromise, 
   ...props 

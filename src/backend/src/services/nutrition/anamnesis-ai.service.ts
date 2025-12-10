@@ -5,7 +5,7 @@
 
 import { logger } from '../../utils/logger';
 import { AiClientFactory } from '../ai-client.factory';
-import { AiServiceType } from '@/shared/types/ai.types';
+import { AiServiceType } from '../../../../shared/types/ai.types';
 
 export interface ClientData {
   name: string;
@@ -57,7 +57,7 @@ export class AnamnesisAIService {
       );
 
       // 3. Parsear resposta
-      const anamnesis = this.parseAnamnesisResponse(response, data);
+      const anamnesis = this.parseAnamnesisResponse(response.content, data);
 
       logger.info('Anamnese generated successfully', {
         clientName: data.name,
@@ -180,7 +180,7 @@ Forneça JSON:
         { temperature: 0.7, maxTokens: 1000 }
       );
 
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
       return JSON.parse(jsonMatch?.[0] || '{}');
       
     } catch (error) {

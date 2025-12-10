@@ -2,8 +2,11 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
-import { PrismaClient } from '@prisma/client';
+import { validateUserLimit } from '../middleware/validateUserLimit';
+// removed UserRole import to avoid conflicts; role is treated as any in Request type
+import { getPrismaClient } from '../config/database';
 import { UserService } from '../services/user.service';
+import { createUserService } from '../utils/service-factory';
 import { CSVParser } from '../utils/csv-parser';
 import { body, validationResult, query } from 'express-validator';
 import { UserFilters, UserBulkAction, UserFormData } from '../../../shared/types';
@@ -12,9 +15,8 @@ import { UserFilters, UserBulkAction, UserFormData } from '../../../shared/types
 type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
 type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DELETED';
 
-// PrismaClient global compartilhado
-const prisma = new PrismaClient();
-const userService = new UserService(prisma);
+// PrismaClient global (mantido apenas para usos diretos pontuais)
+const prisma = getPrismaClient();
 
 const router = Router();
 
@@ -23,7 +25,7 @@ interface RequestWithTenantAndAuth extends RequestWithTenant {
   user?: {
     id: string;
     email: string;
-    role: UserRole;
+    role: any;
     tenantId?: string;
     name?: string;
   };
@@ -33,7 +35,7 @@ interface RequestWithTenantAndAuth extends RequestWithTenant {
 router.get('/me', asyncHandler(async (req: RequestWithTenant, res: Response) => {
   try {
     console.log('🔍 /api/users/me - Headers:', req.headers);
-    
+
     // Auth removed - returning error for now
     return res.status(501).json({
       success: false,
@@ -55,7 +57,7 @@ router.get('/by-email/:email', asyncHandler(async (req: RequestWithTenant, res: 
   try {
     const { email } = req.params;
     console.log('🔍 /api/users/by-email - Buscando usuário:', email);
-    
+
     const user = await prisma.user.findFirst({
       where: {
         email: email
@@ -143,7 +145,7 @@ router.put('/profile', asyncHandler(async (req: RequestWithTenantAndAuth, res: R
 }));
 
 // Get all users (admin only) - Implemented with new auth
-router.get('/', 
+router.get('/',
   [
     query('search').optional().isString().trim(),
     query('role').optional().isIn(['CLIENT', 'TRAINER', 'ADMIN', 'OWNER', 'SUPER_ADMIN']),
@@ -174,7 +176,7 @@ router.get('/',
       // Para SUPER_ADMIN, buscar todos os usuários
       const filters: UserFilters = {
         search: req.query.search as string,
-        role: req.query.role as UserRole,
+        role: (req.query.role as any),
         status: req.query.status as UserStatus,
         createdFrom: req.query.createdFrom as string,
         createdTo: req.query.createdTo as string,
@@ -186,80 +188,27 @@ router.get('/',
 
       console.log('🔍 /api/users - Filters:', filters);
 
-      // Buscar usuários diretamente do banco
-      const skip = ((filters.page || 1) - 1) * (filters.limit || 10);
-      const take = filters.limit || 10;
+      // Usar service com wrapper para isolamento multi-tenant
+      const userService = await createUserService(req);
+      const tenantId = (req as any).tenantId || '';
+      const users = await userService.getUsers(filters, tenantId, 'SUPER_ADMIN');
 
-      const where: any = {};
-      
-      if (filters.search) {
-        where.OR = [
-          { firstName: { contains: filters.search, mode: 'insensitive' } },
-          { lastName: { contains: filters.search, mode: 'insensitive' } },
-          { email: { contains: filters.search, mode: 'insensitive' } }
-        ];
-      }
-      
-      if (filters.role) {
-        where.role = filters.role;
-      }
-      
-      if (filters.status) {
-        where.status = filters.status;
-      }
-      
-      if (filters.createdFrom || filters.createdTo) {
-        where.createdAt = {};
-        if (filters.createdFrom) {
-          where.createdAt.gte = new Date(filters.createdFrom);
-        }
-        if (filters.createdTo) {
-          where.createdAt.lte = new Date(filters.createdTo);
-        }
-      }
-
-      const [users, total] = await Promise.all([
-        prisma.user.findMany({
-          where,
-          skip,
-          take,
-          orderBy: {
-            [filters.sortBy || 'createdAt']: filters.sortOrder || 'desc'
-          },
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-            role: true,
-            status: true,
-            tenantId: true,
-            createdAt: true,
-            updatedAt: true,
-            lastLogin: true
-          }
-        }),
-        prisma.user.count({ where })
-      ]);
-
+      const total = Array.isArray((users as any)) ? (users as any).length : (users as any).users?.length || 0;
       const totalPages = Math.ceil(total / (filters.limit || 10));
 
-      const result = {
-        users,
-        pagination: {
-          page: filters.page,
-          limit: filters.limit,
-          total,
-          totalPages
-        }
-      };
-
-      console.log('📥 /api/users - Result:', { usersCount: users.length, total, totalPages });
+      console.log('📥 /api/users - Result:', { usersCount: total, total, totalPages });
 
       return res.json({
         success: true,
-        data: result
+        data: {
+          users,
+          pagination: {
+            page: filters.page,
+            limit: filters.limit,
+            total,
+            totalPages
+          }
+        }
       });
 
     } catch (error) {
@@ -273,13 +222,13 @@ router.get('/',
 );
 
 // Get user by ID - Auth removed
-router.get('/:id', 
+router.get('/:id',
   asyncHandler(async (req: Request, res: Response) => {
     return res.status(501).json({
       success: false,
       error: { message: 'Authentication system has been removed' }
     });
-    
+
     /* Código comentado devido ao sistema de autenticação removido
     const { id } = req.params;
     const tenantId = req.tenantId || req.user?.tenantId;
@@ -320,6 +269,7 @@ router.post('/',
     body('phone').optional().isString().trim(),
     body('status').optional().isIn(['ACTIVE', 'INACTIVE', 'SUSPENDED'])
   ],
+  validateUserLimit,
   asyncHandler(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -341,8 +291,10 @@ router.post('/',
       });
     }
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const userService = await createUserService(req);
     const userData: UserFormData = req.body;
-    const user = await userService.createUser(userData, tenantId!, req.user!.id);
+    const user = await userService.createUser(userData, tenantId || '', req.user?.id || '');
 
     return res.status(201).json({
       success: true,
@@ -385,8 +337,10 @@ router.put('/:id',
       });
     }
 
+    // Usar service com wrapper para garantir isolamento multi-tenant
+    const userService = await createUserService(req);
     const userData: Partial<UserFormData> = req.body;
-    const user = await userService.updateUser(id, userData, tenantId!, req.user!.id);
+    const user = await userService.updateUser(id, userData, tenantId || '', req.user?.id || '');
 
     return res.json({
       success: true,
@@ -402,7 +356,7 @@ router.delete('/:id',
       success: false,
       error: { message: 'Authentication system has been removed' }
     });
-    
+
     /* Código comentado devido ao sistema de autenticação removido
     const { id } = req.params;
     const tenantId = req.tenantId || req.user?.tenantId;
@@ -455,7 +409,9 @@ router.post('/bulk-action',
     }
 
     const bulkAction: UserBulkAction = req.body;
-    const result = await userService.bulkAction(bulkAction, tenantId!, req.user!.id);
+    const { createUserService } = await import('../utils/service-factory');
+    const userServiceInstance = await createUserService(req);
+    const result = await userServiceInstance.bulkAction(bulkAction, tenantId!, req.user!.id);
 
     return res.json({
       success: true,
@@ -471,7 +427,7 @@ router.post('/import-csv',
       success: false,
       error: { message: 'Authentication system has been removed' }
     });
-    
+
     /* Código comentado devido ao sistema de autenticação removido
     const tenantId = req.tenantId || req.user?.tenantId;
     // SUPER_ADMIN pode acessar sem tenantId específico
@@ -520,7 +476,9 @@ router.post('/:id/reset-password',
       });
     }
 
-    await userService.resetUserPassword(id, newPassword, tenantId!, req.user!.id);
+    const { createUserService: createUserService2 } = await import('../utils/service-factory');
+    const userServiceInstance2 = await createUserService2(req);
+    await userServiceInstance2.resetUserPassword(id, newPassword, tenantId!, req.user!.id);
 
     return res.json({
       success: true,
@@ -536,7 +494,7 @@ router.get('/export/csv',
       success: false,
       error: { message: 'Authentication system has been removed' }
     });
-    
+
     /* Código comentado devido ao sistema de autenticação removido
     const tenantId = req.tenantId || req.user?.tenantId;
     // SUPER_ADMIN pode acessar sem tenantId específico

@@ -1,28 +1,32 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { TrainingProgramService } from '../services/training-program.service';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authenticateToken } from '../middleware/auth.middleware';
 import { tenantMiddleware } from '../middleware/tenant.middleware';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
 import { body, param, query } from 'express-validator';
+import { UserRole } from '../../../shared/types/auth.types';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const programService = new TrainingProgramService(prisma);
 
 // Extend Request interface
 interface RequestWithTenantAndAuth extends RequestWithTenant {
   user?: {
     id: string;
-    role: string;
+    email: string;
+    role: UserRole;
+    tenantId?: string;
+    name?: string;
   };
 }
 
 // POST /api/training-programs - Criar programa
 router.post(
   '/',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [
     body('clientId').notEmpty().withMessage('Client ID is required'),
@@ -49,7 +53,7 @@ router.post(
 // GET /api/training-programs - Listar programas
 router.get(
   '/',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [
     query('clientId').optional().isString(),
@@ -78,7 +82,7 @@ router.get(
 // GET /api/training-programs/:id - Buscar programa por ID
 router.get(
   '/:id',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('id').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
@@ -103,7 +107,7 @@ router.get(
 // PUT /api/training-programs/:id - Atualizar programa
 router.put(
   '/:id',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('id').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
@@ -121,7 +125,7 @@ router.put(
 // PUT /api/training-programs/:id/deactivate - Desativar programa
 router.put(
   '/:id/deactivate',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [param('id').isString().notEmpty()],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
@@ -139,7 +143,7 @@ router.put(
 // POST /api/training-programs/:id/generate-periodization - Gerar periodização
 router.post(
   '/:id/generate-periodization',
-  authMiddleware,
+  authenticateToken,
   tenantMiddleware,
   [
     param('id').isString().notEmpty(),

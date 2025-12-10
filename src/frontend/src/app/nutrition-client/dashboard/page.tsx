@@ -4,11 +4,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Home, 
-  Target, 
-  TrendingUp, 
+import { useAuth } from '@/hooks/use-auth';
+import { useNutrition } from '@/hooks/use-nutrition';
+import {
+  Home,
+  Target,
+  TrendingUp,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -28,90 +31,41 @@ import {
 } from 'lucide-react';
 
 export default function ClientDashboard() {
-  const todayStats = {
-    calories: { consumed: 1450, target: 2000, percentage: 72 },
-    protein: { consumed: 95, target: 120, percentage: 79 },
-    carbs: { consumed: 180, target: 200, percentage: 90 },
-    fat: { consumed: 45, target: 70, percentage: 64 },
-    fiber: { consumed: 18, target: 25, percentage: 72 },
-    water: { consumed: 1800, target: 2500, percentage: 72 }
-  };
+  const { user } = useAuth();
+  const { todayStats, progressData, recentMeals, loading, error } = useNutrition(user?.id);
 
-  const progressData = {
-    weight: { current: 68.5, start: 72.0, target: 65.0, change: -3.5 },
-    bodyFat: { current: 22, start: 26, target: 18, change: -4 },
-    muscle: { current: 28, start: 25, target: 30, change: 3 }
-  };
+  // Loading state
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+        <Skeleton className="h-96" />
+      </div>
+    );
+  }
 
-  const recentMeals = [
-    {
-      id: 1,
-      name: "Café da Manhã",
-      time: "07:30",
-      calories: 320,
-      foods: ["Aveia", "Banana", "Leite desnatado"],
-      status: "completed"
-    },
-    {
-      id: 2,
-      name: "Lanche da Manhã",
-      time: "10:00",
-      calories: 150,
-      foods: ["Maçã", "Amêndoas"],
-      status: "completed"
-    },
-    {
-      id: 3,
-      name: "Almoço",
-      time: "12:30",
-      calories: 580,
-      foods: ["Frango grelhado", "Arroz integral", "Salada"],
-      status: "completed"
-    },
-    {
-      id: 4,
-      name: "Lanche da Tarde",
-      time: "15:00",
-      calories: 200,
-      foods: ["Iogurte grego"],
-      status: "pending"
-    },
-    {
-      id: 5,
-      name: "Jantar",
-      time: "19:00",
-      calories: 0,
-      foods: [],
-      status: "pending"
-    }
-  ];
+  // Error or no data state
+  if (error || !todayStats || !progressData) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Sem dados disponíveis</CardTitle>
+            <CardDescription>
+              {error || 'Não há dados de nutrição disponíveis no momento.'}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
-  const upcomingEvents = [
-    {
-      id: 1,
-      type: "Consulta",
-      title: "Consulta com Dra. Maria",
-      date: "Amanhã",
-      time: "14:00",
-      status: "confirmed"
-    },
-    {
-      id: 2,
-      type: "Lembrete",
-      title: "Tomar suplemento",
-      date: "Hoje",
-      time: "20:00",
-      status: "pending"
-    },
-    {
-      id: 3,
-      type: "Meta",
-      title: "Meta semanal: 3kg perdidos",
-      date: "Esta semana",
-      time: "",
-      status: "in_progress"
-    }
-  ];
+  const upcomingEvents: any[] = [];
 
   const quickActions = [
     {
@@ -215,7 +169,7 @@ export default function ClientDashboard() {
                 {todayStats.calories.percentage}% da meta
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Proteína</span>
@@ -348,7 +302,7 @@ export default function ClientDashboard() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Gordura Corporal</span>
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium">{progressData.bodyFat}%</span>
+                      <span className="text-sm font-medium">{progressData.bodyFat.current}%</span>
                       <Badge variant="outline" className="text-green-600">
                         {progressData.bodyFat.change > 0 ? '+' : ''}{progressData.bodyFat.change}%
                       </Badge>
@@ -361,7 +315,7 @@ export default function ClientDashboard() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Massa Muscular</span>
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium">{progressData.muscle}%</span>
+                      <span className="text-sm font-medium">{progressData.muscle.current}%</span>
                       <Badge variant="outline" className="text-green-600">
                         +{progressData.muscle.change}%
                       </Badge>

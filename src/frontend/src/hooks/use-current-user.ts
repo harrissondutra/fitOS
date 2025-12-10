@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/auth-context';
 import { User } from '../../../shared/types/auth.types';
 
@@ -49,17 +49,31 @@ export function useCurrentUser(): UseCurrentUserReturn {
     }
   }, [fetchMe, isAuthenticated]);
 
-  // Sincronizar com o contexto de autenticação
+  // Sincronizar com o contexto de autenticação - usar useRef para evitar loops
+  const prevContextUserRef = React.useRef<User | null>(null);
+  
   useEffect(() => {
-    setUser(contextUser);
+    // Apenas atualizar se contextUser realmente mudou
+    if (contextUser !== prevContextUserRef.current) {
+      prevContextUserRef.current = contextUser;
+      setUser(contextUser);
+    }
   }, [contextUser]);
 
-  // Obter dados atualizados quando o componente montar
+  // Obter dados atualizados quando o componente montar - remover refetch das dependências
+  const hasFetchedRef = React.useRef(false);
+  
   useEffect(() => {
-    if (isAuthenticated && !user) {
+    if (isAuthenticated && !user && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       refetch();
     }
-  }, [isAuthenticated, user, refetch]); // Incluído refetch
+    // Reset flag se desautenticado
+    if (!isAuthenticated) {
+      hasFetchedRef.current = false;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user]); // refetch é estável (useCallback)
 
   return {
     user,

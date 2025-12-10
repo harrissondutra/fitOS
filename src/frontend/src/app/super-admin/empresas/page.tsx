@@ -53,6 +53,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { toastUtils } from '@/lib/toast-utils';
+import { EmpresaForm } from '@/components/super-admin/empresas/empresa-form';
+import { Plus } from 'lucide-react';
 
 interface Empresa {
   id: string;
@@ -93,6 +95,9 @@ export default function EmpresasPage() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [search, setSearch] = useState('');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedEmpresa, setSelectedEmpresa] = useState<Empresa | null>(null);
   const [filters, setFilters] = useState({
     tenantType: 'all',
     hasCustomPlan: 'all',
@@ -343,6 +348,10 @@ export default function EmpresasPage() {
             Gerencie todas as empresas e clientes cadastrados no FitOS
           </p>
         </div>
+        <Button onClick={() => setCreateDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Criar Empresa
+        </Button>
       </div>
 
       {/* Filters */}
@@ -499,7 +508,14 @@ export default function EmpresasPage() {
                   </TableRow>
                 ) : (
                   empresas.map((empresa) => (
-                    <TableRow key={empresa.id}>
+                    <TableRow
+                      key={empresa.id}
+                      onClick={() => {
+                        setSelectedEmpresa(empresa);
+                        setEditDialogOpen(true);
+                      }}
+                      className="cursor-pointer hover:bg-muted/50"
+                    >
                       <TableCell>
                         <div className="flex items-center space-x-3">
                           <Building2 className="h-8 w-8 text-muted-foreground" />
@@ -558,7 +574,7 @@ export default function EmpresasPage() {
                           {new Date(empresa.createdAt).toLocaleDateString('pt-BR')}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -568,35 +584,48 @@ export default function EmpresasPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                              <Link href={`/super-admin/empresas/${empresa.id}`}>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/super-admin/empresas/${empresa.id}`;
+                              }}
+                            >
                                 <Eye className="mr-2 h-4 w-4" />
                                 Ver detalhes
-                              </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/super-admin/tenants/${empresa.id}/edit`}>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedEmpresa(empresa);
+                                setEditDialogOpen(true);
+                              }}
+                            >
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
-                              </Link>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => handleToggleStatus(empresa.id, 
-                                empresa.status === 'active' ? 'inactive' : 'active')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleStatus(empresa.id, 
+                                empresa.status === 'active' ? 'inactive' : 'active');
+                              }}
                             >
                               <Power className="mr-2 h-4 w-4" />
                               {empresa.status === 'active' ? 'Inativar' : 'Ativar'}
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleToggleStatus(empresa.id, 'suspended')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleStatus(empresa.id, 'suspended');
+                              }}
                               className="text-orange-600"
                             >
                               <Ban className="mr-2 h-4 w-4" />
                               Suspender
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleDelete(empresa.id)}
+                              onClick={(e) => { e.stopPropagation(); handleDelete(empresa.id); }}
                               className="text-red-600"
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
@@ -668,6 +697,33 @@ export default function EmpresasPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog de Criar Empresa */}
+      <EmpresaForm
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSuccess={() => {
+          fetchEmpresas();
+          setCreateDialogOpen(false);
+        }}
+      />
+
+      {/* Dialog de Editar Empresa */}
+      <EmpresaForm
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) {
+            setSelectedEmpresa(null);
+          }
+        }}
+        empresa={selectedEmpresa || undefined}
+        onSuccess={() => {
+          fetchEmpresas();
+          setEditDialogOpen(false);
+          setSelectedEmpresa(null);
+        }}
+      />
     </div>
   );
 }

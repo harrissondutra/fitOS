@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { integrationService } from '../services/integration.service';
 import { globalLimitsService } from '../services/global-limits.service';
-import { AuthMiddleware } from '../middleware/auth.middleware';
+import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { validateIntegration, validateGlobalLimits } from '../middleware/validation';
 import { 
   CreateIntegrationDTO, 
@@ -15,8 +15,8 @@ import {
 // import statusRouter from './integrations/status';
 
 const router = Router();
-const prisma = new PrismaClient();
-const authMiddleware = new AuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 
 // Apply SUPER_ADMIN middleware to all routes
 router.use((req: any, res, next) => authMiddleware.requireSuperAdmin(req, res, next));

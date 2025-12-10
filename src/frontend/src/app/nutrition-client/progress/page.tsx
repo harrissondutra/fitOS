@@ -23,7 +23,8 @@ import {
   Camera,
   BarChart3,
   PieChart,
-  LineChart
+  LineChart,
+  Trophy
 } from 'lucide-react';
 
 export default function ProgressPage() {

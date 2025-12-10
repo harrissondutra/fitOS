@@ -1,351 +1,298 @@
-import { PrismaClient } from '@prisma/client';
+/**
+ * DatabaseCostTrackerService - Rastreamento de Custos de Database e Cache
+ * 
+ * Integra com APIs de provedores de cloud para:
+ * - Buscar custos mensais de PostgreSQL/MySQL
+ * - Buscar custos mensais de Redis/Cache
+ * - Registrar custos no CostEntry
+ * - Fallback para entrada manual se API não disponível
+ */
+
+import { CostTrackerService } from './cost-tracker.service';
 import { logger } from '../utils/logger';
-import { cache } from '../config/redis';
+import { getPrismaClient } from '../config/database';
 
-interface TableSize {
-  schemaname: string;
-  tablename: string;
-  size: string;
-  bytes: number;
-}
+const prisma = getPrismaClient();
 
-interface DatabaseCostData {
-  totalSize: number; // em bytes
-  totalSizeGB: number;
-  cost: number;
-  tables: TableSize[];
-  lastUpdated: Date;
-  cacheHit: boolean;
-}
-
-interface DatabaseStats {
-  totalCost: number;
-  sizeBreakdown: {
-    tables: number;
-    indexes: number;
-    total: number;
-  };
-  costBreakdown: {
-    storage: number;
-    performance: number; // Placeholder para custos de performance
-  };
-  trends: {
-    sizeChange: number; // % de mudança vs mês anterior
-    costChange: number; // % de mudança vs mês anterior
-  };
+export interface DatabaseUsageData {
+  provider: 'aws' | 'digitalocean' | 'railway' | 'manual';
+  databaseType: 'postgresql' | 'mysql' | 'redis';
+  sizeGB: number;
+  instanceType?: string;
+  metadata?: any;
 }
 
 export class DatabaseCostTrackerService {
-  private readonly prisma: PrismaClient;
-  private readonly CACHE_KEY: string;
-  private readonly CACHE_TTL: number;
-  private readonly COST_PER_GB: number;
+  private costTracker: CostTrackerService;
 
-  constructor(prisma: PrismaClient) {
-    this.prisma = prisma;
-    
-    // Usar variáveis de ambiente (ZERO hardcode)
-    const redisPrefix = process.env.REDIS_KEY_PREFIX || 'fitos:';
-    this.CACHE_KEY = `${redisPrefix}costs:database:tables:v1`;
-    this.CACHE_TTL = parseInt(process.env.COST_CACHE_TTL_DATABASE || process.env.COST_CACHE_TTL || '1800');
-    this.COST_PER_GB = parseFloat(process.env.COST_DATABASE_PER_GB || '0.10');
+  constructor() {
+    this.costTracker = new CostTrackerService();
   }
 
   /**
-   * Obtém tamanhos das tabelas com cache Redis
+   * Buscar custos da API do provedor (AWS, DigitalOcean, etc)
    */
-  async getTableSizes(): Promise<TableSize[]> {
+  async fetchProviderCosts(
+    provider: 'aws' | 'digitalocean' | 'railway',
+    databaseType: 'postgresql' | 'mysql' | 'redis'
+  ): Promise<{ cost: number; usageGB: number; metadata?: any } | null> {
     try {
-      // 1. Tentar cache Redis primeiro
-      if (process.env.COST_REDIS_CACHE_ENABLED === 'true') {
-        const cached = await cache.get(this.CACHE_KEY);
-        if (cached) {
-          logger.info('Database table sizes retrieved from cache');
-          return JSON.parse(cached);
-        }
+      switch (provider) {
+        case 'aws':
+          return await this.fetchAWSCosts(databaseType);
+        case 'digitalocean':
+          return await this.fetchDigitalOceanCosts(databaseType);
+        case 'railway':
+          return await this.fetchRailwayCosts(databaseType);
+        default:
+          logger.warn(`Provider ${provider} not supported for automatic cost fetching`);
+          return null;
       }
-
-      // 2. Buscar dados reais do PostgreSQL
-      const tables = await this.fetchTableSizes();
-      
-      // 3. Armazenar no cache Redis
-      if (process.env.COST_REDIS_CACHE_ENABLED === 'true') {
-        await cache.set(this.CACHE_KEY, JSON.stringify(tables), this.CACHE_TTL);
-        logger.info(`Database table sizes cached for ${this.CACHE_TTL} seconds`);
-      }
-
-      return tables;
     } catch (error) {
-      logger.error('Failed to get database table sizes:', error);
-      throw new Error(`Database cost tracking failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      logger.error(`Error fetching costs from ${provider}:`, error);
+      return null;
     }
   }
 
   /**
-   * Busca tamanhos das tabelas usando queries SQL nativas
+   * Buscar custos do AWS RDS/ElastiCache
+   * Requer configuração: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
    */
-  private async fetchTableSizes(): Promise<TableSize[]> {
-    const query = `
-      SELECT 
-        schemaname,
-        tablename,
-        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size,
-        pg_total_relation_size(schemaname||'.'||tablename) AS bytes
-      FROM pg_tables
-      WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
-      ORDER BY bytes DESC
-      LIMIT 50
-    `;
-    
+  private async fetchAWSCosts(
+    databaseType: 'postgresql' | 'mysql' | 'redis'
+  ): Promise<{ cost: number; usageGB: number; metadata?: any } | null> {
+    // TODO: Implementar integração com AWS Cost Explorer API
+    // Por enquanto, retorna null (requer AWS SDK e configuração)
+    logger.info(`AWS cost fetching for ${databaseType} not yet implemented`);
+    return null;
+  }
+
+  /**
+   * Buscar custos do DigitalOcean Managed Databases
+   * Requer configuração: DIGITALOCEAN_API_TOKEN
+   */
+  private async fetchDigitalOceanCosts(
+    databaseType: 'postgresql' | 'mysql' | 'redis'
+  ): Promise<{ cost: number; usageGB: number; metadata?: any } | null> {
+    const apiToken = process.env.DIGITALOCEAN_API_TOKEN;
+    if (!apiToken) {
+      logger.warn('DIGITALOCEAN_API_TOKEN not configured');
+      return null;
+    }
+
     try {
-      const result = await this.prisma.$queryRawUnsafe<TableSize[]>(query);
-      logger.info(`Retrieved ${result.length} table sizes from database`);
-      return result;
+      // TODO: Implementar integração com DigitalOcean API
+      // Exemplo de endpoint: GET https://api.digitalocean.com/v2/databases/{id}
+      // Por enquanto, retorna null
+      logger.info(`DigitalOcean cost fetching for ${databaseType} not yet implemented`);
+      return null;
     } catch (error) {
-      logger.error('Failed to execute table size query:', error);
-      throw error;
+      logger.error('Error fetching DigitalOcean costs:', error);
+      return null;
     }
   }
 
   /**
-   * Calcula custos baseado no tamanho do banco
+   * Buscar custos do Railway
+   * Railway não tem API pública de custos, usar estimativa baseada em uso
    */
-  async calculateCosts(): Promise<DatabaseCostData> {
-    try {
-      const tables = await this.getTableSizes();
-      
-      // Calcular tamanho total
-      const totalSize = tables.reduce((sum, table) => sum + table.bytes, 0);
-      const totalSizeGB = totalSize / (1024 * 1024 * 1024);
-      
-      // Calcular custo
-      const cost = totalSizeGB * this.COST_PER_GB;
-      
-      logger.info(`Database cost calculation: Size=${totalSizeGB.toFixed(2)}GB, Cost=${cost.toFixed(4)}`);
+  private async fetchRailwayCosts(
+    databaseType: 'postgresql' | 'mysql' | 'redis'
+  ): Promise<{ cost: number; usageGB: number; metadata?: any } | null> {
+    // Railway não fornece API de custos, usar estimativa
+    // Preços aproximados: $5/mês base + $0.01/GB storage
+    const baseCost = 5.0;
+    const costPerGB = 0.01;
 
-      return {
-        totalSize,
-        totalSizeGB,
-        cost,
-        tables,
-        lastUpdated: new Date(),
-        cacheHit: false, // Será atualizado pelo cache se aplicável
-      };
-    } catch (error) {
-      logger.error('Failed to calculate database costs:', error);
-      throw error;
-    }
-  }
+    // Estimar uso baseado em tamanho do banco
+    // TODO: Buscar tamanho real do banco via query
+    const estimatedSizeGB = await this.estimateDatabaseSize(databaseType);
 
-  /**
-   * Obtém estatísticas detalhadas do banco de dados
-   */
-  async getDatabaseStats(): Promise<{
-    totalConnections: number;
-    activeConnections: number;
-    maxConnections: number;
-    cacheHitRatio: number;
-    slowQueries: number;
-    deadlocks: number;
-  }> {
-    try {
-      // Query para estatísticas de conexões
-      const connectionQuery = `
-        SELECT 
-          (SELECT count(*) FROM pg_stat_activity) as active_connections,
-          (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') as max_connections
-      `;
-      
-      const connectionResult = await this.prisma.$queryRawUnsafe<{
-        active_connections: number;
-        max_connections: number;
-      }[]>(connectionQuery);
+    const cost = baseCost + estimatedSizeGB * costPerGB;
 
-      // Query para cache hit ratio
-      const cacheQuery = `
-        SELECT 
-          round(
-            (sum(blks_hit) * 100.0 / (sum(blks_hit) + sum(blks_read)))::numeric, 
-            2
-          ) as cache_hit_ratio
-        FROM pg_stat_database 
-        WHERE datname = current_database()
-      `;
-      
-      const cacheResult = await this.prisma.$queryRawUnsafe<{
-        cache_hit_ratio: number;
-      }[]>(cacheQuery);
-
-      // Query para queries lentas (últimas 24h)
-      const slowQueryQuery = `
-        SELECT count(*) as slow_queries
-        FROM pg_stat_statements 
-        WHERE mean_exec_time > 1000
-        AND query_start > NOW() - INTERVAL '24 hours'
-      `;
-      
-      const slowQueryResult = await this.prisma.$queryRawUnsafe<{
-        slow_queries: number;
-      }[]>(slowQueryQuery);
-
-      const connections = connectionResult[0];
-      const cacheHit = cacheResult[0];
-      const slowQueries = slowQueryResult[0];
-
-      return {
-        totalConnections: connections.max_connections,
-        activeConnections: connections.active_connections,
-        maxConnections: connections.max_connections,
-        cacheHitRatio: cacheHit.cache_hit_ratio || 0,
-        slowQueries: slowQueries.slow_queries || 0,
-        deadlocks: 0, // Placeholder - implementar se necessário
-      };
-    } catch (error) {
-      logger.error('Failed to get database stats:', error);
-      // Retornar valores padrão em caso de erro
-      return {
-        totalConnections: 0,
-        activeConnections: 0,
-        maxConnections: 0,
-        cacheHitRatio: 0,
-        slowQueries: 0,
-        deadlocks: 0,
-      };
-    }
-  }
-
-  /**
-   * Obtém estatísticas para dashboard
-   */
-  async getDashboardStats(): Promise<DatabaseStats> {
-    try {
-      const costData = await this.calculateCosts();
-      const dbStats = await this.getDatabaseStats();
-      
-      // Calcular breakdown de tamanho
-      const sizeBreakdown = {
-        tables: costData.totalSize,
-        indexes: 0, // Placeholder - implementar se necessário
-        total: costData.totalSize,
-      };
-
-      // Calcular breakdown de custos
-      const costBreakdown = {
-        storage: costData.cost,
-        performance: 0, // Placeholder para custos de performance
-      };
-
-      // TODO: Implementar comparação com mês anterior quando tivermos dados históricos
-      const trends = {
-        sizeChange: 0, // Placeholder
-        costChange: 0, // Placeholder
-      };
-
-      return {
-        totalCost: costData.cost,
-        sizeBreakdown,
-        costBreakdown,
-        trends,
-      };
-    } catch (error) {
-      logger.error('Failed to get database dashboard stats:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Verifica se o banco está dentro dos limites de performance
-   */
-  async checkPerformanceLimits(): Promise<{
-    withinLimits: boolean;
-    warnings: string[];
-    critical: string[];
-  }> {
-    try {
-      const stats = await this.getDatabaseStats();
-      const warnings: string[] = [];
-      const critical: string[] = [];
-
-      // Verificar conexões
-      const connectionPercentage = (stats.activeConnections / stats.maxConnections) * 100;
-      if (connectionPercentage > 90) {
-        critical.push(`Conexões de banco em ${connectionPercentage.toFixed(1)}% do limite`);
-      } else if (connectionPercentage > 75) {
-        warnings.push(`Conexões de banco em ${connectionPercentage.toFixed(1)}% do limite`);
-      }
-
-      // Verificar cache hit ratio
-      if (stats.cacheHitRatio < 80) {
-        critical.push(`Cache hit ratio baixo: ${stats.cacheHitRatio}%`);
-      } else if (stats.cacheHitRatio < 90) {
-        warnings.push(`Cache hit ratio baixo: ${stats.cacheHitRatio}%`);
-      }
-
-      // Verificar queries lentas
-      if (stats.slowQueries > 100) {
-        critical.push(`${stats.slowQueries} queries lentas nas últimas 24h`);
-      } else if (stats.slowQueries > 50) {
-        warnings.push(`${stats.slowQueries} queries lentas nas últimas 24h`);
-      }
-
-      return {
-        withinLimits: critical.length === 0,
-        warnings,
-        critical,
-      };
-    } catch (error) {
-      logger.error('Failed to check database performance limits:', error);
-      return {
-        withinLimits: true,
-        warnings: [],
-        critical: ['Erro ao verificar limites de performance'],
-      };
-    }
-  }
-
-  /**
-   * Força atualização dos dados (ignora cache)
-   */
-  async forceRefresh(): Promise<DatabaseCostData> {
-    // Limpar cache
-    if (process.env.COST_REDIS_CACHE_ENABLED === 'true') {
-      await cache.del(this.CACHE_KEY);
-      logger.info('Database cache cleared for force refresh');
-    }
-
-    // Buscar dados atualizados
-    return this.calculateCosts();
-  }
-
-  /**
-   * Obtém top 10 tabelas por tamanho
-   */
-  async getTopTablesBySize(limit: number = 10): Promise<TableSize[]> {
-    const tables = await this.getTableSizes();
-    return tables.slice(0, limit);
-  }
-
-  /**
-   * Obtém crescimento de tamanho por período (placeholder)
-   */
-  async getSizeGrowth(period: 'week' | 'month' | 'quarter'): Promise<{
-    period: string;
-    growth: number; // em bytes
-    growthPercentage: number;
-  }> {
-    // TODO: Implementar quando tivermos dados históricos
     return {
-      period,
-      growth: 0,
-      growthPercentage: 0,
+      cost,
+      usageGB: estimatedSizeGB,
+      metadata: {
+        provider: 'railway',
+        estimated: true,
+        baseCost,
+        costPerGB,
+      },
     };
   }
-}
 
-// Exportar instância singleton (será inicializada com Prisma)
-export let databaseCostTracker: DatabaseCostTrackerService;
+  /**
+   * Estimar tamanho do banco de dados via query
+   */
+  private async estimateDatabaseSize(
+    databaseType: 'postgresql' | 'mysql' | 'redis'
+  ): Promise<number> {
+    try {
+      if (databaseType === 'postgresql') {
+        // Query PostgreSQL para tamanho do banco
+        const result = await prisma.$queryRaw<Array<{ size_bytes: bigint }>>`
+          SELECT pg_database_size(current_database()) as size_bytes
+        `;
 
-export function initializeDatabaseCostTracker(prisma: PrismaClient) {
-  databaseCostTracker = new DatabaseCostTrackerService(prisma);
-  return databaseCostTracker;
+        if (result && result[0]) {
+          const sizeBytes = Number(result[0].size_bytes);
+          return sizeBytes / (1024 * 1024 * 1024); // Converter para GB
+        }
+      } else if (databaseType === 'redis') {
+        // Redis: usar estimativa baseada em configuração ou retornar 0
+        // TODO: Integrar com Redis INFO para obter tamanho real
+        return parseFloat(process.env.REDIS_ESTIMATED_SIZE_GB || '0.5');
+      }
+
+      return 0;
+    } catch (error) {
+      logger.error(`Error estimating ${databaseType} size:`, error);
+      return 0;
+    }
+  }
+
+  /**
+   * Sincronizar custos mensais de database
+   * Deve ser executado via job mensal
+   */
+  async syncMonthlyDatabaseCosts(): Promise<void> {
+    try {
+      logger.info('Starting monthly database costs sync');
+
+      const provider = (process.env.DATABASE_PROVIDER || 'railway') as 'aws' | 'digitalocean' | 'railway';
+      const databaseType = (process.env.DATABASE_TYPE || 'postgresql') as 'postgresql' | 'mysql' | 'redis';
+
+      // Tentar buscar custos da API do provedor
+      let costData = await this.fetchProviderCosts(provider, databaseType);
+
+      // Se não conseguir da API, usar estimativa
+      if (!costData) {
+        logger.info(`No API data available, using estimation for ${provider} ${databaseType}`);
+        costData = await this.estimateDatabaseCosts(provider, databaseType);
+      }
+
+      if (!costData || costData.cost <= 0) {
+        logger.debug('No database costs to sync (cost is zero or negative)');
+        return;
+      }
+
+      // Registrar entrada mensal
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+
+      await this.costTracker.trackUsageWithCost({
+        categoryName: 'database',
+        serviceName: databaseType === 'redis' ? 'redis' : 'postgresql',
+        cost: costData.cost,
+        currency: process.env.COST_DEFAULT_CURRENCY || 'BRL',
+        usage: {
+          quantity: 1,
+          unit: 'monthly_sync',
+          metadata: {
+            month,
+            year,
+            provider,
+            databaseType,
+            sizeGB: costData.usageGB,
+            ...costData.metadata,
+          },
+        },
+      });
+
+      logger.info(
+        `Monthly database costs synced: ${costData.cost.toFixed(2)} for ${month}/${year} (${provider} ${databaseType})`
+      );
+    } catch (error) {
+      logger.error('Error syncing monthly database costs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Estimar custos quando API não está disponível
+   */
+  private async estimateDatabaseCosts(
+    provider: string,
+    databaseType: 'postgresql' | 'mysql' | 'redis'
+  ): Promise<{ cost: number; usageGB: number; metadata?: any }> {
+    const sizeGB = await this.estimateDatabaseSize(databaseType);
+
+    // Preços estimados por GB/mês por provedor
+    const costPerGBMap: Record<string, number> = {
+      aws: 0.115, // RDS PostgreSQL
+      digitalocean: 0.05,
+      railway: 0.01,
+      manual: parseFloat(process.env.COST_DATABASE_PER_GB || '0.10'),
+    };
+
+    const baseCostMap: Record<string, number> = {
+      aws: 15.0,
+      digitalocean: 12.0,
+      railway: 5.0,
+      manual: 0,
+    };
+
+    const costPerGB = costPerGBMap[provider] || costPerGBMap.manual;
+    const baseCost = baseCostMap[provider] || 0;
+
+    const cost = baseCost + sizeGB * costPerGB;
+
+    return {
+      cost,
+      usageGB: sizeGB,
+      metadata: {
+        provider,
+        estimated: true,
+        baseCost,
+        costPerGB,
+      },
+    };
+  }
+
+  /**
+   * Registrar custo manual (fallback quando API não disponível)
+   */
+  async recordManualCost(data: {
+    cost: number;
+    usageGB: number;
+    databaseType: 'postgresql' | 'mysql' | 'redis';
+    month: number;
+    year: number;
+    metadata?: any;
+  }): Promise<void> {
+    try {
+      const { cost, usageGB, databaseType, month, year, metadata } = data;
+
+      if (cost <= 0) {
+        logger.warn('Manual cost entry has zero or negative cost, skipping');
+        return;
+      }
+
+      await this.costTracker.trackUsageWithCost({
+        categoryName: 'database',
+        serviceName: databaseType === 'redis' ? 'redis' : 'postgresql',
+        cost,
+        currency: process.env.COST_DEFAULT_CURRENCY || 'BRL',
+        usage: {
+          quantity: 1,
+          unit: 'manual_entry',
+          metadata: {
+            month,
+            year,
+            provider: 'manual',
+            databaseType,
+            sizeGB: usageGB,
+            ...metadata,
+          },
+        },
+      });
+
+      logger.info(`Manual database cost recorded: ${cost.toFixed(2)} for ${month}/${year}`);
+    } catch (error) {
+      logger.error('Error recording manual database cost:', error);
+      throw error;
+    }
+  }
 }

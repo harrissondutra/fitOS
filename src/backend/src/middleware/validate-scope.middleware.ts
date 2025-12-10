@@ -1,18 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 // Tipos temporários para evitar erros de compilação após remoção da autenticação
-type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'NUTRITIONIST' | 'CLIENT';
+import { UserRoles, UserRole } from '../constants/roles';
 
-export interface RequestWithTenant extends Request {
-  tenantId?: string;
-  user?: {
-    id: string;
-    email: string;
-    role: UserRole;
-    tenantId?: string;
-    name?: string;
-  };
-}
+export type RequestWithTenant = Request & { tenantId?: string; user?: any };
 
 export const validateClientScope = (req: RequestWithTenant, res: Response, next: NextFunction) => {
   if (req.user?.role === 'CLIENT' && req.params.clientId !== req.user.id) {

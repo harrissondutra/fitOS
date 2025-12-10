@@ -102,19 +102,28 @@ export function useAiSettings() {
     setError(null)
 
     try {
-      const response = await fetch('/api/super-admin/ai-settings', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
+      // Obter token do localStorage como fallback
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      // Adicionar token no header se disponível
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings', {
+        headers,
+        credentials: 'include'
       })
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const data = await response.json()
-      setSettings(data)
+      const result = await response.json()
+      setSettings(result.success ? result.data : result)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load settings')
     } finally {
@@ -130,12 +139,19 @@ export function useAiSettings() {
     setError(null)
 
     try {
-      const response = await fetch('/api/super-admin/ai-settings/global', {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings/global', {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify(data)
       })
 
@@ -143,7 +159,8 @@ export function useAiSettings() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const updatedSettings = await response.json()
+      const result = await response.json()
+      const updatedSettings = result.success ? result.data : result
       setSettings(prev => prev ? { ...prev, global: updatedSettings } : null)
       return true
     } catch (err) {
@@ -162,12 +179,19 @@ export function useAiSettings() {
     setError(null)
 
     try {
-      const response = await fetch('/api/super-admin/ai-settings/rate-limiting', {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings/rate-limiting', {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify(data)
       })
 
@@ -175,7 +199,8 @@ export function useAiSettings() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const updatedSettings = await response.json()
+      const result = await response.json()
+      const updatedSettings = result.success ? result.data : result
       setSettings(prev => prev ? { ...prev, rateLimiting: updatedSettings } : null)
       return true
     } catch (err) {
@@ -194,12 +219,19 @@ export function useAiSettings() {
     setError(null)
 
     try {
-      const response = await fetch('/api/super-admin/ai-settings/webhook', {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings/webhook', {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify(data)
       })
 
@@ -207,7 +239,8 @@ export function useAiSettings() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const updatedSettings = await response.json()
+      const result = await response.json()
+      const updatedSettings = result.success ? result.data : result
       setSettings(prev => prev ? { ...prev, webhook: updatedSettings } : null)
       return true
     } catch (err) {
@@ -226,12 +259,19 @@ export function useAiSettings() {
     setError(null)
 
     try {
-      const response = await fetch('/api/super-admin/ai-settings/security', {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings/security', {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify(data)
       })
 
@@ -239,7 +279,8 @@ export function useAiSettings() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const updatedSettings = await response.json()
+      const result = await response.json()
+      const updatedSettings = result.success ? result.data : result
       setSettings(prev => prev ? { ...prev, security: updatedSettings } : null)
       return true
     } catch (err) {
@@ -258,12 +299,19 @@ export function useAiSettings() {
     setError(null)
 
     try {
-      const response = await fetch('/api/super-admin/ai-settings/integration', {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings/integration', {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify(data)
       })
 
@@ -271,7 +319,8 @@ export function useAiSettings() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const updatedSettings = await response.json()
+      const result = await response.json()
+      const updatedSettings = result.success ? result.data : result
       setSettings(prev => prev ? { ...prev, integration: updatedSettings } : null)
       return true
     } catch (err) {
@@ -290,12 +339,19 @@ export function useAiSettings() {
     setError(null)
 
     try {
-      const response = await fetch('/api/super-admin/ai-settings/advanced', {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings/advanced', {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
+        credentials: 'include',
         body: JSON.stringify(data)
       })
 
@@ -303,7 +359,8 @@ export function useAiSettings() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const updatedSettings = await response.json()
+      const result = await response.json()
+      const updatedSettings = result.success ? result.data : result
       setSettings(prev => prev ? { ...prev, advanced: updatedSettings } : null)
       return true
     } catch (err) {
@@ -319,12 +376,19 @@ export function useAiSettings() {
    */
   const testWebhookSettings = useCallback(async () => {
     try {
-      const response = await fetch('/api/super-admin/ai-settings/webhook/test', {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings/webhook/test', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
+        headers,
+        credentials: 'include'
       })
 
       if (!response.ok) {
@@ -343,12 +407,19 @@ export function useAiSettings() {
    */
   const generateEncryptionKey = useCallback(async () => {
     try {
-      const response = await fetch('/api/super-admin/ai-settings/security/generate-key', {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings/security/generate-key', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
+        headers,
+        credentials: 'include'
       })
 
       if (!response.ok) {
@@ -371,20 +442,27 @@ export function useAiSettings() {
     setError(null)
 
     try {
-      const response = await fetch('/api/super-admin/ai-settings/reset', {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings/reset', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
+        headers,
+        credentials: 'include'
       })
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const data = await response.json()
-      setSettings(data)
+      const result = await response.json()
+      setSettings(result.success ? result.data : result)
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reset settings')
@@ -399,10 +477,16 @@ export function useAiSettings() {
    */
   const exportSettings = useCallback(async () => {
     try {
-      const response = await fetch('/api/super-admin/ai-settings/export', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        }
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {}
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch('/api/super-admin/ai/settings/export', {
+        headers,
+        credentials: 'include'
       })
 
       if (!response.ok) {
@@ -434,14 +518,20 @@ export function useAiSettings() {
     setError(null)
 
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+      const headers: Record<string, string> = {}
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch('/api/super-admin/ai-settings/import', {
+      const response = await fetch('/api/super-admin/ai/settings/import', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        },
+        headers,
+        credentials: 'include',
         body: formData
       })
 
@@ -449,8 +539,8 @@ export function useAiSettings() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const data = await response.json()
-      setSettings(data)
+      const result = await response.json()
+      setSettings(result.success ? result.data : result)
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import settings')

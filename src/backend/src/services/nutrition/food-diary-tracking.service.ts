@@ -8,11 +8,12 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database';
 import { foodDiaryService } from './food-diary.service';
 import { mealPlanService } from './meal-plan.service';
 import { logger } from '../../utils/logger';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export interface AddFoodEntryInput {
   clientId: string;
@@ -212,7 +213,7 @@ export class FoodDiaryTrackingService {
   private async getClientGoals(clientId: string, date: Date) {
     try {
       // 1. Tentar buscar plano ativo do nutricionista (usa cache do mealPlanService)
-      const mealPlan = await mealPlanService.getTodaysMealPlan(clientId, date);
+      const mealPlan = await mealPlanService.getTodaysMealPlan(clientId);
 
       if (mealPlan && mealPlan.totalCalories) {
         logger.info('Using meal plan goals', { clientId, source: 'nutritionist' });

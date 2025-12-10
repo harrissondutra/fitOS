@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { 
   AiServiceType, 
   AiProviderType,
@@ -8,7 +9,7 @@ import {
 import { aiProviderService } from '../services/ai-provider.service';
 import { aiClientFactory } from '../services/ai-client.factory';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export interface JobQueueItem {
   id: string;

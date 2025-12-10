@@ -144,187 +144,197 @@ export function useCosts() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Mock data for fallback
-  const mockDashboard: CostDashboard = {
-    totalCost: 1114.44,
-    totalCostPreviousMonth: 1145.96,
-    costVariation: -2.75,
-    projectedCost: 1381.91,
-    categories: [
-      {
-        id: 'ai',
-        name: 'ai',
-        displayName: 'Inteligência Artificial',
-        icon: 'Brain',
-        color: '#8B5CF6',
-        totalCost: 298.32,
-        percentage: 26.77,
-        previousMonthCost: 329.56,
-        variation: -9.48,
-        trend: 'down'
-      },
-      {
-        id: 'storage',
-        name: 'storage',
-        displayName: 'Armazenamento',
-        icon: 'Database',
-        color: '#F59E0B',
-        totalCost: 631.68,
-        percentage: 56.68,
-        previousMonthCost: 670.58,
-        variation: -5.80,
-        trend: 'down'
-      },
-      {
-        id: 'database',
-        name: 'database',
-        displayName: 'Database & Cache',
-        icon: 'Server',
-        color: '#EF4444',
-        totalCost: 25.77,
-        percentage: 2.31,
-        previousMonthCost: 25.55,
-        variation: 0.86,
-        trend: 'stable'
-      },
-      {
-        id: 'bandwidth',
-        name: 'bandwidth',
-        displayName: 'Largura de Banda',
-        icon: 'Wifi',
-        color: '#F59E0B',
-        totalCost: 158.66,
-        percentage: 14.24,
-        previousMonthCost: 120.26,
-        variation: 31.93,
-        trend: 'up'
-      }
-    ],
-    topServices: [
-      {
-        id: 'cloudinary',
-        name: 'cloudinary',
-        displayName: 'Cloudinary',
-        categoryName: 'storage',
-        totalCost: 425.76,
-        percentage: 38.20,
-        requestCount: 1,
-        averageCost: 425.76,
-        trend: 'stable'
-      },
-      {
-        id: 'openai-gpt4',
-        name: 'openai-gpt4',
-        displayName: 'OpenAI GPT-4',
-        categoryName: 'ai',
-        totalCost: 214.79,
-        percentage: 19.27,
-        requestCount: 1,
-        averageCost: 214.79,
-        trend: 'stable'
-      },
-      {
-        id: 'aws-s3',
-        name: 'aws-s3',
-        displayName: 'AWS S3',
-        categoryName: 'storage',
-        totalCost: 205.92,
-        percentage: 18.48,
-        requestCount: 1,
-        averageCost: 205.92,
-        trend: 'stable'
-      }
-    ],
-    alerts: [
-      {
-        id: 'ai-warning',
-        type: 'WARNING',
-        severity: 'warning',
-        message: 'Custo de IA próximo do limite mensal',
-        currentAmount: 320.8,
-        limitAmount: 400,
-        percentage: 80.2,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'storage-warning',
-        type: 'WARNING',
-        severity: 'warning',
-        message: 'Custo de armazenamento próximo do limite',
-        currentAmount: 650.3,
-        limitAmount: 800,
-        percentage: 81.3,
-        createdAt: new Date().toISOString()
-      }
-    ],
-    trends: [
-      { date: '2025-05-01', totalCost: 1211.66, categories: { storage: 693.97, ai: 329.42, database: 30.67, bandwidth: 157.59 } },
-      { date: '2025-06-01', totalCost: 1212.37, categories: { storage: 679.31, ai: 348.85, database: 31.37, bandwidth: 152.85 } },
-      { date: '2025-07-01', totalCost: 1144.77, categories: { storage: 688.52, ai: 251.92, database: 31.79, bandwidth: 172.54 } },
-      { date: '2025-08-01', totalCost: 1231.46, categories: { storage: 708.09, ai: 329.12, database: 33.56, bandwidth: 160.69 } },
-      { date: '2025-09-01', totalCost: 1145.96, categories: { storage: 670.58, ai: 329.56, database: 25.55, bandwidth: 120.26 } },
-      { date: '2025-10-01', totalCost: 1114.44, categories: { storage: 631.68, ai: 298.32, database: 25.77, bandwidth: 158.66 } }
-    ],
-    fixedVsVariable: {
-      fixed: 25.77,
-      variable: 1088.67,
-      fixedPercentage: 2.31,
-      variablePercentage: 97.69
-    }
-  };
+  // REMOVIDO: Mock data - SEMPRE usar dados reais do backend
 
-  // Generic API call function with fallback
+    // Generic API call function - SEM dados mockados
   const apiCall = useCallback(async <T>(
     endpoint: string,
-    options: RequestInit = {},
-    fallbackData?: T
+    options: RequestInit = {}
   ): Promise<T> => {
     setLoading(true);
     setError(null);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    const controller = new AbortController();
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    // Função para limpar recursos
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
 
-      const response = await fetch(`${API_BASE}${endpoint}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-        signal: controller.signal,
-        ...options,
+    try {
+      // Configurar timeout com reason para evitar erro genérico
+      timeoutId = setTimeout(() => {
+        cleanup();
+        controller.abort('Request timeout after 30 seconds');
+      }, 30000); // 30 second timeout
+
+      // Obter token do localStorage para autenticação
+      const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;                                                                 
+
+      // Verificar se token existe
+      if (!token && typeof window !== 'undefined') {
+        console.warn('⚠️ Token de autenticação não encontrado no localStorage');
+        // Não mostrar toast para evitar spam, apenas log
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(options.headers as Record<string, string> || {}),
+      };
+
+      // Adicionar token no header se disponível
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      // Adicionar tenant ID se disponível
+      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : null;                                                                 
+      if (tenantId) {
+        headers['X-Tenant-Id'] = tenantId;
+      }
+
+      const url = `${API_BASE}${endpoint}`;
+      console.log(`🔄 API Call: ${options.method || 'GET'} ${url}`, {
+        hasToken: !!token,
+        hasTenantId: !!tenantId,
       });
 
-      clearTimeout(timeoutId);
+      const response = await fetch(url, {
+        method: options.method || 'GET',
+        headers,
+        credentials: 'include',
+        signal: controller.signal,
+        body: options.body,
+      });
+
+      // Limpar timeout ao receber resposta
+      cleanup();
+
+      // Verificar se é erro de autenticação
+      if (response.status === 401 || response.status === 403) {
+        const errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
+        setError(errorMessage);
+        console.error(`❌ Erro de autenticação (${response.status}):`, endpoint);
+        
+        toast({
+          title: 'Erro de autenticação',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        
+        // Redirecionar para login se for erro de autenticação
+        if (typeof window !== 'undefined' && response.status === 401) {
+          setTimeout(() => {
+            window.location.href = '/auth/login';
+          }, 2000);
+        }
+        
+        throw new Error(errorMessage);
+      }
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        let errorData: any = {};
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            errorData = await response.json();
+          } else {
+            errorData = { error: await response.text() };
+          }
+        } catch (parseError) {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+        
+        const errorMessage = errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        setError(errorMessage);
+        console.error(`❌ API call failed for ${endpoint}:`, {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+        
+        // Não mostrar toast para todos os erros, apenas para erros críticos
+        if (response.status >= 500) {
+          toast({
+            title: 'Erro do servidor',
+            description: errorMessage,
+            variant: 'destructive',
+          });
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Verificar se a resposta é JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.warn(`⚠️ Resposta não é JSON para ${endpoint}:`, text);
+        throw new Error('Resposta inválida do servidor');
       }
 
       const data = await response.json();
+      console.log(`✅ API Call success: ${endpoint}`, { data: data?.data || data });
       return data.data || data;
-    } catch (err) {
-      console.warn(`API call failed for ${endpoint}, using fallback data:`, err);
+        } catch (err) {
+      // Sempre limpar timeout em caso de erro
+      cleanup();
       
-      if (fallbackData) {
-        toast({
-          title: 'Usando dados de exemplo',
-          description: 'Conectando com dados mock devido a problemas de conexão',
-          variant: 'default',
-        });
-        return fallbackData;
+      // Tratar erros específicos
+      let errorMessage = 'Erro desconhecido';
+      let shouldShowToast = true;
+
+      if (err instanceof Error) {
+        // AbortError pode ser por timeout ou cancelamento - tratar silenciosamente se for cancelamento
+        if (err.name === 'AbortError') {
+          // Se a mensagem é sobre timeout, mostrar erro ao usuário
+          const isTimeout = err.message === 'Request timeout after 30 seconds';
+          
+          if (isTimeout) {
+            errorMessage = 'A requisição demorou muito para responder. Tente novamente.';
+            console.warn(`⏱️ Request timeout for ${endpoint}`);
+          } else {
+            // Cancelamento intencional (navegação, unmount, etc.) - não mostrar erro
+            console.log(`ℹ️ Request cancelled for ${endpoint}`);
+            shouldShowToast = false;
+            errorMessage = ''; // Não definir erro para cancelamentos
+          }
+        } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          errorMessage = 'Erro de conexão. Verifique se o backend está rodando e acessível.';
+        } else {
+          errorMessage = err.message;
+        }
       }
 
-      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
-      setError(errorMessage);
-      toast({
-        title: 'Erro',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-      throw err;
+      // Só definir erro e mostrar toast se necessário
+      if (shouldShowToast && errorMessage) {
+        setError(errorMessage);
+        console.error(`❌ API call failed for ${endpoint}:`, err);
+        
+        // Mostrar toast apenas para erros reais (não para cancelamentos silenciosos ou autenticação)
+        if (!errorMessage.includes('Sessão expirada') && errorMessage) {
+          toast({
+            title: 'Erro ao carregar dados',
+            description: errorMessage,
+            variant: 'destructive',
+          });
+        }
+      }
+
+      // Re-lançar erro apenas se não for cancelamento intencional
+      if (shouldShowToast) {
+        throw err;
+      }
+      
+      // Retornar null para cancelamentos intencionais
+      return null as T;
     } finally {
+      // Garantir cleanup final
+      cleanup();
       setLoading(false);
     }
   }, [toast]);
@@ -345,7 +355,7 @@ export function useCosts() {
     const queryString = queryParams.toString();
     const endpoint = `/api/costs/dashboard${queryString ? `?${queryString}` : ''}`;
     
-    return apiCall<CostDashboard>(endpoint, {}, mockDashboard);
+    return apiCall<CostDashboard>(endpoint);
   }, [apiCall]);
 
   // Categories
@@ -354,10 +364,41 @@ export function useCosts() {
   }, [apiCall]);
 
   // Services
-  const getServices = useCallback(async (categoryId?: string): Promise<CostService[]> => {
-    const endpoint = categoryId 
-      ? `/api/costs/services?categoryId=${categoryId}`
-      : '/api/costs/services';
+  const getServices = useCallback(async (filters?: CostFilters | string): Promise<CostService[]> => {
+    // Aceitar tanto string (categoryId) quanto objeto (filters)
+    let categoryId: string | undefined;
+    let filtersObj: CostFilters | undefined;
+    
+    if (typeof filters === 'string') {
+      categoryId = filters;
+    } else if (filters && typeof filters === 'object') {
+      filtersObj = filters;
+      // Extrair categoryId do objeto filters (aceitar tanto categoryId quanto category)
+      categoryId = filters.categoryId || (filters as any).category;
+    }
+
+    // Construir query params
+    const queryParams = new URLSearchParams();
+    if (categoryId) {
+      queryParams.set('categoryId', categoryId);
+    }
+    
+    // Adicionar outros filtros se for objeto
+    if (filtersObj) {
+      Object.entries(filtersObj).forEach(([key, value]) => {
+        // Ignorar 'category' já que convertemos para 'categoryId', mas processar outros campos
+        if (value !== undefined && value !== null && key !== 'category') {
+          if (Array.isArray(value)) {
+            queryParams.set(key, value.join(','));
+          } else {
+            queryParams.set(key, String(value));
+          }
+        }
+      });
+    }
+
+    const queryString = queryParams.toString();
+    const endpoint = `/api/costs/services${queryString ? `?${queryString}` : ''}`;
     
     return apiCall<CostService[]>(endpoint);
   }, [apiCall]);

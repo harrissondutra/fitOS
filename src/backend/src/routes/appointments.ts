@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { SchedulingService } from '../services/scheduling.service';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { requireRole, requireResourceAccess, canCreateForClient } from '../middleware/permissions';
 import { body, param, query, validationResult } from 'express-validator';
 
 const router = Router();
 const schedulingService = new SchedulingService();
-const prisma = new PrismaClient();
-const authMiddleware = getAuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 
 // Middleware de autenticação para todas as rotas
 router.use(authMiddleware.requireAuth);

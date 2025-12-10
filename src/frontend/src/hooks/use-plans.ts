@@ -1,4 +1,6 @@
-import useSWR from 'swr';
+'use client';
+
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 export interface Plan {
@@ -31,25 +33,34 @@ const fetcher = async (url: string) => {
 export function usePlans() {
   const { toast } = useToast();
 
-  const { data, error, isLoading } = useSWR<Plan[]>(
-    '/api/plans',
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 300000, // 5 minutos - planos mudam raramente
-      onError: (error) => {
-        console.error('Plans fetch error:', error);
+  // Use native fetch para buscar planos
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        setIsLoading(true);
+        const data = await fetcher('/api/plans');
+        setPlans(data);
+      } catch (err) {
+        setError(err as Error);
         toast({
           variant: 'destructive',
           title: 'Erro ao carregar planos',
-          description: error.message
+          description: (err as Error).message
         });
+      } finally {
+        setIsLoading(false);
       }
-    }
-  );
+    };
+
+    fetchPlans();
+  }, [toast]);
 
   return {
-    plans: data || [],
+    plans,
     isLoading,
     error
   };

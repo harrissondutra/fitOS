@@ -87,7 +87,7 @@ export function useAiTemplates() {
     setError(null)
 
     try {
-      const response = await fetch('/api/super-admin/ai-templates', {
+      const response = await fetch('/api/super-admin/ai/templates', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -112,7 +112,7 @@ export function useAiTemplates() {
    */
   const getTemplateById = useCallback(async (id: string): Promise<ProviderTemplate | null> => {
     try {
-      const response = await fetch(`/api/super-admin/ai-templates/${id}`, {
+      const response = await fetch(`/api/super-admin/ai/templates/${id}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -139,7 +139,7 @@ export function useAiTemplates() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/super-admin/ai-templates/provider/${provider}`, {
+      const response = await fetch(`/api/super-admin/ai/templates/provider/${provider}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -167,7 +167,7 @@ export function useAiTemplates() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/super-admin/ai-templates/capability/${capability}`, {
+      const response = await fetch(`/api/super-admin/ai/templates/capability/${capability}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -205,7 +205,7 @@ export function useAiTemplates() {
       if (filters.hasEmbeddings !== undefined) queryParams.append('hasEmbeddings', filters.hasEmbeddings.toString())
       if (filters.maxCost !== undefined) queryParams.append('maxCost', filters.maxCost.toString())
 
-      const response = await fetch(`/api/super-admin/ai-templates/search?${queryParams}`, {
+      const response = await fetch(`/api/super-admin/ai/templates/search?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'
@@ -230,7 +230,7 @@ export function useAiTemplates() {
    */
   const generateConfig = useCallback(async (templateId: string, apiKey?: string, additionalConfig?: Record<string, any>) => {
     try {
-      const response = await fetch(`/api/super-admin/ai-templates/${templateId}/generate-config`, {
+      const response = await fetch(`/api/super-admin/ai/templates/${templateId}/generate-config`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
@@ -256,7 +256,7 @@ export function useAiTemplates() {
    */
   const validateConfig = useCallback(async (templateId: string, config: any) => {
     try {
-      const response = await fetch(`/api/super-admin/ai-templates/${templateId}/validate-config`, {
+      const response = await fetch(`/api/super-admin/ai/templates/${templateId}/validate-config`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
@@ -282,7 +282,7 @@ export function useAiTemplates() {
    */
   const getTemplatesStats = useCallback(async () => {
     try {
-      const response = await fetch('/api/super-admin/ai-templates/stats/overview', {
+      const response = await fetch('/api/super-admin/ai/templates/stats/overview', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
           'Content-Type': 'application/json'

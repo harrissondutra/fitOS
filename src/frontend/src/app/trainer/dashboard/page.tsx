@@ -21,6 +21,7 @@ import {
   UserCheck,
   Clock
 } from 'lucide-react';
+import { GoalsWidget } from '@/components/trainer/goals-widget';
 
 export default function TrainerDashboardPage() {
   const router = useRouter();
@@ -195,6 +196,9 @@ export default function TrainerDashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Goals Widget */}
+        <GoalsWidget limit={5} />
 
         {/* Trainer Features */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

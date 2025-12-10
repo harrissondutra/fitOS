@@ -11,6 +11,7 @@
 import { redisService } from './redis.service';
 import { logger } from '../utils/logger';
 import { generateCacheKey, calculateTTL } from '../utils/cache-utils';
+import { sessionPolicyService, DeviceFingerprint } from './session-policy.service';
 import jwt from 'jsonwebtoken';
 
 export interface SessionData {
@@ -40,7 +41,7 @@ export class SessionService {
   private readonly LOCKOUT_DURATION = 900; // 15 minutos
 
   /**
-   * Criar nova sessão
+   * Criar nova sessão com validação de política
    */
   async createSession(
     userId: string,
@@ -48,8 +49,9 @@ export class SessionService {
     role: string,
     email: string,
     ip: string,
-    userAgent: string
-  ): Promise<string> {
+    userAgent: string,
+    deviceFingerprint?: DeviceFingerprint
+  ): Promise<{ sessionId: string; terminatedSessions: number }> {
     const sessionId = this.generateSessionId();
     const now = new Date();
 
@@ -72,11 +74,31 @@ export class SessionService {
       ttl: this.SESSION_TTL
     });
 
+    // Aplicar política de sessão
+    let terminatedSessions = 0;
+    if (deviceFingerprint) {
+      try {
+        const result = await sessionPolicyService.createSession(
+          userId,
+          role as any,
+          deviceFingerprint,
+          ip
+        );
+        terminatedSessions = result.terminatedSessions;
+        
+        // Armazenar session ID no Prisma session
+        await sessionPolicyService.getUserSessionStats(userId);
+      } catch (error) {
+        logger.error('Error applying session policy waiver:', error);
+      }
+    }
+
     // Rastrear sessões ativas do usuário
     await this.trackUserSession(userId, sessionId);
 
-    logger.info(`Session created for user ${userId} (${email}) from ${ip}`);
-    return sessionId;
+    logger.info(`Session created for user ${userId} (${email}) from ${ip}, terminated ${terminatedSessions} sessions`);
+    
+    return { sessionId, terminatedSessions };
   }
 
   /**

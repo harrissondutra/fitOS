@@ -9,7 +9,6 @@ import { getPrismaClient } from '../config/database';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
-const authMiddleware = getAuthMiddleware(getPrismaClient());
 
 // ============================================================================
 // STORE MANAGEMENT ROUTES
@@ -19,7 +18,11 @@ const authMiddleware = getAuthMiddleware(getPrismaClient());
  * GET /api/marketplace/store/:userId
  * Busca dados da loja de um usuário específico
  */
-router.get('/store/:userId', authMiddleware.requireAuth, async (req, res) => {
+router.get('/store/:userId', (req, res, next) => {
+  const prisma = getPrismaClient();
+  const authMiddleware = getAuthMiddleware();
+  authMiddleware.requireAuth()(req, res, next);
+}, async (req, res) => {
   try {
     const { userId } = req.params;
     const prisma = getPrismaClient();
@@ -270,7 +273,11 @@ router.get('/store/:userId', authMiddleware.requireAuth, async (req, res) => {
  * PUT /api/marketplace/store/:userId
  * Atualiza dados da loja de um usuário
  */
-router.put('/store/:userId', authMiddleware.requireAuth, async (req, res) => {
+router.put('/store/:userId', (req, res, next) => {
+  const prisma = getPrismaClient();
+  const authMiddleware = getAuthMiddleware();
+  authMiddleware.requireAuth()(req, res, next);
+}, async (req, res) => {
   try {
     const { userId } = req.params;
     const updateData = req.body;
@@ -349,7 +356,11 @@ router.put('/store/:userId', authMiddleware.requireAuth, async (req, res) => {
  * GET /api/marketplace/listings
  * Lista produtos de um vendedor
  */
-router.get('/listings', authMiddleware.requireAuth, async (req, res) => {
+router.get('/listings', (req, res, next) => {
+  const prisma = getPrismaClient();
+  const authMiddleware = getAuthMiddleware();
+  authMiddleware.requireAuth()(req, res, next);
+}, async (req, res) => {
   try {
     const { sellerId, status, categoryId, page = 1, limit = 10 } = req.query;
     const prisma = getPrismaClient();
@@ -518,7 +529,11 @@ router.get('/listings/:id', async (req, res) => {
  * GET /api/marketplace/orders
  * Lista pedidos de um vendedor ou comprador
  */
-router.get('/orders', authMiddleware.requireAuth, async (req, res) => {
+router.get('/orders', (req, res, next) => {
+  const prisma = getPrismaClient();
+  const authMiddleware = getAuthMiddleware();
+  authMiddleware.requireAuth()(req, res, next);
+}, async (req, res) => {
   try {
     const { role, page = 1, limit = 10, status } = req.query;
     const requestingUser = req.user;
@@ -658,7 +673,11 @@ router.get('/categories', async (req, res) => {
  * GET /api/marketplace/admin/stats
  * Estatísticas gerais do marketplace (apenas SUPER_ADMIN)
  */
-router.get('/admin/stats', authMiddleware.requireAuth, async (req, res) => {
+router.get('/admin/stats', (req, res, next) => {
+  const prisma = getPrismaClient();
+  const authMiddleware = getAuthMiddleware();
+  authMiddleware.requireAuth()(req, res, next);
+}, async (req, res) => {
   try {
     const prisma = getPrismaClient();
 

@@ -10,12 +10,22 @@ import {
   AiProviderType
 } from '../../../shared/types/ai.types';
 import { asyncHandler } from '../utils/async-handler';
+import { getPrismaClient } from '../config/database';
+import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { requireSuperAdmin } from '../middleware/superAdmin';
+import { logger } from '../utils/logger';
 
 const router = Router();
-const prisma = new PrismaClient();
 
-// Aplicar middleware de autenticação para todas as rotas
+// Aplicar middleware de autenticação ANTES de requireSuperAdmin (lazy evaluation)
+router.use((req, res, next) => {
+  const prisma = getPrismaClient();
+  const authMiddleware = getAuthMiddleware();
+  // Desabilitar verificação de sessão para SUPER_ADMIN evitar deslogar
+  authMiddleware.requireAuth({ checkSessionActivity: false })(req, res, next);
+});
+
+// Aplicar middleware de super admin (depende de req.user do requireAuth)
 router.use(requireSuperAdmin);
 
 /**
@@ -23,6 +33,7 @@ router.use(requireSuperAdmin);
  * Lista todas as configurações de serviços com paginação e filtros
  */
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
+    const prisma = getPrismaClient();
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.pageSize as string) || 10;
   const serviceType = req.query.serviceType as AiServiceType;
@@ -32,8 +43,13 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const skip = (page - 1) * pageSize;
   const take = pageSize;
 
+  // Para SUPER_ADMIN, buscar configs do tenant OU globais
+  const userTenantId = req.user?.tenantId;
   const where: any = {
-    tenantId: req.user?.tenantId || 'global'
+    OR: [
+      { tenantId: userTenantId || 'global' },
+      { tenantId: 'global' }
+    ]
   };
 
   if (serviceType) where.serviceType = serviceType;
@@ -110,6 +126,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
  * Busca configuração específica por ID
  */
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
 
   const serviceConfig = await prisma.aiServiceConfig.findUnique({
@@ -161,6 +178,17 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     });
   }
 
+  // Validar se serviceType é um valor válido do enum
+  const validServiceTypes = Object.values(AiServiceType);
+  if (!validServiceTypes.includes(configData.serviceType as AiServiceType)) {
+    return res.status(400).json({
+      error: `Invalid serviceType: ${configData.serviceType}. Must be one of: ${validServiceTypes.join(', ')}`,
+      code: 'INVALID_SERVICE_TYPE',
+      validServiceTypes
+    });
+  }
+
+  const prisma = getPrismaClient();
   // Verificar se o provedor existe e está ativo
   const provider = await prisma.aiProvider.findUnique({
     where: { id: configData.providerId }
@@ -174,9 +202,10 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Verificar se já existe configuração para este serviço + provedor
+  // Usar o enum do Prisma gerado (@prisma/client) para garantir compatibilidade
   const existingConfig = await prisma.aiServiceConfig.findFirst({
     where: {
-      serviceType: configData.serviceType,
+      serviceType: configData.serviceType as any, // Cast para any pois o enum pode estar desatualizado
       providerId: configData.providerId,
       tenantId: req.user?.tenantId || 'global'
     }
@@ -194,7 +223,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
       ...configData,
       tenantId: req.user?.tenantId || 'global',
       config: configData.config as any,
-      serviceName: configData.serviceName || `${configData.serviceType} - ${provider.displayName}`
+      serviceName: configData.serviceName || `${configData.serviceType} - ${provider.displayName}`,
+      serviceType: configData.serviceType as any
     },
     include: {
       provider: {
@@ -219,53 +249,160 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 /**
- * PUT /api/super-admin/ai-service-configs/:id
- * Atualiza configuração existente
+ * PUT /api/super-admin/ai-service-configs/bulk-update
+ * Atualiza múltiplas configurações em uma única requisição
+ * 
+ * IMPORTANTE: Esta rota deve vir ANTES de /:id para evitar conflito de rotas
  */
-router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const updateData: UpdateAiServiceConfigRequest = {
-    ...req.body,
-    id
-  };
-
-  const existingConfig = await prisma.aiServiceConfig.findUnique({
-    where: { id }
+router.put('/bulk-update', asyncHandler(async (req: Request, res: Response) => {
+  const prisma = getPrismaClient();
+  const { ids, data } = req.body;
+  
+  // Log inicial para debug
+  logger.info('Bulk update request received', {
+    userId: req.user?.id,
+    userRole: req.user?.role,
+    tenantId: req.user?.tenantId,
+    requestedIds: ids,
+    requestedIdsCount: ids?.length,
+    updateData: data
   });
 
-  if (!existingConfig) {
-    return res.status(404).json({
-      error: 'Service configuration not found',
-      code: 'SERVICE_CONFIG_NOT_FOUND'
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({
+      error: 'ids must be a non-empty array',
+      code: 'INVALID_IDS'
     });
   }
 
-  const updatedConfig = await prisma.aiServiceConfig.update({
-    where: { id },
-    data: {
-      ...updateData,
-      config: updateData.config as any
-    },
-    include: {
-      provider: {
-        select: {
-          id: true,
-          name: true,
-          displayName: true,
-          provider: true,
-          isActive: true
-        }
-      }
-    }
+  if (!data || typeof data !== 'object') {
+    return res.status(400).json({
+      error: 'data must be an object',
+      code: 'INVALID_DATA'
+    });
+  }
+
+  const userTenantId = req.user?.tenantId;
+  const userRole = req.user?.role;
+  const isSuperAdmin = userRole === 'SUPER_ADMIN';
+
+  // Para SUPER_ADMIN, buscar todos os IDs sem filtro de tenant
+  // Para outros usuários, buscar apenas do próprio tenant ou global
+  const whereClause: any = isSuperAdmin
+    ? { id: { in: ids } }
+    : {
+        id: { in: ids },
+        OR: [
+          { tenantId: userTenantId || 'global' },
+          { tenantId: 'global' }
+        ]
+      };
+
+  const existingConfigs = await prisma.aiServiceConfig.findMany({
+    where: whereClause,
+    select: { id: true, tenantId: true }
   });
 
-  const formattedConfig = {
-    ...updatedConfig,
-    serviceType: updatedConfig.serviceType as AiServiceType,
-    config: updatedConfig.config as Record<string, any>
+  if (existingConfigs.length !== ids.length) {
+    const foundIds = existingConfigs.map(c => c.id);
+    const missingIds = ids.filter(id => !foundIds.includes(id));
+    
+    // Verificar quantos IDs existem no banco sem filtro de tenant
+    const totalInDb = await prisma.aiServiceConfig.count({ where: { id: { in: ids } } });
+    
+    // Buscar todos os IDs para ver quais tenantIds eles têm
+    const allConfigs = await prisma.aiServiceConfig.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, tenantId: true }
+    });
+    
+    logger.warn('Bulk update: Some service configs not found', {
+      userTenantId,
+      userRole,
+      isSuperAdmin,
+      requestedIds: ids,
+      foundIds,
+      missingIds,
+      totalInDb,
+      totalInDbWithoutFilter: allConfigs.length,
+      allConfigsWithTenant: allConfigs,
+      whereClause
+    });
+    
+    return res.status(404).json({
+      error: 'Some service configurations were not found',
+      code: 'SOME_CONFIGS_NOT_FOUND',
+      missingIds,
+      foundIds,
+      requestedCount: ids.length,
+      foundCount: existingConfigs.length
+    });
+  }
+
+  // Validar serviceType se estiver sendo atualizado
+  if (data.serviceType) {
+    const validServiceTypes = Object.values(AiServiceType);
+    if (!validServiceTypes.includes(data.serviceType as AiServiceType)) {
+      return res.status(400).json({
+        error: `Invalid serviceType: ${data.serviceType}. Must be one of: ${validServiceTypes.join(', ')}`,
+        code: 'INVALID_SERVICE_TYPE',
+        validServiceTypes
+      });
+    }
+  }
+
+  // Atualizar todos em uma única transação
+  // Para SUPER_ADMIN, permitir atualizar configs globais e do tenant
+  const updateData: any = {
+    ...(data.providerId && { providerId: data.providerId }),
+    ...(data.model !== undefined && { model: data.model }),
+    ...(data.priority !== undefined && { priority: data.priority }),
+    ...(data.isActive !== undefined && { isActive: data.isActive }),
+    ...(data.maxRequestsPerMinute !== undefined && { maxRequestsPerMinute: data.maxRequestsPerMinute }),
+    ...(data.costPerRequest !== undefined && { costPerRequest: data.costPerRequest }),
+    ...(data.config && { config: data.config as any }),
+    ...(data.serviceType && { serviceType: data.serviceType as any }) // Validado acima
   };
 
-  return res.json(formattedConfig);
+  // Para SUPER_ADMIN, atualizar sem verificar tenantId no where
+  // Para outros usuários, manter verificação de tenantId
+  const updatedConfigs = await prisma.$transaction(
+    ids.map(id => {
+      // Para SUPER_ADMIN, sempre usar apenas { id } no where
+      // Para outros, usar { id, tenantId } para segurança
+      const whereClause = isSuperAdmin
+        ? { id }
+        : { id, tenantId: userTenantId || 'global' };
+      
+      return prisma.aiServiceConfig.update({
+        where: whereClause,
+        data: updateData,
+        include: {
+          provider: {
+            select: {
+              id: true,
+              name: true,
+              displayName: true,
+              provider: true,
+              isActive: true
+            }
+          }
+        }
+      });
+    })
+  );
+
+  const formattedConfigs = updatedConfigs.map(config => ({
+    ...config,
+    serviceType: config.serviceType as AiServiceType,
+    config: config.config as Record<string, any>
+  }));
+
+  return res.json({
+    success: true,
+    updated: formattedConfigs.length,
+    data: formattedConfigs
+  });
 }));
 
 /**
@@ -273,6 +410,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
  * Remove configuração (soft delete - marca como inativa)
  */
 router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
 
   const existingConfig = await prisma.aiServiceConfig.findUnique({
@@ -303,6 +441,7 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
  * Lista configurações por tipo de serviço
  */
 router.get('/by-service/:serviceType', asyncHandler(async (req: Request, res: Response) => {
+  const prisma = getPrismaClient();
   const { serviceType } = req.params;
 
   if (!Object.values(AiServiceType).includes(serviceType as AiServiceType)) {
@@ -315,7 +454,7 @@ router.get('/by-service/:serviceType', asyncHandler(async (req: Request, res: Re
 
   const configs = await prisma.aiServiceConfig.findMany({
     where: {
-      serviceType: serviceType as AiServiceType,
+      serviceType: serviceType as any,
       tenantId: req.user?.tenantId || 'global',
       isActive: true
     },
@@ -351,6 +490,7 @@ router.get('/by-service/:serviceType', asyncHandler(async (req: Request, res: Re
  * Lista configurações por provedor
  */
 router.get('/by-provider/:providerId', asyncHandler(async (req: Request, res: Response) => {
+  const prisma = getPrismaClient();
   const { providerId } = req.params;
 
   const configs = await prisma.aiServiceConfig.findMany({
@@ -394,6 +534,7 @@ router.get('/by-provider/:providerId', asyncHandler(async (req: Request, res: Re
  * Duplica configuração existente
  */
 router.post('/:id/duplicate', asyncHandler(async (req: Request, res: Response) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
   const { newServiceName, newProviderId } = req.body;
 
@@ -451,6 +592,7 @@ router.post('/:id/duplicate', asyncHandler(async (req: Request, res: Response) =
  * Estatísticas resumidas das configurações
  */
 router.get('/stats/summary', asyncHandler(async (req: Request, res: Response) => {
+  const prisma = getPrismaClient();
   const tenantId = req.user?.tenantId || 'global';
 
   const total = await prisma.aiServiceConfig.count({ where: { tenantId } });

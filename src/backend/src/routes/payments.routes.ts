@@ -7,12 +7,12 @@
  */
 
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { BillingService } from '../services/billing.service';
 import { z } from 'zod';
 
 const router = Router();
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const billingService = new BillingService(prisma);
 
 // ========== SCHEMAS DE VALIDAÇÃO ==========

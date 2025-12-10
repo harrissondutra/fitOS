@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { 
   Brain, 
   Server, 
@@ -18,60 +19,65 @@ import {
   Settings,
   FileText,
   Users,
-  Target
+  Target,
+  RefreshCw
 } from "lucide-react"
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 export default function AIDashboardPage() {
   const [stats, setStats] = useState({
-    activeProviders: 8,
-    configuredServices: 42,
-    requestsPerMinute: 1234,
-    monthlyCost: 89.50,
-    successRate: 98.5,
-    activeIntegrations: 15,
-    totalRequests: 45678,
-    errorRate: 1.5
+    activeProviders: 0,
+    configuredServices: 0,
+    requestsPerMinute: 0,
+    monthlyCost: 0,
+    successRate: 0,
+    activeIntegrations: 0,
+    totalRequests: 0,
+    errorRate: 0
   })
 
-  const [recentActivity, setRecentActivity] = useState([
-    {
-      id: 1,
-      type: 'provider',
-      message: 'OpenAI API configurada com sucesso',
-      timestamp: '2 minutos atrás',
-      status: 'success'
-    },
-    {
-      id: 2,
-      type: 'service',
-      message: 'Serviço de análise de postura ativado',
-      timestamp: '15 minutos atrás',
-      status: 'success'
-    },
-    {
-      id: 3,
-      type: 'integration',
-      message: 'Falha na conexão com Anthropic Claude',
-      timestamp: '1 hora atrás',
-      status: 'error'
-    },
-    {
-      id: 4,
-      type: 'cost',
-      message: 'Limite de custo mensal atingido (80%)',
-      timestamp: '2 horas atrás',
-      status: 'warning'
-    }
-  ])
+  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  const [topServices, setTopServices] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
-  const [topServices, setTopServices] = useState([
-    { name: 'Análise de Postura', requests: 15420, cost: 23.50, status: 'active' },
-    { name: 'Geração de Treinos', requests: 12340, cost: 18.75, status: 'active' },
-    { name: 'Análise de Nutrição', requests: 9870, cost: 15.20, status: 'active' },
-    { name: 'Coach Virtual', requests: 7650, cost: 12.30, status: 'active' },
-    { name: 'Análise de Sentimentos', requests: 5430, cost: 8.90, status: 'warning' }
-  ])
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/super-admin/ai/dashboard', {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar dados do dashboard')
+      }
+
+      const result = await response.json()
+      
+      if (result.success && result.data) {
+        setStats(result.data.stats || stats)
+        setRecentActivity(result.data.recentActivity || [])
+        setTopServices(result.data.topServices || [])
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar dashboard:', error)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível carregar os dados do dashboard',
+        variant: 'destructive'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -91,6 +97,33 @@ export default function AIDashboardPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-9 w-64 mb-2" />
+            <Skeleton className="h-5 w-96" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map(i => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-4 w-32" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-24 mb-2" />
+                <Skeleton className="h-3 w-40" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -106,6 +139,10 @@ export default function AIDashboardPage() {
             <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
             Sistema Ativo
           </Badge>
+          <Button variant="outline" onClick={loadDashboardData}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Atualizar
+          </Button>
           <Button asChild>
             <Link href="/super-admin/ai/settings">
               <Settings className="mr-2 h-4 w-4" />
@@ -162,9 +199,14 @@ export default function AIDashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${stats.monthlyCost}</div>
+            <div className="text-2xl font-bold">
+              {new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              }).format(stats.monthlyCost)}
+            </div>
             <p className="text-xs text-muted-foreground">
-              -5% vs mês anterior
+              Últimos 30 dias
             </p>
           </CardContent>
         </Card>
@@ -236,17 +278,23 @@ export default function AIDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-start space-x-3">
-                  {getStatusIcon(activity.status)}
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium">{activity.message}</p>
-                    <p className={`text-xs ${getStatusColor(activity.status)}`}>
-                      {activity.timestamp}
-                    </p>
+              {recentActivity.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhuma atividade recente
+                </p>
+              ) : (
+                recentActivity.map((activity) => (
+                  <div key={activity.id} className="flex items-start space-x-3">
+                    {getStatusIcon(activity.status)}
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-medium">{activity.message}</p>
+                      <p className={`text-xs ${getStatusColor(activity.status)}`}>
+                        {activity.timestamp}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
             <div className="mt-4">
               <Button variant="outline" size="sm" asChild>
@@ -268,30 +316,41 @@ export default function AIDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {topServices.map((service, index) => (
-                <div key={service.name} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
-                      {index + 1}
+              {topServices.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhum serviço utilizado ainda
+                </p>
+              ) : (
+                topServices.map((service, index) => (
+                  <div key={service.name || index} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{service.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {service.requests?.toLocaleString() || 0} requests
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{service.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {service.requests.toLocaleString()} requests
+                    <div className="text-right">
+                      <p className="text-sm font-medium">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL'
+                        }).format(service.cost || 0)}
                       </p>
+                      <Badge 
+                        variant={service.status === 'active' ? 'default' : 'secondary'}
+                        className="text-xs"
+                      >
+                        {service.status}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">${service.cost}</p>
-                    <Badge 
-                      variant={service.status === 'active' ? 'default' : 'secondary'}
-                      className="text-xs"
-                    >
-                      {service.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
             <div className="mt-4">
               <Button variant="outline" size="sm" asChild>
@@ -333,7 +392,7 @@ export default function AIDashboardPage() {
               </Link>
             </Button>
             <Button asChild variant="outline" className="h-20 flex-col">
-              <Link href="/super-admin/ai/costs">
+              <Link href="/super-admin/management/costs/inteligencia-artificial">
                 <DollarSign className="h-6 w-6 mb-2" />
                 <span>Custos</span>
               </Link>

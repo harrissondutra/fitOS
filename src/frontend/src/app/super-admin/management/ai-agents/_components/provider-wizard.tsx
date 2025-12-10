@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,12 +30,19 @@ import {
   Shield,
   Search,
   Filter,
-  Star
+  Star,
+  Wifi,
+  WifiOff,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Save
 } from "lucide-react"
 import { useAiProviders } from "../_hooks/use-ai-providers"
 import { useAiTemplates } from "../_hooks/use-ai-templates"
-import { AiProviderType, CreateAiProviderRequest } from "@/shared/types/ai.types"
+import { AiProviderType, CreateAiProviderRequest } from "@/shared/types/ai.types"      
 import { TemplateCard } from "./template-card"
+import { ProviderIcon } from '@/components/ui/provider-icon'
 
 interface ProviderWizardProps {
   isOpen: boolean
@@ -44,7 +51,7 @@ interface ProviderWizardProps {
 }
 
 export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardProps) {
-  const { createProvider } = useAiProviders()
+  const { createProvider, listProviders, providers } = useAiProviders()
   const { templates, generateConfig, validateConfig, getRecommendedTemplates } = useAiTemplates()
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -52,6 +59,39 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterCapability, setFilterCapability] = useState<string>("all")
+  const [installedProviders, setInstalledProviders] = useState<Set<AiProviderType>>(new Set())
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ success: boolean; error?: string; responseTime?: number } | null>(null)
+  const [showTestDialog, setShowTestDialog] = useState(false)
+
+  // Carregar providers instalados quando o wizard abrir
+  useEffect(() => {
+    if (isOpen) {
+      listProviders({ isActive: true }, { page: 1, limit: 100 })
+        .then(() => {
+          // Providers já estão no estado do hook
+        })
+        .catch(err => {
+          console.error('Erro ao carregar providers:', err)
+        })
+    }
+  }, [isOpen, listProviders])
+
+  // Atualizar lista de providers instalados
+  useEffect(() => {
+    const installed = new Set<AiProviderType>()
+    providers.forEach(provider => {
+      if (provider.isActive) {
+        installed.add(provider.provider)
+      }
+    })
+    setInstalledProviders(installed)
+  }, [providers])
+
+  // Verificar se um template já está instalado
+  const isTemplateInstalled = (template: any): boolean => {
+    return installedProviders.has(template.provider as AiProviderType)
+  }
   
   const [formData, setFormData] = useState<CreateAiProviderRequest>({
     name: "",
@@ -98,9 +138,65 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
           config: config.config || template.config,
           headers: config.config?.headers || template.config.headers
         }))
+        
+        // Avançar automaticamente para o próximo passo após configurar
+        setTimeout(() => {
+          handleNext()
+        }, 300) // Pequeno delay para melhor UX
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao gerar configuração')
+    }
+  }
+
+  const handleTest = async () => {
+    setTesting(true)
+    setTestResult(null)
+    setError(null)
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await fetch(`${apiUrl}/api/super-admin/ai/providers/test-config`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          provider: formData.provider,
+          apiKey: formData.apiKey,
+          baseUrl: formData.baseUrl,
+          models: formData.models
+        })
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setTestResult({
+          success: true,
+          responseTime: result.responseTime
+        })
+      } else {
+        setTestResult({
+          success: false,
+          error: result.error || 'Erro desconhecido ao testar conexão'
+        })
+      }
+      
+      // Mostrar dialog se houver erro
+      if (!result.success) {
+        setShowTestDialog(true)
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao testar conexão'
+      setTestResult({
+        success: false,
+        error: errorMessage
+      })
+      setShowTestDialog(true)
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -114,15 +210,17 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
         const validation = await validateConfig(selectedTemplate.id, formData)
         if (!validation.valid) {
           setError(`Configuração inválida: ${validation.errors.join(', ')}`)
+          setLoading(false)
           return
         }
       }
 
       await createProvider(formData)
+      resetForm()
       onSuccess()
+      handleClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao criar provedor')
-    } finally {
       setLoading(false)
     }
   }
@@ -147,6 +245,9 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
       headers: {}
     })
     setError(null)
+    setTestResult(null)
+    setShowTestDialog(false)
+    setTesting(false)
   }
 
   const handleClose = () => {
@@ -155,39 +256,43 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
   }
 
   // Filtrar templates
-  const filteredTemplates = templates.filter(template => {
-    const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         template.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         template.description.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesCapability = filterCapability === "all" || 
-                             template.capabilities[filterCapability as keyof typeof template.capabilities]
-    
-    return matchesSearch && matchesCapability
-  })
-
-  const getRecommendedTemplatesForStep = () => {
-    // Templates recomendados baseado no caso de uso
-    const recommended = templates.filter(template => 
-      template.capabilities.chat && template.capabilities.streaming
-    ).slice(0, 3)
-    
-    return recommended
-  }
+  const filteredTemplates = templates
+    .filter(template => {
+      const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           template.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           template.description.toLowerCase().includes(searchQuery.toLowerCase())
+      
+      const matchesCapability = filterCapability === "all" || 
+                               template.capabilities[filterCapability as keyof typeof template.capabilities]
+      
+      return matchesSearch && matchesCapability
+    })
+    .sort((a: any, b: any) => {
+      // Ordenar: primeiro os recomendados, depois alfabeticamente
+      const aRecommended = a.capabilities?.chat && a.capabilities?.streaming
+      const bRecommended = b.capabilities?.chat && b.capabilities?.streaming
+      
+      if (aRecommended && !bRecommended) return -1
+      if (!aRecommended && bRecommended) return 1
+      
+      return String(a.displayName).localeCompare(String(b.displayName))
+    })
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
+      <DialogContent className="max-w-4xl max-h-[95vh] w-[95vw] md:w-full flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+          <DialogTitle className="flex items-center space-x-2 text-lg">
             <Server className="h-5 w-5" />
             <span>Adicionar Provedor de IA</span>
             <Badge variant="outline">{currentStep}/3</Badge>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             Configure um novo provedor de IA para sua aplicação
           </DialogDescription>
         </DialogHeader>
+        
+        <div className="flex-1 overflow-y-auto px-6 py-4">
 
         {error && (
           <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
@@ -200,16 +305,16 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
 
         {/* Step 1: Template Selection */}
         {currentStep === 1 && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium mb-2">Escolha um Template</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="text-base font-medium mb-1">Escolha um Template</h3>
+              <p className="text-xs text-muted-foreground">
                 Selecione um template pré-configurado ou configure manualmente
               </p>
             </div>
 
             {/* Search and Filters */}
-            <div className="flex space-x-4">
+            <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -220,7 +325,7 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
                 />
               </div>
               <Select value={filterCapability} onValueChange={setFilterCapability}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Filtrar por capacidade" />
                 </SelectTrigger>
                 <SelectContent>
@@ -235,43 +340,40 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
               </Select>
             </div>
 
-            {/* Recommended Templates */}
-            {searchQuery === "" && filterCapability === "all" && (
-              <div>
-                <div className="flex items-center space-x-2 mb-4">
-                  <Star className="h-4 w-4 text-yellow-500" />
-                  <h4 className="text-sm font-medium">Recomendados</h4>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  {getRecommendedTemplatesForStep().map((template) => (
+            {/* All Templates */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-medium">
+                  {searchQuery || filterCapability !== "all" ? "Resultados" : "Todos os Templates"}
+                  <Badge variant="outline" className="ml-2">{filteredTemplates.length}</Badge>
+                </h4>
+                {searchQuery === "" && filterCapability === "all" && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Star className="h-3 w-3 text-yellow-500" />
+                    <span>Recomendados aparecem primeiro</span>
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filteredTemplates.map((template) => {
+                  const isInstalled = isTemplateInstalled(template)
+                  return (
                     <TemplateCard
                       key={template.id}
                       template={template}
-                      onSelect={handleTemplateSelect}
-                      recommended={true}
+                      onSelect={isInstalled ? undefined : handleTemplateSelect}
+                      selected={selectedTemplate?.id === template.id}
+                      recommended={template.capabilities?.chat && template.capabilities?.streaming}
+                      isInstalled={isInstalled}
                     />
-                  ))}
+                  )
+                })}
+              </div>
+              {filteredTemplates.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhum template encontrado com os filtros aplicados
                 </div>
-                <Separator className="my-6" />
-              </div>
-            )}
-
-            {/* All Templates */}
-            <div>
-              <h4 className="text-sm font-medium mb-4">
-                {searchQuery || filterCapability !== "all" ? "Resultados" : "Todos os Templates"}
-                <Badge variant="outline" className="ml-2">{filteredTemplates.length}</Badge>
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-                {filteredTemplates.map((template) => (
-                  <TemplateCard
-                    key={template.id}
-                    template={template}
-                    onSelect={handleTemplateSelect}
-                    selected={selectedTemplate?.id === template.id}
-                  />
-                ))}
-              </div>
+              )}
             </div>
 
             {/* Custom Option */}
@@ -300,21 +402,21 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
 
         {/* Step 2: Configuration */}
         {currentStep === 2 && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium mb-2">Configuração</h3>
-              <p className="text-sm text-muted-foreground">
+              <h3 className="text-base font-medium mb-1">Configuração</h3>
+              <p className="text-xs text-muted-foreground">
                 {selectedTemplate ? `Configure o ${selectedTemplate.displayName}` : 'Configure o provedor personalizado'}
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Basic Info */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Informações Básicas</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Informações Básicas</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
                   <div>
                     <Label htmlFor="name">Nome</Label>
                     <Input
@@ -356,10 +458,10 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
 
               {/* API Configuration */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Configuração da API</CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">Configuração da API</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-3">
                   <div>
                     <Label htmlFor="apiKey">API Key</Label>
                     <Input
@@ -397,17 +499,59 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
                       rows={3}
                     />
                   </div>
+                  
+                  {/* Test Connection Button */}
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleTest}
+                      disabled={testing || !formData.apiKey || !formData.baseUrl}
+                      className="w-full"
+                    >
+                      {testing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Testando...
+                        </>
+                      ) : (
+                        <>
+                          <Wifi className="h-4 w-4 mr-2" />
+                          Testar Conexão
+                        </>
+                      )}
+                    </Button>
+                    
+                    {/* Success Message */}
+                    {testResult?.success && (
+                      <div className="mt-2 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                              Conexão bem-sucedida!
+                            </p>
+                            {testResult.responseTime && (
+                              <p className="text-xs text-green-600 dark:text-green-400">
+                                Tempo de resposta: {testResult.responseTime}ms
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
 
             {/* Advanced Settings */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Configurações Avançadas</CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Configurações Avançadas</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div>
                     <Label htmlFor="timeout">Timeout (ms)</Label>
                     <Input
@@ -516,10 +660,15 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center space-x-3">
-                    <span className="text-2xl">{selectedTemplate.icon}</span>
+                    <ProviderIcon 
+                      providerId={selectedTemplate.id} 
+                      iconUrl={selectedTemplate.iconUrl}
+                      emoji={selectedTemplate.icon}
+                      size={32}
+                    />
                     <div>
-                      <div className="font-medium">{selectedTemplate.displayName}</div>
-                      <div className="text-sm text-muted-foreground">{selectedTemplate.description}</div>
+                      <div className="font-medium">{selectedTemplate.displayName}</div>   
+                      <div className="text-sm text-muted-foreground">{selectedTemplate.description}</div>                                                                           
                     </div>
                   </div>
                 </CardContent>
@@ -528,32 +677,64 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
           </div>
         )}
 
+        </div>
+        
         {/* Footer */}
-        <div className="flex justify-between pt-6">
+        <div className="border-t px-6 py-4 shrink-0 flex justify-between gap-2 flex-col sm:flex-row">
           <Button 
             variant="outline" 
             onClick={handlePrevious}
             disabled={currentStep === 1}
+            className="w-full sm:w-auto"
           >
             <ChevronLeft className="mr-2 h-4 w-4" />
             Anterior
           </Button>
 
-          <div className="flex space-x-2">
-            <Button variant="outline" onClick={handleClose}>
+          <div className="flex space-x-2 w-full sm:w-auto">
+            <Button 
+              variant="outline" 
+              onClick={handleClose}
+              className="flex-1 sm:flex-initial"
+            >
               Cancelar
             </Button>
             
-            {currentStep < 3 ? (
-              <Button onClick={handleNext}>
+            {currentStep === 1 ? (
+              <Button 
+                onClick={handleNext}
+                className="flex-1 sm:flex-initial"
+              >
                 Próximo
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
-            ) : (
-              <Button onClick={handleSubmit} disabled={loading}>
+            ) : currentStep === 2 ? (
+              <Button 
+                onClick={handleSubmit} 
+                disabled={loading}
+                className="flex-1 sm:flex-initial"
+              >
                 {loading ? (
                   <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Salvar
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleSubmit} 
+                disabled={loading}
+                className="flex-1 sm:flex-initial"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Criando...
                   </>
                 ) : (
@@ -567,6 +748,50 @@ export function ProviderWizard({ isOpen, onClose, onSuccess }: ProviderWizardPro
           </div>
         </div>
       </DialogContent>
+
+      {/* Test Error Dialog */}
+      <Dialog open={showTestDialog} onOpenChange={setShowTestDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="h-5 w-5 text-destructive" />
+              Erro no Teste de Conexão
+            </DialogTitle>
+            <DialogDescription>
+              Não foi possível estabelecer conexão com o provedor.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {testResult?.error && (
+            <div className="space-y-4">
+              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm font-medium text-destructive mb-2">
+                  Erro:
+                </p>
+                <p className="text-sm text-foreground">
+                  {testResult.error}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Verifique:</p>
+                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Se a API Key está correta</li>
+                  <li>Se a Base URL está correta</li>
+                  <li>Se o provedor está ativo</li>
+                  <li>Se há conexão com a internet</li>
+                </ul>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setShowTestDialog(false)}>
+              Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

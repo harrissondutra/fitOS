@@ -11,24 +11,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from '@/components/ui/chart';
-import { 
-  Store, 
-  TrendingUp, 
-  Package, 
-  ShoppingCart, 
-  Eye, 
-  Heart, 
-  Star, 
-  Users, 
-  Calendar, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Globe, 
-  Instagram, 
-  Facebook, 
-  Share2, 
-  Settings, 
+import {
+  Store,
+  TrendingUp,
+  Package,
+  ShoppingCart,
+  Eye,
+  Heart,
+  Star,
+  Users,
+  Calendar,
+  MapPin,
+  Phone,
+  Mail,
+  Globe,
+  Instagram,
+  Facebook,
+  Share2,
+  Settings,
   Plus,
   UserX,
   CheckCircle,
@@ -53,6 +53,7 @@ import {
   LineChart
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { useStore } from '@/hooks/use-store';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -191,152 +192,6 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-// Função para gerar dados mock realistas
-const generateMockData = (period: string): { storeData: StoreData; chartData: ChartData } => {
-  const now = new Date();
-  let daysBack = 30;
-  
-  switch (period) {
-    case '7d': daysBack = 7; break;
-    case '30d': daysBack = 30; break;
-    case '3m': daysBack = 90; break;
-    case '6m': daysBack = 180; break;
-    case '1y': daysBack = 365; break;
-    default: daysBack = 30;
-  }
-
-  // Gerar dados de vendas
-  const salesTimeline = Array.from({ length: daysBack }, (_, i) => {
-    const date = subDays(now, daysBack - i - 1);
-    const baseValue = 1000 + Math.random() * 2000;
-    const trend = Math.sin(i / daysBack * Math.PI) * 500;
-    return {
-      date: format(date, 'yyyy-MM-dd'),
-      value: Math.max(0, baseValue + trend),
-      previousValue: Math.max(0, baseValue + trend - 200)
-    };
-  });
-
-  // Gerar dados de pedidos
-  const ordersTimeline = Array.from({ length: Math.min(daysBack, 30) }, (_, i) => {
-    const date = subDays(now, Math.min(daysBack, 30) - i - 1);
-    return {
-      date: format(date, 'yyyy-MM-dd'),
-      processing: Math.floor(Math.random() * 10) + 2,
-      shipped: Math.floor(Math.random() * 15) + 5,
-      delivered: Math.floor(Math.random() * 20) + 10,
-      cancelled: Math.floor(Math.random() * 3)
-    };
-  });
-
-  // Produtos mais vendidos
-  const topProducts = [
-    { id: '1', name: 'Whey Protein Premium', quantity: 45, revenue: 4045.50, growth: 15.2 },
-    { id: '2', name: 'Creatina Monohidratada', quantity: 32, revenue: 1468.80, growth: 8.5 },
-    { id: '3', name: 'BCAA 2:1:1', quantity: 28, revenue: 1901.20, growth: 22.1 },
-    { id: '4', name: 'Halteres Ajustáveis', quantity: 15, revenue: 2998.50, growth: -5.2 },
-    { id: '5', name: 'Camiseta Dry Fit', quantity: 67, revenue: 2673.30, growth: 12.8 }
-  ];
-
-  // Distribuição por categoria
-  const categoryDistribution = [
-    { category: 'Suplementos', value: 45, fill: 'hsl(var(--chart-1))' },
-    { category: 'Equipamentos', value: 25, fill: 'hsl(var(--chart-2))' },
-    { category: 'Roupas', value: 20, fill: 'hsl(var(--chart-3))' },
-    { category: 'Acessórios', value: 10, fill: 'hsl(var(--chart-4))' }
-  ];
-
-  // Pedidos recentes
-  const recentOrders = [
-    { id: 'ORD-001', customer: 'João Silva', total: 225.70, status: 'processing', createdAt: '2024-01-20T10:30:00Z' },
-    { id: 'ORD-002', customer: 'Maria Santos', total: 67.90, status: 'shipped', createdAt: '2024-01-19T15:45:00Z' },
-    { id: 'ORD-003', customer: 'Pedro Costa', total: 199.90, status: 'delivered', createdAt: '2024-01-18T09:20:00Z' },
-    { id: 'ORD-004', customer: 'Ana Oliveira', total: 89.90, status: 'processing', createdAt: '2024-01-17T14:10:00Z' },
-    { id: 'ORD-005', customer: 'Carlos Mendes', total: 156.40, status: 'shipped', createdAt: '2024-01-16T11:25:00Z' }
-  ];
-
-  // Avaliações recentes
-  const recentReviews = [
-    { id: '1', customer: 'João Silva', product: 'Whey Protein Premium', rating: 5, comment: 'Excelente produto!', createdAt: '2024-01-20T14:30:00Z', needsResponse: false },
-    { id: '2', customer: 'Maria Santos', product: 'Creatina Monohidratada', rating: 4, comment: 'Bom produto, mas embalagem poderia ser melhor.', createdAt: '2024-01-19T16:45:00Z', needsResponse: true },
-    { id: '3', customer: 'Pedro Costa', product: 'BCAA 2:1:1', rating: 2, comment: 'Produto não chegou ainda.', createdAt: '2024-01-18T09:20:00Z', needsResponse: true }
-  ];
-
-  const totalSales = salesTimeline.reduce((sum, item) => sum + item.value, 0);
-  const totalOrders = ordersTimeline.reduce((sum, item) => sum + item.processing + item.shipped + item.delivered, 0);
-
-  const storeData: StoreData = {
-    id: '1',
-    name: 'Minha Loja',
-    owner: 'Usuário',
-    email: 'usuario@exemplo.com',
-    phone: '',
-    location: 'Brasil',
-    foundedYear: '2024',
-    description: 'Loja especializada em produtos de fitness e bem-estar.',
-    verified: true,
-    badges: ['Verified', 'Top Seller'],
-    specialties: ['Suplementos', 'Equipamentos', 'Roupas'],
-    socialMedia: {
-      website: '',
-      instagram: '',
-      facebook: ''
-    },
-    stats: {
-      totalSales,
-      monthlySales: totalSales * 0.3,
-      totalOrders,
-      monthlyOrders: totalOrders * 0.3,
-      totalProducts: 24,
-      activeProducts: 20,
-      averageRating: 4.7,
-      totalReviews: 156,
-      storeViews: 1234,
-      favorites: 89,
-      conversionRate: 3.2,
-      returnCustomers: 45,
-      avgTicket: totalSales / Math.max(totalOrders, 1),
-      outOfStockProducts: 4
-    },
-    performance: {
-      salesGrowth: 15.2,
-      orderGrowth: 8.5,
-      viewGrowth: 22.1,
-      ratingTrend: 0.3
-    }
-  };
-
-  return { storeData, chartData: { salesTimeline, ordersTimeline, topProducts, categoryDistribution, recentOrders, recentReviews } };
-};
-
-// Função para buscar dados da loja do usuário
-const fetchStoreData = async (userId: string): Promise<StoreData> => {
-  try {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      throw new Error('Token de acesso não encontrado');
-    }
-
-    const response = await fetch(`http://localhost:3001/api/marketplace/store/${userId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      return data;
-    } else {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Erro ao buscar dados da loja');
-    }
-  } catch (error) {
-    console.warn('Erro ao buscar dados da loja, usando dados padrão:', error);
-    return generateMockData('30d').storeData;
-  }
-};
-
 // Componente de KPI Card
 const KPICard = ({ title, value, change, icon: Icon, color = "text-primary", sparkline }: {
   title: string;
@@ -347,24 +202,24 @@ const KPICard = ({ title, value, change, icon: Icon, color = "text-primary", spa
   sparkline?: Array<{ value: number }>;
 }) => {
   const [displayValue, setDisplayValue] = useState(0);
-  
+
   useEffect(() => {
     const targetValue = typeof value === 'number' ? value : parseFloat(value.toString().replace(/[^\d.-]/g, ''));
     const duration = 1000;
     const steps = 60;
     const stepValue = targetValue / steps;
     let currentStep = 0;
-    
+
     const timer = setInterval(() => {
       currentStep++;
       setDisplayValue(stepValue * currentStep);
-      
+
       if (currentStep >= steps) {
         setDisplayValue(targetValue);
         clearInterval(timer);
       }
     }, duration / steps);
-    
+
     return () => clearInterval(timer);
   }, [value]);
 
@@ -396,9 +251,9 @@ const KPICard = ({ title, value, change, icon: Icon, color = "text-primary", spa
             <div className="mt-2 h-8">
               <ChartContainer config={chartConfig} className="h-full w-full">
                 <RechartsLineChart data={sparkline}>
-                  <Line 
-                    type="monotone" 
-                    dataKey="value" 
+                  <Line
+                    type="monotone"
+                    dataKey="value"
                     stroke="hsl(var(--chart-1))"
                     strokeWidth={2}
                     dot={false}
@@ -437,39 +292,30 @@ export default function StorePage() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [selectedPeriod, setSelectedPeriod] = useState('30d');
-  const [storeData, setStoreData] = useState<StoreData | null>(null);
+
+  // Buscar dados reais da loja usando o hook
+  const {
+    storeData,
+    topProducts,
+    recentOrders,
+    recentReviews,
+    loading: storeLoading,
+    error: storeError
+  } = useStore(user?.id);
+
+  const loading = isLoading || storeLoading;
+
+  // Dados de gráficos (por enquanto vazios - serão implementados com API real)
   const [chartData, setChartData] = useState<ChartData | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  // Validação de autenticação e permissões
+  // Validar autenticação
+  // Validar autenticação
   useEffect(() => {
-    const loadStoreData = async () => {
-      if (!isLoading) {
-        if (!isAuthenticated || !user) {
-          toast.error('Você precisa estar logado para acessar sua loja');
-          router.push('/auth/login');
-          return;
-        }
-
-        try {
-          setLoading(true);
-          // Gerar dados mock baseados no período selecionado
-          const mockData = generateMockData(selectedPeriod);
-          setStoreData(mockData.storeData);
-          setChartData(mockData.chartData);
-        } catch (error) {
-          console.warn('Erro ao carregar dados da loja:', error);
-          const mockData = generateMockData(selectedPeriod);
-          setStoreData(mockData.storeData);
-          setChartData(mockData.chartData);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadStoreData();
-  }, [isAuthenticated, user, isLoading, router, selectedPeriod]);
+    if (!isLoading && !isAuthenticated) {
+      toast.error('Você precisa estar logado para acessar sua loja');
+      router.push('/auth/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   // Loading state com skeleton
   if (isLoading || loading) {
@@ -551,7 +397,7 @@ export default function StorePage() {
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
           {/* Header da Loja */}
-          <motion.div 
+          <motion.div
             className="mb-8"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -610,7 +456,7 @@ export default function StorePage() {
           </motion.div>
 
           {/* Alertas e Insights */}
-          <motion.div 
+          <motion.div
             className="mb-8"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -620,14 +466,14 @@ export default function StorePage() {
               <Lightbulb className="h-4 w-4" />
               <AlertTitle>Insight do Dia</AlertTitle>
               <AlertDescription>
-                Suas vendas cresceram {storeData.performance.salesGrowth}% este mês! 
+                Suas vendas cresceram {storeData.performance.salesGrowth}% este mês!
                 Continue assim para alcançar suas metas.
               </AlertDescription>
             </Alert>
           </motion.div>
 
           {/* Filtro de Período */}
-          <motion.div 
+          <motion.div
             className="mb-8"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -749,18 +595,18 @@ export default function StorePage() {
                     <AreaChart data={chartData.salesTimeline}>
                       <defs>
                         <linearGradient id="fillSales" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.1}/>
+                          <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.8} />
+                          <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0.1} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid vertical={false} />
-                      <XAxis 
-                        dataKey="date" 
+                      <XAxis
+                        dataKey="date"
                         tickFormatter={(value) => format(parseISO(value), 'dd/MM', { locale: ptBR })}
                       />
-                      <ChartTooltip 
+                      <ChartTooltip
                         content={
-                          <ChartTooltipContent 
+                          <ChartTooltipContent
                             indicator="line"
                             labelFormatter={(value) => {
                               return format(parseISO(value), 'dd/MM/yyyy', { locale: ptBR })
@@ -774,9 +620,9 @@ export default function StorePage() {
                           />
                         }
                       />
-                      <Area 
-                        type="monotone" 
-                        dataKey="value" 
+                      <Area
+                        type="monotone"
+                        dataKey="value"
                         stroke="hsl(var(--chart-1))"
                         fill="url(#fillSales)"
                       />
@@ -803,13 +649,13 @@ export default function StorePage() {
                   <ChartContainer config={chartConfig} className="h-[300px]">
                     <BarChart data={chartData.ordersTimeline}>
                       <CartesianGrid vertical={false} />
-                      <XAxis 
-                        dataKey="date" 
+                      <XAxis
+                        dataKey="date"
                         tickFormatter={(value) => format(parseISO(value), 'dd/MM', { locale: ptBR })}
                       />
-                      <ChartTooltip 
+                      <ChartTooltip
                         content={
-                          <ChartTooltipContent 
+                          <ChartTooltipContent
                             indicator="dot"
                             labelFormatter={(value) => `Período: ${format(parseISO(value), 'dd/MM/yyyy', { locale: ptBR })}`}
                             formatter={(value, name) => {
@@ -912,9 +758,9 @@ export default function StorePage() {
                           <Cell key={`cell-${index}`} fill={entry.fill} />
                         ))}
                       </Pie>
-                      <ChartTooltip 
+                      <ChartTooltip
                         content={
-                          <ChartTooltipContent 
+                          <ChartTooltipContent
                             hideLabel
                             formatter={(value, name) => (
                               <div className="flex items-center gap-2">
@@ -954,9 +800,9 @@ export default function StorePage() {
                   <ChartContainer config={chartConfig} className="h-[250px]">
                     <RadialBarChart cx="50%" cy="50%" innerRadius="60%" outerRadius="90%" data={[{ value: 87 }]}>
                       <RadialBar dataKey="value" fill="hsl(var(--chart-1))" />
-                      <ChartTooltip 
+                      <ChartTooltip
                         content={
-                          <ChartTooltipContent 
+                          <ChartTooltipContent
                             hideLabel
                             formatter={(value) => `${value}% de entregas no prazo`}
                           />

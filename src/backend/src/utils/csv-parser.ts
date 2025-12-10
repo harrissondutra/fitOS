@@ -1,7 +1,6 @@
-// Tipos temporários para evitar erros de compilação após remoção da autenticação
-type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'CLIENT';
-type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DELETED';
 import { CSVImportResult, UserFormData } from '../../../shared/types';
+import { UserRole } from '../../../shared/types/auth.types';
+type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DELETED';
 
 export interface CSVRow {
   firstName: string;
@@ -56,9 +55,9 @@ export class CSVParser {
     if (!row.role || typeof row.role !== 'string') {
       errors.push(`Linha ${rowIndex + 1}: Role é obrigatório`);
     } else {
-      const validRoles: UserRole[] = ['CLIENT', 'TRAINER', 'ADMIN', 'OWNER'];
-      if (!validRoles.includes(row.role.toUpperCase() as UserRole)) {
-        errors.push(`Linha ${rowIndex + 1}: Role inválido. Use: ${validRoles.join(', ')}`);
+      const validRoles: string[] = ['CLIENT', 'TRAINER', 'ADMIN', 'OWNER', 'SUPER_ADMIN', 'PROFESSIONAL'];
+      if (!validRoles.includes(String(row.role).toUpperCase())) {
+        errors.push(`Linha ${rowIndex + 1}: Role inválido.`);
       }
     }
 
@@ -92,7 +91,7 @@ export class CSVParser {
       lastName: row.lastName?.trim() || '',
       email: row.email?.trim().toLowerCase() || '',
       phone: row.phone?.trim() || undefined,
-      role: (row.role?.toUpperCase() as UserRole) || 'CLIENT',
+      role: ((row.role?.toUpperCase() as unknown as UserRole) || ('CLIENT' as unknown as UserRole)),
       status: row.status ? (row.status.toUpperCase() as UserStatus) : 'ACTIVE',
       password: this.generateTemporaryPassword()
     };

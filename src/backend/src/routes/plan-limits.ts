@@ -3,7 +3,7 @@ import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
 import { RequestWithTenant } from '../middleware/tenant';
 // import { requireAuth, requireAdmin, requireSuperAdmin } from '../middleware/auth';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { PlanLimitsService } from '../services/plan-limits.service';
 import { 
   checkWorkoutLimit, 
@@ -19,7 +19,7 @@ import { body, validationResult, query } from 'express-validator';
 import { UserRole } from '../../../shared/types/auth.types';
 
 // PrismaClient global compartilhado
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 const planLimitsService = new PlanLimitsService(prisma);
 
 const router = Router();

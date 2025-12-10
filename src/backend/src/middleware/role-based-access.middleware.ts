@@ -6,7 +6,7 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email: string;
-    role: UserRole;
+    role: any;
     tenantId?: string;
     name?: string;
   };
@@ -19,9 +19,9 @@ export const requireAuth = (req: AuthenticatedRequest, res: Response, next: Next
   return next();
 };
 
-export const requireRole = (roles: UserRole[]) => {
+export const requireRole = (roles: (UserRole | 'OWNER' | 'TRAINER' | 'NUTRITIONIST')[]) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user || !(roles as string[]).includes(req.user.role as any)) {
       return res.status(403).json({ message: 'Forbidden' });
     }
     return next();

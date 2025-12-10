@@ -34,67 +34,72 @@ export default function DatabasePage() {
   const { getDashboard, getServices } = useCosts();
   const { toast } = useToast();
 
-  // Carregar dados
+    // Carregar dados
   const loadData = useCallback(async () => {
     setLoading(true);
-    
-    // Usar dados mockados diretamente para garantir que sempre há dados
-    const mockDashboard = {
-      totalCost: 85.30,
-      monthlyTrend: 5.2,
-      services: [
-        {
-          id: 'postgresql',
-          name: 'PostgreSQL',
-          cost: 45.80,
-          trend: 3.1,
-          status: 'active',
-          icon: Database,
-          description: 'Banco de dados principal'
-        },
-        {
-          id: 'redis',
-          name: 'Redis Cache',
-          cost: 25.50,
-          trend: 8.5,
-          status: 'active',
-          icon: Zap,
-          description: 'Cache em memória'
-        },
-        {
-          id: 'backup',
-          name: 'Backup Storage',
-          cost: 14.00,
-          trend: 1.2,
-          status: 'active',
-          icon: Database,
-          description: 'Armazenamento de backups'
-        }
-      ],
-      trends: [
-        { date: '2024-01-01', totalCost: 70, categories: { database: 70 } },
-        { date: '2024-02-01', totalCost: 75, categories: { database: 75 } },
-        { date: '2024-03-01', totalCost: 80, categories: { database: 80 } },
-        { date: '2024-04-01', totalCost: 82, categories: { database: 82 } },
-        { date: '2024-05-01', totalCost: 85, categories: { database: 85 } },
-        { date: '2024-06-01', totalCost: 85, categories: { database: 85 } }
-      ]
-    };
-    
-    // Simular carregamento
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    setDashboard(mockDashboard);
-    setServices(mockDashboard.services);
-    
-    toast({
-      title: 'Modo Demonstração',
-      description: 'Usando dados de exemplo para database',
-      variant: 'default',
-    });
-    
-    setLoading(false);
-  }, [toast]);
+
+    try {
+      // Buscar dados reais do banco de dados
+      const [dashboardData, servicesData] = await Promise.all([
+        getDashboard(filters),
+        getServices({ category: 'database', ...filters })
+      ]);
+
+      // Processar dados do dashboard
+      const databaseCategory = dashboardData?.categories?.find(
+        (cat: any) => cat.name === 'database' || cat.id === 'database'
+      );
+
+      // Processar serviços de database
+      const processedServices = (servicesData || []).map((service: any) => ({
+        id: service.id,
+        name: service.name,
+        cost: service.totalCost || 0,
+        trend: service.monthlyTrend || 0,
+        status: service.isActive ? 'active' : 'inactive',
+        icon: service.name?.toLowerCase().includes('redis') ? Zap :
+              service.name?.toLowerCase().includes('postgres') || service.name?.toLowerCase().includes('database') ? Database :
+              Database,
+        description: service.description || ''
+      }));
+
+      // Processar trends de database
+      const processedTrends = (dashboardData?.trends || []).map((trend: any) => ({
+        date: trend.date,
+        totalCost: trend.categories?.database || 0,
+        categories: { database: trend.categories?.database || 0 }
+      }));
+
+      setDashboard({
+        totalCost: databaseCategory?.totalCost || 0,
+        monthlyTrend: databaseCategory?.variation || 0,
+        services: processedServices,
+        trends: processedTrends,
+        categories: dashboardData?.categories || []
+      });
+
+      setServices(processedServices);
+    } catch (error) {
+      console.error('Error loading database costs:', error);
+      toast({
+        title: 'Erro ao carregar dados',
+        description: 'Não foi possível carregar os custos de database',
+        variant: 'destructive',
+      });
+      
+      // Fallback para dados vazios em caso de erro
+      setDashboard({
+        totalCost: 0,
+        monthlyTrend: 0,
+        services: [],
+        trends: [],
+        categories: []
+      });
+      setServices([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [getDashboard, getServices, filters, toast]);
 
   useEffect(() => {
     loadData();

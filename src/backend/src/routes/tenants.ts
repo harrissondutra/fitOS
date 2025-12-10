@@ -280,4 +280,40 @@ router.put('/me/settings', rateLimiter, asyncHandler(async (req: RequestWithTena
   }
 }));
 
+// Public route for plan info (used by AdWrapper)
+router.get('/public/:tenantId/plan-info', rateLimiter, asyncHandler(async (req: Request, res: Response) => {
+  const { tenantId } = req.params;
+
+  try {
+    const tenant = await tenantService.resolveTenantById(tenantId);
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: 'Tenant not found',
+        },
+      });
+    }
+
+    // Return only necessary information for ad rendering
+    return res.json({
+      success: true,
+      data: {
+        plan: tenant.plan,
+        adsEnabled: tenant.adsEnabled ?? true, // Default to true if not set
+        tenantType: tenant.tenantType,
+      },
+    });
+  } catch (error) {
+    logger.error('Error getting tenant plan info:', error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        message: 'Failed to get tenant plan info',
+      },
+    });
+  }
+}));
+
 export { router as tenantRoutes };

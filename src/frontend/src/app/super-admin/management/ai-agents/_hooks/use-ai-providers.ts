@@ -8,6 +8,7 @@ import {
   PaginationParams,
   PaginatedResponse
 } from '@/shared/types/ai.types';
+import { authenticatedFetch } from './_utils/fetch-helper';
 
 /**
  * Hook para gerenciar provedores de IA
@@ -52,21 +53,24 @@ export function useAiProviders() {
       if (paginationParams.sortBy) queryParams.append('sortBy', paginationParams.sortBy);
       if (paginationParams.sortOrder) queryParams.append('sortOrder', paginationParams.sortOrder);
 
-      const response = await fetch(`/api/super-admin/ai-providers?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers?${queryParams}`);
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data: PaginatedResponse<AiProvider> = await response.json();
       
-      setProviders(data.data);
-      setPagination(data.pagination);
+      // Garantir que data e pagination existem
+      setProviders(data?.data || []);
+      setPagination(data?.pagination || {
+        page: 1,
+        limit: 20,
+        total: 0,
+        pages: 0
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch providers');
     } finally {
@@ -79,12 +83,8 @@ export function useAiProviders() {
    */
   const getProviderById = useCallback(async (id: string, includeDecrypted: boolean = false): Promise<AiProvider | null> => {
     try {
-      const response = await fetch(`/api/super-admin/ai-providers/${id}?includeDecrypted=${includeDecrypted}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers/${id}?includeDecrypted=${includeDecrypted}`);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -105,12 +105,9 @@ export function useAiProviders() {
     setError(null);
 
     try {
-      const response = await fetch('/api/super-admin/ai-providers', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify(data)
       });
 
@@ -140,12 +137,9 @@ export function useAiProviders() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/super-admin/ai-providers/${id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers/${id}`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify(data)
       });
 
@@ -168,19 +162,50 @@ export function useAiProviders() {
   }, []);
 
   /**
-   * Remove provedor
+   * Ativa ou inativa um provedor (soft delete)
+   */
+  const toggleActiveProvider = useCallback(async (id: string, isActive: boolean): Promise<AiProvider | null> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers/${id}/toggle-active`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      const updatedProvider = result.provider;
+      
+      // Atualizar lista local
+      setProviders(prev => prev.map(p => p.id === id ? updatedProvider : p));
+      
+      return updatedProvider;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to toggle provider status');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Remove provedor completamente do banco de dados (hard delete)
    */
   const deleteProvider = useCallback(async (id: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/super-admin/ai-providers/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers/${id}`, {
+        method: 'DELETE'
       });
 
       if (!response.ok) {
@@ -204,12 +229,9 @@ export function useAiProviders() {
    */
   const testProvider = useCallback(async (id: string): Promise<{ success: boolean; error?: string; responseTime?: number }> => {
     try {
-      const response = await fetch(`/api/super-admin/ai-providers/${id}/test`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers/${id}/test`, {
+        method: 'POST'
       });
 
       if (!response.ok) {
@@ -233,12 +255,9 @@ export function useAiProviders() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/super-admin/ai-providers/${id}/rotate-key`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers/${id}/rotate-key`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        },
         body: JSON.stringify({ apiKey: newApiKey })
       });
 
@@ -261,16 +280,53 @@ export function useAiProviders() {
   }, []);
 
   /**
+   * Define um provedor como padrão
+   */
+  const setDefaultProvider = useCallback(async (id: string): Promise<AiProvider | null> => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers/${id}/set-default`, {
+        method: 'POST'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      const updatedProvider = result.data || result.provider;
+      
+      // Atualizar lista local - marcar todos os outros do mesmo tipo como não padrão
+      setProviders(prev => prev.map(p => {
+        if (p.id === id) {
+          return { ...p, isDefault: true };
+        }
+        if (p.provider === updatedProvider.provider) {
+          return { ...p, isDefault: false };
+        }
+        return p;
+      }));
+      
+      return updatedProvider;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to set default provider');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
    * Obtém estatísticas dos provedores
    */
   const getProviderStats = useCallback(async () => {
     try {
-      const response = await fetch('/api/super-admin/ai-providers/stats', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers/stats`);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -288,12 +344,8 @@ export function useAiProviders() {
    */
   const getProvidersByType = useCallback(async (providerType: AiProviderType): Promise<AiProvider[]> => {
     try {
-      const response = await fetch(`/api/super-admin/ai-providers/by-type/${providerType}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await authenticatedFetch(`${apiUrl}/api/super-admin/ai/providers/by-type/${providerType}`);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -306,12 +358,7 @@ export function useAiProviders() {
     }
   }, []);
 
-  /**
-   * Carrega provedores na inicialização
-   */
-  useEffect(() => {
-    listProviders();
-  }, [listProviders]);
+  // Removido useEffect de inicialização - deve ser chamado explicitamente pelo componente
 
   return {
     // Estado
@@ -325,9 +372,11 @@ export function useAiProviders() {
     getProviderById,
     createProvider,
     updateProvider,
+    toggleActiveProvider,
     deleteProvider,
     testProvider,
     rotateApiKey,
+    setDefaultProvider,
     getProviderStats,
     getProvidersByType,
     

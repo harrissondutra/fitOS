@@ -30,7 +30,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
-import { authenticatedApiRequest, API_ENDPOINTS } from '@/lib/api-url';
+import { authenticatedApiRequest, API_ENDPOINTS } from '@/lib/api';
 import { ErrorBoundary } from '@/components/error-boundary';
 
 interface DashboardStats {

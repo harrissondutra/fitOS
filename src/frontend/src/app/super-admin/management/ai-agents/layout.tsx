@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent } from "@/components/ui/card"
 import { Loader2, ShieldX } from "lucide-react"
+import { UserRoles } from '@/shared/types/auth.types';
 
 interface SuperAdminLayoutProps {
   children: React.ReactNode
@@ -37,8 +38,8 @@ export default function AIAgentsLayout({ children }: SuperAdminLayoutProps) {
         }
 
         const result = await response.json()
-        
-        if (result.success && result.user?.role === 'SUPER_ADMIN') {
+
+        if (result.success && result.user?.role === UserRoles.SUPER_ADMIN) {
           setIsSuperAdmin(true)
         } else {
           setIsSuperAdmin(false)
@@ -77,10 +78,10 @@ export default function AIAgentsLayout({ children }: SuperAdminLayoutProps) {
             <ShieldX className="h-12 w-12 text-destructive" />
             <h2 className="text-xl font-semibold">Acesso Negado</h2>
             <p className="text-sm text-muted-foreground text-center">
-              Você não tem permissão para acessar esta área. 
+              Você não tem permissão para acessar esta área.
               Apenas super administradores podem gerenciar agentes de IA.
             </p>
-            <button 
+            <button
               onClick={() => router.push('/dashboard')}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
             >

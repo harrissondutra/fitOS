@@ -4,6 +4,9 @@
  */
 
 import PDFDocument from 'pdfkit';
+
+// Type alias para o tipo correto do PDFDocument
+type PDFDoc = typeof PDFDocument extends new (...args: any[]) => infer R ? R : any;
 import fs from 'fs';
 import path from 'path';
 import { logger } from '../../utils/logger';
@@ -64,55 +67,55 @@ export class PDFExportService {
   /**
    * Adicionar cabeçalho ao PDF
    */
-  private addHeader(doc: PDFDocument, title: string, subtitle?: string) {
+  private addHeader(doc: PDFDoc, title: string, subtitle?: string) {
     // Logo (se tiver)
     doc.fontSize(24)
-       .text('FitOS', { align: 'center' });
+      .text('FitOS', { align: 'center' });
 
     if (subtitle) {
       doc.fontSize(14)
-         .text(subtitle, { align: 'center' });
+        .text(subtitle, { align: 'center' });
     }
 
     doc.fontSize(20)
-       .text(title, { align: 'center' })
-       .moveDown();
+      .text(title, { align: 'center' })
+      .moveDown();
   }
 
   /**
    * Adicionar informações do paciente
    */
-  private addPatientInfo(doc: PDFDocument, clientName: string) {
+  private addPatientInfo(doc: PDFDoc, clientName: string) {
     doc.fontSize(12)
-       .text('Paciente:', { continued: true })
-       .text(clientName, { indent: 100 })
-       .text(`Data: ${new Date().toLocaleDateString('pt-BR')}`)
-       .moveDown();
+      .text('Paciente:', { continued: true })
+      .text(clientName, { indent: 100 })
+      .text(`Data: ${new Date().toLocaleDateString('pt-BR')}`)
+      .moveDown();
   }
 
   /**
    * Adicionar conteúdo da prescrição
    */
-  private addPrescriptionContent(doc: PDFDocument, content: any) {
+  private addPrescriptionContent(doc: PDFDoc, content: any) {
     doc.fontSize(14)
-       .text('Prescrição Nutricional:', { underline: true })
-       .moveDown();
+      .text('Prescrição Nutricional:', { underline: true })
+      .moveDown();
 
     // Se for plano alimentar
     if (content.meals) {
       content.meals.forEach((meal: any, index: number) => {
         doc.fontSize(12)
-           .text(`${index + 1}. ${meal.mealType}:`, { continued: true })
-           .text(meal.foods.join(', '));
+          .text(`${index + 1}. ${meal.mealType}:`, { continued: true })
+          .text(meal.foods.join(', '));
       });
     }
 
     // Se for orientações gerais
     if (content.recommendations) {
       doc.moveDown()
-         .fontSize(12)
-         .text('Recomendações:', { underline: true });
-      
+        .fontSize(12)
+        .text('Recomendações:', { underline: true });
+
       content.recommendations.forEach((rec: string) => {
         doc.text(`• ${rec}`);
       });
@@ -122,32 +125,30 @@ export class PDFExportService {
   /**
    * Adicionar rodapé
    */
-  private addFooter(doc: PDFDocument, professionalName: string) {
+  private addFooter(doc: PDFDoc, professionalName: string) {
     doc.moveTo(50, doc.page.height - 100)
-       .lineTo(doc.page.width - 50, doc.page.height - 100)
-       .stroke()
-       .moveDown()
-       .fontSize(10)
-       .text('Prescrito por:', { continued: true })
-       .text(professionalName, { indent: 100 })
-       .text(`Emitido em: ${new Date().toLocaleString('pt-BR')}`)
-       .fontSize(8)
-       .text('Este documento foi gerado automaticamente pelo FitOS.', 
-             { align: 'center' });
+      .lineTo(doc.page.width - 50, doc.page.height - 100)
+      .stroke()
+      .moveDown()
+      .fontSize(10)
+      .text('Prescrito por:', { continued: true })
+      .text(professionalName, { indent: 100 })
+      .text(`Emitido em: ${new Date().toLocaleString('pt-BR')}`)
+      .fontSize(8)
+      .text('Este documento foi gerado automaticamente pelo FitOS.',
+        { align: 'center' });
   }
 
   /**
    * Adicionar watermark
    */
-  private addWatermark(doc: PDFDocument) {
+  private addWatermark(doc: PDFDoc) {
     doc.fillColor('lightgray')
-       .fontSize(72)
-       .text('FITOS', {
-         align: 'center',
-         baseline: 'middle',
-         opacity: 0.1,
-         angle: 45
-       });
+      .fontSize(72)
+      .text('FITOS', {
+        align: 'center',
+        baseline: 'middle'
+      });
   }
 
   /**
@@ -161,4 +162,7 @@ export class PDFExportService {
 }
 
 export default new PDFExportService();
+
+
+
 

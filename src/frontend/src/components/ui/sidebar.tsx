@@ -595,6 +595,7 @@ const SidebarMenuButton = React.forwardRef<
         <TooltipContent
           side="right"
           align="center"
+          suppressHydrationWarning
           hidden={state !== "collapsed"}
           {...tooltip}
         />

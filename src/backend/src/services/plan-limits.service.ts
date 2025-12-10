@@ -75,7 +75,9 @@ export interface PlanConfig {
 }
 
 export type TenantType = 'individual' | 'business';
-export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN' | 'TRAINER' | 'MEMBER';
+import { UserRoles, UserRole } from '../constants/roles';
+
+export type { UserRole };
 
 export class PlanLimitsService {
   private prisma: PrismaClient;
@@ -107,12 +109,15 @@ export class PlanLimitsService {
     }
 
     // Prioridade: plano customizado > plano base
-    const planConfig = tenant.customPlanId 
-      ? tenant.customPlan 
+    const planConfig = tenant.customPlanId
+      ? tenant.customPlan
       : await this.getBasePlanConfig(tenant.plan, tenant.tenantType as TenantType);
 
     if (!planConfig) {
-      throw new Error('Configuração de plano não encontrada');
+      // Fallback seguro: sem configuração de plano, usar limites vazios (ou ilimitado para super_admin somente se necessário)
+      console.warn(`PlanLimitsService: Configuração de plano não encontrada para tenant ${tenant.id} (plan=${tenant.plan}, type=${tenant.tenantType}). Aplicando limites padrão.`);
+      const base: PlanLimits = {} as any;
+      return this.mergeLimits(base, (tenant.extraSlots as Record<string, number>) || {});
     }
 
     // Somar limites base + extraSlots
@@ -175,7 +180,7 @@ export class PlanLimitsService {
     // Para business, verificar limite por role
     const limits = await this.getPlanLimits(tenantId);
     const currentCount = await this.prisma.user.count({
-      where: { 
+      where: {
         tenantId,
         role: role.toUpperCase()
       }
@@ -240,8 +245,12 @@ export class PlanLimitsService {
     const counts: Record<string, number> = {};
     users.forEach(user => {
       // Converter SUPER_ADMIN para super_admin para compatibilidade com PlanLimits
-      const role = user.role === 'SUPER_ADMIN' ? 'super_admin' : (user.role || 'member').toLowerCase();
-      counts[role] = (counts[role] || 0) + 1;
+      // Map MEMBER to CLIENT for consistency if needed, or keep as is if DB has MEMBER
+      let role = user.role || UserRoles.CLIENT;
+      if (role === 'MEMBER') role = UserRoles.CLIENT; // Handle legacy MEMBER role
+
+      const normalizedRole = role === UserRoles.SUPER_ADMIN ? 'super_admin' : role.toLowerCase();
+      counts[normalizedRole] = (counts[normalizedRole] || 0) + 1;
     });
 
     return counts;
@@ -268,8 +277,8 @@ export class PlanLimitsService {
     }
 
     // Prioridade: tenant.enabledFeatures > plano.features
-    const planConfig = tenant.customPlanId 
-      ? tenant.customPlan 
+    const planConfig = tenant.customPlanId
+      ? tenant.customPlan
       : await this.getBasePlanConfig(tenant.plan, tenant.tenantType as TenantType);
 
     const planFeatures = planConfig?.features as Record<string, boolean> || {};
@@ -347,7 +356,7 @@ export class PlanLimitsService {
    */
   async convertToBusiness(tenantId: string, subdomain: string): Promise<void> {
     const validation = await this.canConvertToBusiness(tenantId);
-    
+
     if (!validation.canConvert) {
       throw new Error(validation.reason);
     }
@@ -433,7 +442,7 @@ export class PlanLimitsService {
     available: number;
   }> {
     const limits = await this.getPlanLimits(tenantId);
-    
+
     // Calcular storage atual (simplificado - apenas workouts e exercícios)
     const workoutCount = await this.prisma.workout.count({
       where: { tenantId }
@@ -441,7 +450,7 @@ export class PlanLimitsService {
     const exerciseCount = await this.prisma.exercise.count({
       where: { tenantId }
     });
-    
+
     // Estimativa: 1KB por workout, 2KB por exercício
     const currentStorageMB = (workoutCount * 0.001) + (exerciseCount * 0.002);
 
@@ -470,7 +479,7 @@ export class PlanLimitsService {
   }> {
     const limits = await this.getPlanLimits(tenantId);
     const userCounts = await this.getUserCountByRole(tenantId);
-    
+
     const [workoutCount, exerciseCount, memberCount] = await Promise.all([
       this.prisma.workout.count({ where: { tenantId } }),
       this.prisma.exercise.count({ where: { tenantId } }),
@@ -647,7 +656,7 @@ export class PlanLimitsService {
 
       // Calcular uso atual do mês
       const currentUsage = await this.getCurrentMonthAIUsage(tenantId, serviceType);
-      const limit = serviceType 
+      const limit = serviceType
         ? globalLimits.overrides?.aiLimits?.[serviceType]?.maxTokensPerMonth || 0
         : globalLimits.overrides?.aiLimits?.maxTokensPerMonth || 0;
 
@@ -716,7 +725,7 @@ export class PlanLimitsService {
 
       // Calcular custo atual do mês
       const currentCost = await this.getCurrentMonthAICost(tenantId, serviceType);
-      const limit = serviceType 
+      const limit = serviceType
         ? globalLimits.overrides?.aiLimits?.[serviceType]?.maxTokensPerMonth || 0
         : globalLimits.overrides?.aiLimits?.monthlyBudget || 0;
 

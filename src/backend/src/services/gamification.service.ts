@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 // TODO: Add Challenge, Badge, UserBadge, ChallengeParticipant models to Prisma schema
 type Challenge = any;
 type Badge = any;
@@ -13,7 +14,7 @@ export class GamificationService {
   private cache: CacheService;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = getPrismaClient();
     this.cache = new CacheService();
   }
 

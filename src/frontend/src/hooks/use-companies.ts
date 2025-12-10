@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { authenticatedApiRequest, API_ENDPOINTS } from '@/lib/api-url';
+import { authenticatedApiRequest, API_ENDPOINTS } from '@/lib/api';
 
 interface Company {
   id: string;

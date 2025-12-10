@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { GlobalLimitsService } from '../services/global-limits.service';
-import { AuthMiddleware } from '../middleware/auth.middleware';
+import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { validateGlobalLimits } from '../middleware/validation.middleware';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 
 const router = Router();
 const globalLimitsService = new GlobalLimitsService();
-const prisma = new PrismaClient();
-const authMiddleware = new AuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 
 // Middleware para todas as rotas
 router.use((req: any, res, next) => authMiddleware.requireSuperAdmin(req, res, next));

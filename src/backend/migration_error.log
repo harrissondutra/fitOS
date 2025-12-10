@@ -1,0 +1,15 @@
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "postgres", schemas "fitness" at "132.145.206.169:5432"
+
+Error: P3006
+
+Migration `20241104000000_add_missing_ai_service_types` failed to apply cleanly to the shadow database. 
+Error:
+ERROR: schema "fitos" does not exist
+   0: sql_schema_connector::validate_migrations
+           with namespaces=Some(Namespaces("fitness", []))
+             at schema-engine\connectors\sql-schema-connector\src\lib.rs:335
+   1: schema_core::state::DevDiagnostic
+             at schema-engine\core\src\state.rs:276
+

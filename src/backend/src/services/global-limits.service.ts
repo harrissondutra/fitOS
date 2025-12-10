@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { 
   GlobalLimitsConfig, 
   CreateGlobalLimitsDTO, 
@@ -11,7 +12,7 @@ import {
   CreateTenantOverrideDTO
 } from '../../../shared/types/integrations.types';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export class GlobalLimitsService {
   /**

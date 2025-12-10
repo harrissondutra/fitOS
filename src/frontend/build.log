@@ -1,0 +1,43 @@
+
+> fitos-frontend@1.0.0 build
+> next build
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'isrMemoryCacheSize' at "experimental"
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+   ▲ Next.js 15.5.4
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · isrMemoryCacheSize: 0
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 24.3s
+   Skipping linting
+   Checking validity of types ...
+ ⚠ TypeScript project references are not fully supported. Attempting to build in incremental mode.
+   Collecting page data ...
+   Generating static pages (0/32) ...
+🔧 AuthClient configurado com baseURL: http://localhost:3001
+🔧 AuthClient configurado com baseURL: http://localhost:3001
+Error occurred prerendering page "/admin/users". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: useAuth must be used within an AuthProvider
+    at t (E:\Documentos\Desenvolvimento\Sistudo\fitOS\src\frontend\.next\server\chunks\3005.js:1:25563)
+    at s (E:\Documentos\Desenvolvimento\Sistudo\fitOS\src\frontend\.next\server\chunks\3005.js:1:18755) {
+  digest: '3475611653'
+}
+Export encountered an error on /admin/users/page: /admin/users, exiting the build.
+Error occurred prerendering page "/member/progress". Read more: https://nextjs.org/docs/messages/prerender-error
+Error: useAuth must be used within an AuthProvider
+    at t (E:\Documentos\Desenvolvimento\Sistudo\fitOS\src\frontend\.next\server\chunks\3005.js:1:25563)
+    at s (E:\Documentos\Desenvolvimento\Sistudo\fitOS\src\frontend\.next\server\chunks\3005.js:1:18755) {
+  digest: '3475611653'
+}
+Export encountered an error on /member/progress/page: /member/progress, exiting the build.
+ ⨯ Next.js build worker exited with code: 1 and signal: null
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path E:\Documentos\Desenvolvimento\Sistudo\fitOS\src\frontend
+npm error workspace fitos-frontend@1.0.0
+npm error location E:\Documentos\Desenvolvimento\Sistudo\fitOS\src\frontend
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c next build

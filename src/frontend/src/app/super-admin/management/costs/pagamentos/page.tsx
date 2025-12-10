@@ -33,58 +33,49 @@ export default function PagamentosPage() {
   const { getDashboard, getServices } = useCosts();
   const { toast } = useToast();
 
-  // Carregar dados
+    // Carregar dados
   const loadData = useCallback(async () => {
-    setLoading(true);
-    
-    // Usar dados mockados diretamente para garantir que sempre há dados
-    const mockDashboard = {
-      totalCost: 45.20,
-      monthlyTrend: 2.1,
-      services: [
-        {
-          id: 'stripe',
-          name: 'Stripe',
-          cost: 25.80,
-          trend: 1.5,
-          status: 'active',
-          icon: CreditCard,
-          description: 'Processamento de pagamentos'
-        },
-        {
-          id: 'mercadopago',
-          name: 'Mercado Pago',
-          cost: 19.40,
-          trend: 3.2,
-          status: 'active',
-          icon: DollarSign,
-          description: 'Gateway de pagamento brasileiro'
-        }
-      ],
-      trends: [
-        { date: '2024-01-01', totalCost: 40, categories: { payment: 40 } },
-        { date: '2024-02-01', totalCost: 42, categories: { payment: 42 } },
-        { date: '2024-03-01', totalCost: 45, categories: { payment: 45 } },
-        { date: '2024-04-01', totalCost: 43, categories: { payment: 43 } },
-        { date: '2024-05-01', totalCost: 47, categories: { payment: 47 } },
-        { date: '2024-06-01', totalCost: 45, categories: { payment: 45 } }
-      ]
-    };
-    
-    // Simular carregamento
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    setDashboard(mockDashboard);
-    setServices(mockDashboard.services);
-    
-    toast({
-      title: 'Modo Demonstração',
-      description: 'Usando dados de exemplo para pagamentos',
-      variant: 'default',
-    });
-    
-    setLoading(false);
-  }, [toast]);
+    try {
+      setLoading(true);
+
+      // Buscar dashboard com filtro de pagamentos
+      const dashboardData = await getDashboard(filters);
+      
+      // Buscar serviços da categoria payment
+      const servicesData = await getServices({ categoryId: 'payment' });
+
+      // Processar serviços para o formato esperado
+      const processedServices = servicesData.map((service: any) => {
+        // Calcular custo total do serviço no período atual
+        const serviceCost = dashboardData?.services?.find((s: any) => s.serviceId === service.id)?.totalCost || 0;
+        
+        return {
+          id: service.id,
+          name: service.name,
+          displayName: service.displayName || service.name,
+          cost: serviceCost,
+          trend: 0, // Calcular trend se necessário
+          status: service.isActive ? 'active' : 'inactive',
+          icon: service.name === 'stripe' ? CreditCard : DollarSign,
+          description: service.displayName || 'Serviço de pagamento'
+        };
+      });
+
+      setDashboard(dashboardData);
+      setServices(processedServices);
+    } catch (error) {
+      console.error('Erro ao carregar dados de pagamentos:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      
+      toast({
+        title: 'Erro',
+        description: `Não foi possível carregar os custos de pagamentos: ${errorMessage}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [getDashboard, getServices, filters, toast]);
 
   useEffect(() => {
     loadData();

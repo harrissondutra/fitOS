@@ -1,21 +1,22 @@
 import { Router } from 'express';
 import { getPrismaClient } from '../config/database';
+import type { $Enums } from '@prisma/client';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { requireSuperAdmin, requireAdminOrSuperAdmin, requireTenantAccess } from '../middleware/superAdmin';
 import { PlanLimitsService } from '../services/plan-limits.service';
 import { CustomPlanService } from '../services/custom-plan.service';
 import { PaymentService } from '../services/payment.service';
 import { asyncHandler } from '../utils/asyncHandler';
+import { serializeBigInt } from '../utils/bigint-serializer';
 
 const router = Router();
-const prisma = getPrismaClient();
-const planLimitsService = new PlanLimitsService(prisma);
-const customPlanService = new CustomPlanService(prisma);
-const paymentService = new PaymentService();
 
-// Aplicar middleware de autenticação em todas as rotas
-const authMiddleware = getAuthMiddleware(prisma);
-router.use(authMiddleware.requireAuth());
+// Aplicar middleware de autenticação em todas as rotas (lazy evaluation)
+router.use((req, res, next) => {
+  const prisma = getPrismaClient();
+  const authMiddleware = getAuthMiddleware();
+  authMiddleware.requireAuth()(req, res, next);
+});
 
 // === Dashboard Stats ===
 
@@ -25,6 +26,11 @@ router.use(authMiddleware.requireAuth());
  */
 router.get('/dashboard/stats', requireSuperAdmin, asyncHandler(async (req, res) => {
   try {
+    const prisma = getPrismaClient();
+    const planLimitsService = new PlanLimitsService(prisma);
+    const customPlanService = new CustomPlanService(prisma);
+    const paymentService = new PaymentService();
+    
     const [
       totalTenants,
       totalUsers,
@@ -109,6 +115,7 @@ router.get('/tenants', requireSuperAdmin, asyncHandler(async (req, res) => {
 
     console.log('Database query where clause:', where);
 
+    const prisma = getPrismaClient();
     // Executar queries separadamente para evitar problemas de conexão
     let tenants, total;
     
@@ -139,6 +146,7 @@ router.get('/tenants', requireSuperAdmin, asyncHandler(async (req, res) => {
     console.log(`Found ${tenants.length} tenants out of ${total} total`);
 
     // Adicionar estatísticas de uso para cada tenant
+    const planLimitsService = new PlanLimitsService(prisma);
     const tenantsWithStats = await Promise.all(
       tenants.map(async (tenant) => {
         try {
@@ -174,7 +182,7 @@ router.get('/tenants', requireSuperAdmin, asyncHandler(async (req, res) => {
     const response = {
       success: true,
       data: {
-        tenants: tenantsWithStats,
+        tenants: serializeBigInt(tenantsWithStats),
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -201,10 +209,274 @@ router.get('/tenants', requireSuperAdmin, asyncHandler(async (req, res) => {
 }));
 
 /**
+ * POST /api/super-admin/tenants
+ * Criar novo tenant (empresa)
+ */
+router.post('/tenants', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  try {
+    const {
+      name,
+      subdomain,
+      customDomain,
+      tenantType = 'business',
+      plan = 'starter',
+      billingEmail,
+      status = 'active',
+      planType,
+      planLimits = {},
+      enabledFeatures = {},
+      settings = {}
+    } = req.body;
+
+    // Validações
+    if (!name || !billingEmail) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Nome e email de cobrança são obrigatórios' }
+      });
+    }
+
+    // Validar formato do email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(billingEmail)) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Email de cobrança inválido' }
+      });
+    }
+
+    // Validar subdomain se fornecido
+    if (subdomain) {
+      const subdomainRegex = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+      if (!subdomainRegex.test(subdomain)) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Subdomain inválido. Use apenas letras minúsculas, números e hífens' }
+        });
+      }
+
+      // Verificar se subdomain já existe
+      const existingSubdomain = await prisma.tenant.findUnique({
+        where: { subdomain }
+      });
+      if (existingSubdomain) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Subdomain já está em uso' }
+        });
+      }
+    }
+
+    // Verificar se customDomain já existe se fornecido
+    if (customDomain) {
+      const existingDomain = await prisma.tenant.findUnique({
+        where: { customDomain }
+      });
+      if (existingDomain) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Domínio customizado já está em uso' }
+        });
+      }
+    }
+
+    // Normalizar planType: aceitar apenas valores válidos do enum PlanType
+    const toPlanType = (v?: string | null): $Enums.PlanType | null => {
+      if (!v) return null;
+      const allowed = new Set(['individual','professional','business','enterprise','custom']);
+      return allowed.has(v) ? (v as $Enums.PlanType) : null;
+    };
+    const normalizedPlanType = toPlanType(planType as string);
+
+    // Criar tenant
+    const tenant = await prisma.tenant.create({
+      data: {
+        name,
+        subdomain: subdomain || null,
+        customDomain: customDomain || null,
+        tenantType,
+        plan,
+        billingEmail,
+        status,
+        planType: normalizedPlanType,
+        planLimits: planLimits as any,
+        enabledFeatures: enabledFeatures as any,
+        settings: settings as any
+      },
+      include: {
+        customPlan: true,
+        _count: {
+          select: {
+            users: true,
+            clients: true
+          }
+        }
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      data: serializeBigInt(tenant),
+      message: 'Empresa criada com sucesso'
+    });
+  } catch (error) {
+    console.error('Error creating tenant:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erro interno do servidor ao criar empresa',
+        details: process.env.NODE_ENV === 'development' ? 
+          (error instanceof Error ? error.message : String(error)) : 
+          undefined
+      }
+    });
+  }
+}));
+
+/**
+ * PUT /api/super-admin/tenants/:id
+ * Atualizar tenant existente
+ */
+router.put('/tenants/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  try {
+    const { id } = req.params;
+    const {
+      name,
+      subdomain,
+      customDomain,
+      tenantType,
+      plan,
+      billingEmail,
+      status,
+      planType,
+      planLimits,
+      enabledFeatures,
+      settings
+    } = req.body;
+
+    // Verificar se tenant existe
+    const existingTenant = await prisma.tenant.findUnique({
+      where: { id }
+    });
+
+    if (!existingTenant) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Tenant não encontrado' }
+      });
+    }
+
+    // Validar email se fornecido
+    if (billingEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(billingEmail)) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Email de cobrança inválido' }
+        });
+      }
+    }
+
+    // Validar subdomain se fornecido e diferente do atual
+    if (subdomain && subdomain !== existingTenant.subdomain) {
+      const subdomainRegex = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+      if (!subdomainRegex.test(subdomain)) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Subdomain inválido. Use apenas letras minúsculas, números e hífens' }
+        });
+      }
+
+      const existingSubdomain = await prisma.tenant.findUnique({
+        where: { subdomain }
+      });
+      if (existingSubdomain) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Subdomain já está em uso' }
+        });
+      }
+    }
+
+    // Validar customDomain se fornecido e diferente do atual
+    if (customDomain && customDomain !== existingTenant.customDomain) {
+      const existingDomain = await prisma.tenant.findUnique({
+        where: { customDomain }
+      });
+      if (existingDomain) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Domínio customizado já está em uso' }
+        });
+      }
+    }
+
+    // Normalizar planType para enum (ou null)
+    const toPlanType = (v?: string | null): $Enums.PlanType | null => {
+      if (!v) return null;
+      const allowed = new Set(['individual','professional','business','enterprise','custom']);
+      return allowed.has(v) ? (v as $Enums.PlanType) : null;
+    };
+    const normalizedPlanType = planType !== undefined
+      ? toPlanType(planType as string)
+      : undefined;
+
+    // Preparar dados para atualização
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (subdomain !== undefined) updateData.subdomain = subdomain || null;
+    if (customDomain !== undefined) updateData.customDomain = customDomain || null;
+    if (tenantType !== undefined) updateData.tenantType = tenantType;
+    if (plan !== undefined) updateData.plan = plan;
+    if (billingEmail !== undefined) updateData.billingEmail = billingEmail;
+    if (status !== undefined) updateData.status = status;
+    if (normalizedPlanType !== undefined) updateData.planType = normalizedPlanType;
+    if (planLimits !== undefined) updateData.planLimits = planLimits as any;
+    if (enabledFeatures !== undefined) updateData.enabledFeatures = enabledFeatures as any;
+    if (settings !== undefined) updateData.settings = settings as any;
+
+    // Atualizar tenant
+    const tenant = await prisma.tenant.update({
+      where: { id },
+      data: updateData,
+      include: {
+        customPlan: true,
+        _count: {
+          select: {
+            users: true,
+            clients: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: serializeBigInt(tenant),
+      message: 'Empresa atualizada com sucesso'
+    });
+  } catch (error) {
+    console.error('Error updating tenant:', error);
+    res.status(500).json({
+      success: false,
+      error: {
+        message: 'Erro interno do servidor ao atualizar empresa',
+        details: process.env.NODE_ENV === 'development' ? 
+          (error instanceof Error ? error.message : String(error)) : 
+          undefined
+      }
+    });
+  }
+}));
+
+/**
  * GET /api/super-admin/tenants/:id
  * Detalhes de um tenant específico
  */
 router.get('/tenants/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
 
   const tenant = await prisma.tenant.findUnique({
@@ -238,13 +510,14 @@ router.get('/tenants/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
     });
   }
 
+  const planLimitsService = new PlanLimitsService(prisma);
   const userCounts = await planLimitsService.getUserCountByRole(tenant.id);
   const limits = await planLimitsService.getPlanLimits(tenant.id);
   const features = await planLimitsService.getEnabledFeatures(tenant.id);
 
   res.json({
     success: true,
-    data: {
+    data: serializeBigInt({
       ...tenant,
       stats: {
         userCounts,
@@ -252,7 +525,7 @@ router.get('/tenants/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
         features,
         isCustomPlan: !!tenant.customPlanId
       }
-    }
+    })
   });
 }));
 
@@ -261,6 +534,7 @@ router.get('/tenants/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
  * Alterar plano de um tenant (base ou custom)
  */
 router.put('/tenants/:id/plan', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
   const { planId, planType } = req.body; // planType: 'base' | 'custom'
 
@@ -275,6 +549,7 @@ router.put('/tenants/:id/plan', requireSuperAdmin, asyncHandler(async (req, res)
     });
   }
 
+  const customPlanService = new CustomPlanService(prisma);
   if (planType === 'custom') {
     // Atribuir plano customizado
     await customPlanService.assignCustomPlanToTenant(id, planId);
@@ -300,6 +575,7 @@ router.put('/tenants/:id/plan', requireSuperAdmin, asyncHandler(async (req, res)
  * Adicionar/remover slots extras
  */
 router.put('/tenants/:id/extra-slots', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
   const { role, quantity } = req.body;
 
@@ -321,6 +597,7 @@ router.put('/tenants/:id/extra-slots', requireSuperAdmin, asyncHandler(async (re
     });
   }
 
+  const planLimitsService = new PlanLimitsService(prisma);
   await planLimitsService.addExtraSlots(id, role, quantity);
 
   res.json({
@@ -334,6 +611,7 @@ router.put('/tenants/:id/extra-slots', requireSuperAdmin, asyncHandler(async (re
  * Habilitar/desabilitar features específicas para um tenant
  */
 router.put('/tenants/:id/features', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
   const { features } = req.body; // { featureName: boolean }
 
@@ -367,6 +645,8 @@ router.put('/tenants/:id/features', requireSuperAdmin, asyncHandler(async (req, 
  * Converter de individual para business
  */
 router.put('/tenants/:id/type', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  const planLimitsService = new PlanLimitsService(prisma);
   const { id } = req.params;
   const { subdomain } = req.body;
 
@@ -394,6 +674,7 @@ router.put('/tenants/:id/type', requireSuperAdmin, asyncHandler(async (req, res)
  * Listar configurações de planos (base e custom)
  */
 router.get('/plan-configs', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { 
     isCustom, 
     tenantType, 
@@ -458,6 +739,7 @@ router.get('/plan-configs', requireSuperAdmin, asyncHandler(async (req, res) => 
  * Criar novo plano base
  */
 router.post('/plan-configs', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const {
     plan,
     displayName,
@@ -497,6 +779,7 @@ router.post('/plan-configs', requireSuperAdmin, asyncHandler(async (req, res) =>
  * Atualizar plano base
  */
 router.put('/plan-configs/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
   const updateData = req.body;
 
@@ -538,6 +821,7 @@ router.put('/plan-configs/:id', requireSuperAdmin, asyncHandler(async (req, res)
  * Desativar plano base
  */
 router.delete('/plan-configs/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
 
   const planConfig = await prisma.planConfig.findUnique({
@@ -591,6 +875,8 @@ router.delete('/plan-configs/:id', requireSuperAdmin, asyncHandler(async (req, r
  * Criar plano customizado para tenant específico
  */
 router.post('/custom-plans', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  const customPlanService = new CustomPlanService(prisma);
   const {
     tenantId,
     displayName,
@@ -633,6 +919,8 @@ router.post('/custom-plans', requireSuperAdmin, asyncHandler(async (req, res) =>
  * Duplicar plano base como customizado
  */
 router.post('/custom-plans/duplicate', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  const customPlanService = new CustomPlanService(prisma);
   const { basePlan, tenantId } = req.body;
 
   const customPlan = await customPlanService.duplicatePlanAsCustom(
@@ -653,6 +941,8 @@ router.post('/custom-plans/duplicate', requireSuperAdmin, asyncHandler(async (re
  * Editar plano customizado existente
  */
 router.put('/custom-plans/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  const customPlanService = new CustomPlanService(prisma);
   const { id } = req.params;
   const updateData = req.body;
 
@@ -670,6 +960,8 @@ router.put('/custom-plans/:id', requireSuperAdmin, asyncHandler(async (req, res)
  * Atribuir plano customizado ao tenant
  */
 router.post('/custom-plans/:id/assign', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  const customPlanService = new CustomPlanService(prisma);
   const { id } = req.params;
   const { tenantId } = req.body;
 
@@ -686,6 +978,8 @@ router.post('/custom-plans/:id/assign', requireSuperAdmin, asyncHandler(async (r
  * Listar planos customizados
  */
 router.get('/custom-plans', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  const customPlanService = new CustomPlanService(prisma);
   const { tenantId, isActive, search, page = 1, limit = 20 } = req.query;
 
   const result = await customPlanService.listCustomPlans({
@@ -715,6 +1009,8 @@ router.get('/custom-plans', requireSuperAdmin, asyncHandler(async (req, res) => 
  * Estatísticas de um plano customizado
  */
 router.get('/custom-plans/:id/stats', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  const customPlanService = new CustomPlanService(prisma);
   const { id } = req.params;
 
   const stats = await customPlanService.getCustomPlanStats(id);
@@ -730,6 +1026,8 @@ router.get('/custom-plans/:id/stats', requireSuperAdmin, asyncHandler(async (req
  * Desativar plano customizado
  */
 router.delete('/custom-plans/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  const customPlanService = new CustomPlanService(prisma);
   const { id } = req.params;
 
   await customPlanService.deactivateCustomPlan(id);
@@ -747,6 +1045,8 @@ router.delete('/custom-plans/:id', requireSuperAdmin, asyncHandler(async (req, r
  * Buscar histórico de pagamentos com dados do Stripe/MercadoPago
  */
 router.get('/tenants/:id/payments', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
+  const paymentService = new PaymentService();
   const { id } = req.params;
   
   // Buscar subscription e invoices do banco
@@ -794,6 +1094,7 @@ router.get('/tenants/:id/payments', requireSuperAdmin, asyncHandler(async (req, 
  * Ativar/Inativar/Suspender tenant
  */
 router.put('/tenants/:id/status', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
   const { status } = req.body; // 'active' | 'inactive' | 'suspended'
   
@@ -820,6 +1121,7 @@ router.put('/tenants/:id/status', requireSuperAdmin, asyncHandler(async (req, re
  * Buscar usuários de um tenant específico
  */
 router.get('/tenants/:id/users', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
   
   const users = await prisma.user.findMany({
@@ -847,6 +1149,7 @@ router.get('/tenants/:id/users', requireSuperAdmin, asyncHandler(async (req, res
  * Excluir tenant (soft delete recomendado)
  */
 router.delete('/tenants/:id', requireSuperAdmin, asyncHandler(async (req, res) => {
+  const prisma = getPrismaClient();
   const { id } = req.params;
   
   // Verificar se pode excluir

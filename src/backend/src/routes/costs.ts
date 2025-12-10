@@ -2,24 +2,24 @@ import { Router } from 'express';
 import { getAuthMiddleware } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/permissions';
 import { body, query, validationResult } from 'express-validator';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { costManagementService } from '../services/cost-management.service';
 import { costTrackerService } from '../services/cost-tracker.service';
 import { logger } from '../utils/logger';
 
 const router = Router();
-const prisma = new PrismaClient();
-const authMiddleware = getAuthMiddleware(prisma);
+const prisma = getPrismaClient();
+const authMiddleware = getAuthMiddleware();
 
-// Middleware de autenticação opcional para custos
-router.use(authMiddleware.optionalAuth);
+// Middleware de autenticação obrigatória para custos
+router.use(authMiddleware.requireAuth);
 
 /**
  * @route GET /api/costs/dashboard
  * @desc Obter dashboard completo de custos
  * @access SUPER_ADMIN
  */
-router.get('/dashboard', async (req: any, res) => {
+router.get('/dashboard', requireRole(['SUPER_ADMIN']), async (req: any, res) => {
   try {
     const filters = {
       startDate: req.query.startDate as string,

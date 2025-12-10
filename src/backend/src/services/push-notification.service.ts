@@ -3,8 +3,9 @@
 
 import webpush from 'web-push';
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 // Configurar VAPID keys
 const vapidKeys = {

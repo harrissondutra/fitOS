@@ -2,8 +2,6 @@ import { PrismaClient } from '@prisma/client';
 import { NotificationService } from './notification.service';
 import { AuditService } from './audit.service';
 
-const prisma = new PrismaClient();
-
 export interface CreateClientProfileData {
   tenantId: string;
   professionalId: string;
@@ -59,10 +57,17 @@ export interface CRMFilters {
 }
 
 export class ProfessionalCRMService {
+  private prisma: PrismaClient | any; // Aceita PrismaClient ou PrismaTenantWrapper
   private notificationService: NotificationService;
   private auditService: AuditService;
 
-  constructor() {
+  constructor(prisma?: PrismaClient | any) {
+    // Se não fornecido, importar getPrismaClient para fallback
+    // Mas preferencialmente sempre passar do request via factory
+    this.prisma = prisma || (() => {
+      const { getPrismaClient } = require('../config/database');
+      return getPrismaClient();
+    })();
     this.notificationService = new NotificationService();
     this.auditService = new AuditService();
   }
@@ -77,7 +82,7 @@ export class ProfessionalCRMService {
   }> {
     try {
       // Verifica se já existe perfil para este cliente
-      const existingProfile = await prisma.clientProfile.findUnique({
+      const existingProfile = await this.prisma.clientProfile.findUnique({
         where: { clientId: data.clientId }
       });
 
@@ -85,7 +90,7 @@ export class ProfessionalCRMService {
         return { success: false, error: 'Perfil de cliente já existe para este cliente' };
       }
 
-      const clientProfile = await prisma.clientProfile.create({
+      const clientProfile = await this.prisma.clientProfile.create({
         data: {
           ...data,
           // lastContact: new Date(),
@@ -122,7 +127,7 @@ export class ProfessionalCRMService {
       await this.notificationService.create({
         userId: data.professionalId,
         tenantId: data.tenantId,
-        type: 'crm_task',
+          type: 'info',
         title: 'Novo Cliente no CRM',
         message: `Perfil criado para cliente ${clientProfile.id}`,
         data: { clientId: clientProfile.id }
@@ -144,7 +149,7 @@ export class ProfessionalCRMService {
     userId: string
   ): Promise<{ success: boolean; clientProfile?: any; error?: string }> {
     try {
-      const existingProfile = await prisma.clientProfile.findUnique({
+      const existingProfile = await this.prisma.clientProfile.findUnique({
         where: { id: clientId }
       });
 
@@ -152,7 +157,7 @@ export class ProfessionalCRMService {
         return { success: false, error: 'Perfil de cliente não encontrado' };
       }
 
-      const clientProfile = await prisma.clientProfile.update({
+      const clientProfile = await this.prisma.clientProfile.update({
         where: { id: clientId },
         data: {
           ...data,
@@ -224,7 +229,7 @@ export class ProfessionalCRMService {
       }
 
       const [clients, total] = await Promise.all([
-        prisma.clientProfile.findMany({
+        this.prisma.clientProfile.findMany({
           where,
           include: {
             client: {
@@ -244,7 +249,7 @@ export class ProfessionalCRMService {
           take: filters.limit || 50,
           skip: filters.offset || 0
         }),
-        prisma.clientProfile.count({ where })
+        this.prisma.clientProfile.count({ where })
       ]);
 
       return { success: true, clients, total };
@@ -263,7 +268,7 @@ export class ProfessionalCRMService {
     error?: string;
   }> {
     try {
-      const clientProfile = await prisma.clientProfile.findUnique({
+      const clientProfile = await this.prisma.clientProfile.findUnique({
         where: { id: clientId },
         include: {
           client: {
@@ -314,7 +319,7 @@ export class ProfessionalCRMService {
     error?: string;
   }> {
     try {
-      const interaction = await prisma.clientInteraction.create({
+      const interaction = await this.prisma.clientInteraction.create({
         data: {
           ...data,
           clientProfileId: data.clientId,
@@ -339,7 +344,7 @@ export class ProfessionalCRMService {
       });
 
       // Atualiza lastContact do cliente
-      await prisma.clientProfile.update({
+      await this.prisma.clientProfile.update({
         where: { id: data.clientId },
         data: { lastInteractionAt: new Date() }
       });
@@ -370,7 +375,7 @@ export class ProfessionalCRMService {
     error?: string;
   }> {
     try {
-      const task = await prisma.cRMTask.create({
+      const task = await this.prisma.cRMTask.create({
         data: {
           ...data,
           priority: data.priority || 'normal'
@@ -402,13 +407,12 @@ export class ProfessionalCRMService {
         changes: { after: task }
       });
 
-      // Notificação
-      await this.notificationService.createCRMTaskNotification(
-        data.professionalId,
-        data.tenantId,
-        task,
-        'created'
-      );
+      // Notificação - desabilitada temporariamente
+      // await this.notificationService.createCRMTaskNotification(
+      //   data.professionalId,
+      //   task.name || 'Nova Tarefa',
+      //   task.dueDate || new Date()
+      // );
 
       return { success: true, task };
     } catch (error: any) {
@@ -432,7 +436,7 @@ export class ProfessionalCRMService {
     userId: string
   ): Promise<{ success: boolean; task?: any; error?: string }> {
     try {
-      const existingTask = await prisma.cRMTask.findUnique({
+      const existingTask = await this.prisma.cRMTask.findUnique({
         where: { id: taskId }
       });
 
@@ -445,7 +449,7 @@ export class ProfessionalCRMService {
         updateData.completedAt = new Date();
       }
 
-      const task = await prisma.cRMTask.update({
+      const task = await this.prisma.cRMTask.update({
         where: { id: taskId },
         data: updateData,
         include: {
@@ -509,7 +513,7 @@ export class ProfessionalCRMService {
       }
 
       const [tasks, total] = await Promise.all([
-        prisma.cRMTask.findMany({
+        this.prisma.cRMTask.findMany({
           where,
           include: {
             clientProfile: {
@@ -530,7 +534,7 @@ export class ProfessionalCRMService {
           take: limit,
           skip: offset
         }),
-        prisma.cRMTask.count({ where })
+        this.prisma.cRMTask.count({ where })
       ]);
 
       return { success: true, tasks, total };
@@ -554,7 +558,7 @@ export class ProfessionalCRMService {
         where.professionalId = professionalId;
       }
 
-      const clients = await prisma.clientProfile.findMany({
+      const clients = await this.prisma.clientProfile.findMany({
         where,
         include: {
           client: {
@@ -609,23 +613,23 @@ export class ProfessionalCRMService {
         pendingTasks,
         overdueTasks
       ] = await Promise.all([
-        prisma.clientProfile.count({ where }),
-        prisma.clientProfile.groupBy({
+        this.prisma.clientProfile.count({ where }),
+        this.prisma.clientProfile.groupBy({
           by: ['status'],
           where,
           _count: { status: true }
         }),
-        prisma.clientProfile.groupBy({
+        this.prisma.clientProfile.groupBy({
           by: ['status'],
           where,
           _count: { status: true }
         }),
-        prisma.clientInteraction.count({ where }),
-        prisma.cRMTask.count({ where }),
-        prisma.cRMTask.count({
+        this.prisma.clientInteraction.count({ where }),
+        this.prisma.cRMTask.count({ where }),
+        this.prisma.cRMTask.count({
           where: { ...where, status: 'pending' }
         }),
-        prisma.cRMTask.count({
+        this.prisma.cRMTask.count({
           where: {
             ...where,
             status: 'pending',
@@ -669,7 +673,7 @@ export class ProfessionalCRMService {
   }> {
     try {
       const [client, interactions, tasks] = await Promise.all([
-        prisma.clientProfile.findUnique({
+        this.prisma.clientProfile.findUnique({
           where: { id: clientId },
           include: {
             client: {
@@ -677,12 +681,12 @@ export class ProfessionalCRMService {
             }
           }
         }),
-        prisma.clientInteraction.findMany({
+        this.prisma.clientInteraction.findMany({
           where: { clientProfileId: clientId },
           orderBy: { createdAt: 'desc' },
           take: 10
         }),
-        prisma.cRMTask.findMany({
+        this.prisma.cRMTask.findMany({
           where: { clientProfileId: clientId },
           orderBy: { dueDate: 'asc' }
         })

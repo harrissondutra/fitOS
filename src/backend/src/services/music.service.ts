@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 type SpotifyConnection = any;
 type UserPreferences = any;
 import { CacheService } from '../config/redis.cache';
@@ -12,7 +13,7 @@ export class MusicService {
   private spotifyIntegration: SpotifyIntegration;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = getPrismaClient();
     this.cache = new CacheService();
     this.spotifyIntegration = new SpotifyIntegration();
   }

@@ -12,33 +12,123 @@ export const connectRedis = async (): Promise<void> => {
       return;
     }
 
-    // Parse Redis URL properly
-    const redisUrl = new URL(config.redis.url);
+    // Verificar se é localhost e não conectar nesse caso
+    if (config.redis.url.includes('localhost') && config.redis.host === 'localhost') {
+      logger.warn('⚠️ Redis URL is localhost, but you mentioned Redis is remote. Please update REDIS_URL in .env');
+      return;
+    }
+
+    // Usar URL completa ou host/port separados
+    let redisConfig: any;
     
-    redis = new Redis({
-      host: redisUrl.hostname,
-      port: parseInt(redisUrl.port || '6379', 10),
-      password: redisUrl.password || config.redis.password,
-      db: config.redis.db,
-      enableReadyCheck: false,
-      maxRetriesPerRequest: null,
-    });
+    if (config.redis.url && !config.redis.url.includes('localhost')) {
+      // Usar URL completa para Redis remoto
+      logger.info(`🔗 Connecting to remote Redis: ${config.redis.url.replace(/:[^:]*@/, ':****@')}`);
+      redisConfig = {
+        enableReadyCheck: true,
+        maxRetriesPerRequest: 3,
+        retryStrategy: (times: number) => {
+          const delay = Math.min(times * 50, 2000);
+          if (times > 3) {
+            logger.error('❌ Redis max retries reached');
+            return null; // Stop retrying
+          }
+          return delay;
+        },
+        reconnectOnError: (err: Error) => {
+          const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT'];
+          const shouldReconnect = targetErrors.some(e => err.message.includes(e));
+          if (shouldReconnect) {
+            logger.warn('⚠️ Redis reconnection needed:', err.message);
+            return true;
+          }
+          return false;
+        },
+        lazyConnect: true
+      };
+      redis = new Redis(config.redis.url, redisConfig);
+    } else {
+      // Usar configuração separada
+      logger.info(`🔗 Connecting to Redis: ${config.redis.host}:${config.redis.port}`);
+      redisConfig = {
+        host: config.redis.host,
+        port: config.redis.port,
+        password: config.redis.password,
+        db: config.redis.db,
+        enableReadyCheck: true,
+        maxRetriesPerRequest: 3,
+        retryStrategy: (times: number) => {
+          const delay = Math.min(times * 50, 2000);
+          if (times > 3) {
+            logger.error('❌ Redis max retries reached');
+            return null; // Stop retrying
+          }
+          return delay;
+        },
+        reconnectOnError: (err: Error) => {
+          const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT'];
+          const shouldReconnect = targetErrors.some(e => err.message.includes(e));
+          if (shouldReconnect) {
+            logger.warn('⚠️ Redis reconnection needed:', err.message);
+            return true;
+          }
+          return false;
+        },
+        lazyConnect: true
+      };
+      redis = new Redis(redisConfig);
+    }
 
     redis.on('connect', () => {
       logger.info('✅ Redis connected');
     });
 
-    redis.on('error', (error) => {
+    redis.on('ready', () => {
+      logger.info('✅ Redis ready');
+    });
+
+    // Tratamento completo de erros do Redis
+    redis.on('error', (error: Error) => {
+      const errorMessage = error.message || String(error);
+      
+      // ECONNRESET, ETIMEDOUT são erros de rede comuns - apenas logar como warning
+      if (errorMessage.includes('ECONNRESET') || errorMessage.includes('ETIMEDOUT') || errorMessage.includes('ECONNREFUSED')) {
+        logger.warn(`⚠️ Redis network error (will retry): ${errorMessage}`);
+        return;
+      }
+      
+      // Outros erros - logar como erro mas não lançar
       logger.error('❌ Redis connection error:', error);
     });
 
     redis.on('close', () => {
-      logger.warn('⚠️ Redis connection closed');
+      logger.warn('⚠️ Redis connection closed - will attempt to reconnect');
     });
 
-    // Test connection
-    await redis.ping();
-    logger.info('✅ Redis ping successful');
+    redis.on('end', () => {
+      logger.warn('⚠️ Redis connection ended - will attempt to reconnect');
+    });
+
+    redis.on('reconnecting', (delay: number) => {
+      logger.info(`🔄 Redis reconnecting in ${delay}ms`);
+    });
+
+    // Conectar ao Redis
+    await redis.connect();
+    
+    // Test connection with timeout
+    try {
+      const pingPromise = redis.ping();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Redis ping timeout')), 10000)
+      );
+      
+      await Promise.race([pingPromise, timeoutPromise]);
+      logger.info('✅ Redis ping successful');
+    } catch (error) {
+      logger.warn('⚠️ Redis ping failed, but continuing:', error);
+      // Não lançar erro - permitir que continue sem Redis
+    }
   } catch (error) {
     logger.error('❌ Redis connection failed:', error);
     logger.warn('⚠️ Continuing without Redis. Some features will be disabled.');
@@ -69,6 +159,8 @@ export const getRedisClient = (): Redis => {
       info: async () => '',
       on: () => {},
       quit: async () => 'OK',
+      disconnect: async () => {},
+      connect: async () => {},
       status: 'ready',
       pipeline: () => {
         const commands: any[] = [];
@@ -97,6 +189,21 @@ export const getRedisClient = (): Redis => {
       unsubscribe: async () => {}
     } as any;
   }
+  
+  // Garantir que o Redis sempre tenha tratamento de erro
+  // Verificar se já tem listener de erro, se não tiver, adicionar
+  const errorListeners = (redis as any).listenerCount?.('error') || 0;
+  if (errorListeners === 0) {
+    redis.on('error', (error: Error) => {
+      const errorMessage = error.message || String(error);
+      if (errorMessage.includes('ECONNRESET') || errorMessage.includes('ETIMEDOUT') || errorMessage.includes('ECONNREFUSED')) {
+        logger.warn(`⚠️ Redis network error (will retry): ${errorMessage}`);
+      } else {
+        logger.error('❌ Redis error:', error);
+      }
+    });
+  }
+  
   return redis;
 };
 

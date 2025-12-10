@@ -96,10 +96,32 @@ apiClient.interceptors.response.use(
       });
     }
 
-    // Tratar erro 401 (Unauthorized)
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Verificar se é erro de autenticação (401, 403 ou TOKEN_EXPIRED)
+    const isAuthError = error.response?.status === 401 || 
+                       error.response?.status === 403 ||
+                       error.response?.data?.error === 'TOKEN_EXPIRED' ||
+                       error.response?.data?.message === 'TOKEN_EXPIRED' ||
+                       error.message === 'TOKEN_EXPIRED';
+
+    if (isAuthError && !originalRequest._retry) {
       originalRequest._retry = true;
 
+      // Verificar se a mensagem de erro indica token expirado
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          error.message || '';
+      const isTokenExpired = errorMessage === 'TOKEN_EXPIRED' || 
+                            errorMessage?.includes('expired') ||
+                            errorMessage?.includes('expirou') ||
+                            error.response?.status === 401;
+
+      // Se for token expirado, não tentar refresh - redirecionar direto
+      if (isTokenExpired) {
+        handleAuthError();
+        return Promise.reject(error);
+      }
+
+      // Se não for token expirado, tentar refresh
       try {
         // Tentar renovar o token
         const refreshToken = localStorage.getItem('refreshToken');
@@ -109,13 +131,16 @@ apiClient.interceptors.response.use(
           });
 
           if (refreshResponse.data.success) {
+            const newAccessToken = refreshResponse.data.data?.accessToken || refreshResponse.data.accessToken;
+            const newRefreshToken = refreshResponse.data.data?.refreshToken || refreshResponse.data.refreshToken;
+            
             // Salvar novos tokens
-            localStorage.setItem('accessToken', refreshResponse.data.accessToken);
-            localStorage.setItem('refreshToken', refreshResponse.data.refreshToken);
+            localStorage.setItem('accessToken', newAccessToken);
+            localStorage.setItem('refreshToken', newRefreshToken);
 
             // Atualizar header da requisição original
             if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.accessToken}`;
+              originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
             }
 
             // Retry da requisição original
@@ -142,18 +167,21 @@ apiClient.interceptors.response.use(
 // ============================================================================
 
 function handleAuthError() {
-  // Limpar dados de autenticação
+  // Limpar todos os dados de autenticação
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
+  localStorage.removeItem('fitos_tokens');
   localStorage.removeItem('user');
+  localStorage.removeItem('tenantId');
 
   // Mostrar notificação
   toast.error('Sessão expirada', {
     description: 'Faça login novamente para continuar'
   });
 
-  // Redirecionar para login
+  // Redirecionar para login imediatamente
   if (typeof window !== 'undefined') {
+    // Usar window.location.href para garantir redirecionamento imediato
     window.location.href = '/auth/login';
   }
 }

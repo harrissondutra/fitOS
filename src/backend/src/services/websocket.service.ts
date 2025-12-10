@@ -1,309 +1,230 @@
-import { WebSocketServer, WebSocket } from 'ws';
-import { Server } from 'http';
-
-interface AuthenticatedWebSocket extends WebSocket {
-  userId?: string;
-  tenantId?: string;
-  isAlive?: boolean;
-}
+import { Server as SocketIOServer, Socket } from 'socket.io';
+import { logger } from '../utils/logger';
+import { ProviderIntegrationService } from './provider-integration.service';
+import { getRedisClient } from '../config/redis';
 
 export class WebSocketService {
-  private wss: WebSocketServer | null = null;
-  private clients: Map<string, AuthenticatedWebSocket> = new Map();
+  private io: SocketIOServer;
+  private providerService: ProviderIntegrationService;
+  private redis: any;
+  private metricsIntervals: Map<string, NodeJS.Timeout> = new Map();
 
-  /**
-   * Inicializa o servidor WebSocket
-   */
-  initialize(server: Server): void {
-    this.wss = new WebSocketServer({ server });
+  constructor(io: SocketIOServer) {
+    this.io = io;
 
-    this.wss.on('connection', (ws: AuthenticatedWebSocket, request) => {
-      console.log('Nova conexão WebSocket estabelecida');
+    this.providerService = new ProviderIntegrationService();
+    this.redis = getRedisClient();
 
-      // Configura ping/pong para manter conexão viva
-      ws.isAlive = true;
-      ws.on('pong', () => {
-        ws.isAlive = true;
+    this.setupEventHandlers();
+    logger.info('WebSocket service initialized for real-time server metrics');
+  }
+
+  private setupEventHandlers(): void {
+    this.io.on('connection', (socket: Socket) => {
+      logger.info('Client connected to WebSocket', { socketId: socket.id });
+
+      // Client se inscreve para receber métricas de um servidor específico
+      socket.on('subscribe:server:metrics', async (data: { serverId: string }) => {
+        const { serverId } = data;
+        logger.info('Client subscribed to server metrics', { socketId: socket.id, serverId });
+
+        // Join room do servidor
+        socket.join(`server:${serverId}`);
+
+        // Enviar métricas imediatamente
+        await this.sendServerMetrics(serverId, socket);
+
+        // Iniciar intervalo de atualização (a cada 5 segundos)
+        this.startMetricsInterval(serverId);
       });
 
-      // Handler para mensagens recebidas
-      ws.on('message', (data) => {
-        try {
-          const message = JSON.parse(data.toString());
-          this.handleMessage(ws, message);
-        } catch (error) {
-          console.error('Erro ao processar mensagem WebSocket:', error);
+      // Client se desinscreve
+      socket.on('unsubscribe:server:metrics', (data: { serverId: string }) => {
+        const { serverId } = data;
+        logger.info('Client unsubscribed from server metrics', { socketId: socket.id, serverId });
+
+        socket.leave(`server:${serverId}`);
+
+        // Se ninguém mais está escutando, parar o intervalo
+        const room = this.io.sockets.adapter.rooms.get(`server:${serverId}`);
+        if (!room || room.size === 0) {
+          this.stopMetricsInterval(serverId);
         }
       });
 
-      // Handler para fechamento da conexão
-      ws.on('close', () => {
-        if (ws.userId) {
-          this.clients.delete(ws.userId);
-          console.log(`Cliente ${ws.userId} desconectado`);
-        }
+      socket.on('disconnect', () => {
+        logger.info('Client disconnected from WebSocket', { socketId: socket.id });
       });
 
-      // Handler para erros
-      ws.on('error', (error) => {
-        console.error('Erro na conexão WebSocket:', error);
+      // Ping/Pong para manter conexão viva
+      socket.on('ping', () => {
+        socket.emit('pong');
       });
     });
-
-    // Ping periódico para manter conexões vivas
-    setInterval(() => {
-      this.wss?.clients.forEach((ws: AuthenticatedWebSocket) => {
-        if (ws.isAlive === false) {
-          ws.terminate();
-          return;
-        }
-        ws.isAlive = false;
-        ws.ping();
-      });
-    }, 30000); // 30 segundos
   }
 
-  /**
-   * Processa mensagens recebidas do cliente
-   */
-  private handleMessage(ws: AuthenticatedWebSocket, message: any): void {
-    switch (message.type) {
-      case 'authenticate':
-        this.handleAuthentication(ws, message);
-        break;
-      case 'ping':
-        ws.send(JSON.stringify({ type: 'pong' }));
-        break;
-      default:
-        console.log('Tipo de mensagem desconhecido:', message.type);
-    }
-  }
-
-  /**
-   * Processa autenticação do cliente
-   */
-  private handleAuthentication(ws: AuthenticatedWebSocket, message: any): void {
-    const { userId, tenantId } = message.data || {};
-
-    if (!userId || !tenantId) {
-      ws.send(JSON.stringify({
-        type: 'error',
-        message: 'userId e tenantId são obrigatórios'
-      }));
+  private startMetricsInterval(serverId: string): void {
+    // Se já existe intervalo, não criar outro
+    if (this.metricsIntervals.has(serverId)) {
       return;
     }
 
-    ws.userId = userId;
-    ws.tenantId = tenantId;
-    this.clients.set(userId, ws);
+    // Atualizar métricas a cada 5 segundos
+    const interval = setInterval(async () => {
+      await this.broadcastServerMetrics(serverId);
+    }, 5000);
 
-    ws.send(JSON.stringify({
-      type: 'authenticated',
-      message: 'Conexão autenticada com sucesso'
-    }));
-
-    console.log(`Cliente ${userId} autenticado no tenant ${tenantId}`);
+    this.metricsIntervals.set(serverId, interval);
+    logger.info('Started metrics interval', { serverId });
   }
 
-  /**
-   * Envia mensagem para um usuário específico
-   */
-  async sendToUser(userId: string, message: any): Promise<boolean> {
-    const client = this.clients.get(userId);
-    
-    if (!client || client.readyState !== WebSocket.OPEN) {
-      return false;
+  private stopMetricsInterval(serverId: string): void {
+    const interval = this.metricsIntervals.get(serverId);
+    if (interval) {
+      clearInterval(interval);
+      this.metricsIntervals.delete(serverId);
+      logger.info('Stopped metrics interval', { serverId });
     }
+  }
 
+  private async sendServerMetrics(serverId: string, socket: Socket): Promise<void> {
     try {
-      client.send(JSON.stringify(message));
-      return true;
+      // Buscar SSH key do Redis
+      const sshKey = await this.redis.get(`fitos:ssh:key:${serverId}`);
+      if (!sshKey) {
+        socket.emit('server:metrics:error', {
+          serverId,
+          error: 'SSH key not found',
+        });
+        return;
+      }
+
+      // Buscar dados do servidor do Redis cache
+      const cachedData = await this.redis.get(`fitos:server:scan:${serverId}`);
+      if (!cachedData) {
+        socket.emit('server:metrics:error', {
+          serverId,
+          error: 'Server data not found',
+        });
+        return;
+      }
+
+      const serverData = JSON.parse(cachedData);
+      const { host, port, username } = serverData;
+
+      // Obter health atual via SSH
+      const result = await this.providerService.getHealthAndContainersViaSSH({
+        sshHost: host,
+        sshPort: port || 22,
+        sshUsername: username,
+        sshKey,
+      });
+
+      // Enviar métricas
+      socket.emit('server:metrics:update', {
+        serverId,
+        health: result.health,
+        timestamp: Date.now(),
+      });
     } catch (error) {
-      console.error('Erro ao enviar mensagem para usuário:', error);
-      return false;
+      logger.error('Error sending server metrics', { serverId, error });
+      socket.emit('server:metrics:error', {
+        serverId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 
-  /**
-   * Envia mensagem para todos os usuários de um tenant
-   */
-  async sendToTenant(tenantId: string, message: any): Promise<number> {
-    let sentCount = 0;
-
-    this.clients.forEach((client) => {
-      if (client.tenantId === tenantId && client.readyState === WebSocket.OPEN) {
-        try {
-          client.send(JSON.stringify(message));
-          sentCount++;
-        } catch (error) {
-          console.error('Erro ao enviar mensagem para tenant:', error);
-        }
+  private async broadcastServerMetrics(serverId: string): Promise<void> {
+    try {
+      // Verificar se alguém está ouvindo
+      const room = this.io.sockets.adapter.rooms.get(`server:${serverId}`);
+      if (!room || room.size === 0) {
+        this.stopMetricsInterval(serverId);
+        return;
       }
-    });
 
-    return sentCount;
-  }
-
-  /**
-   * Envia mensagem para todos os usuários conectados
-   */
-  async broadcast(message: any): Promise<number> {
-    let sentCount = 0;
-
-    this.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        try {
-          client.send(JSON.stringify(message));
-          sentCount++;
-        } catch (error) {
-          console.error('Erro ao fazer broadcast:', error);
-        }
+      // Buscar SSH key do Redis
+      const sshKey = await this.redis.get(`fitos:ssh:key:${serverId}`);
+      if (!sshKey) {
+        this.io.to(`server:${serverId}`).emit('server:metrics:error', {
+          serverId,
+          error: 'SSH key not found',
+        });
+        return;
       }
-    });
 
-    return sentCount;
-  }
+      // Buscar dados do servidor do Redis cache
+      const cachedData = await this.redis.get(`fitos:server:scan:${serverId}`);
+      if (!cachedData) {
+        this.io.to(`server:${serverId}`).emit('server:metrics:error', {
+          serverId,
+          error: 'Server data not found',
+        });
+        return;
+      }
 
-  /**
-   * Envia notificação em tempo real
-   */
-  async sendNotification(
-    userId: string,
-    notification: {
-      id: string;
-      type: string;
-      title: string;
-      message: string;
-      data?: any;
+      const serverData = JSON.parse(cachedData);
+      const { host, port, username } = serverData;
+
+      // Obter health atual via SSH
+      const result = await this.providerService.getHealthAndContainersViaSSH({
+        sshHost: host,
+        sshPort: port || 22,
+        sshUsername: username,
+        sshKey,
+      });
+
+      // Broadcast para todos no room
+      this.io.to(`server:${serverId}`).emit('server:metrics:update', {
+        serverId,
+        health: result.health,
+        timestamp: Date.now(),
+      });
+
+      logger.debug('Broadcasted server metrics', { serverId, listeners: room.size });
+    } catch (error) {
+      logger.error('Error broadcasting server metrics', { serverId, error });
+      this.io.to(`server:${serverId}`).emit('server:metrics:error', {
+        serverId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
-  ): Promise<boolean> {
-    return this.sendToUser(userId, {
-      type: 'notification',
-      data: notification
+  }
+
+  // Broadcast manual de evento (para uso externo)
+  public broadcastContainerAction(serverId: string, action: string, containerId: string): void {
+    this.io.to(`server:${serverId}`).emit('server:container:action', {
+      serverId,
+      action,
+      containerId,
+      timestamp: Date.now(),
     });
+    logger.info('Broadcasted container action', { serverId, action, containerId });
   }
 
-  /**
-   * Envia atualização de agendamento
-   */
-  async sendAppointmentUpdate(
-    userId: string,
-    appointment: any,
-    action: 'created' | 'updated' | 'cancelled'
-  ): Promise<boolean> {
-    return this.sendToUser(userId, {
-      type: 'appointment_update',
-      data: {
-        appointment,
-        action
-      }
+  public broadcastImageAction(serverId: string, action: string, imageId: string): void {
+    this.io.to(`server:${serverId}`).emit('server:image:action', {
+      serverId,
+      action,
+      imageId,
+      timestamp: Date.now(),
     });
+    logger.info('Broadcasted image action', { serverId, action, imageId });
   }
 
-  /**
-   * Envia atualização de CRM
-   */
-  async sendCRMUpdate(
-    userId: string,
-    entity: any,
-    entityType: 'client' | 'task' | 'interaction',
-    action: 'created' | 'updated' | 'deleted'
-  ): Promise<boolean> {
-    return this.sendToUser(userId, {
-      type: 'crm_update',
-      data: {
-        entity,
-        entityType,
-        action
-      }
-    });
+  public getIO(): SocketIOServer {
+    return this.io;
   }
 
-  /**
-   * Envia atualização de bioimpedância
-   */
-  async sendBioimpedanceUpdate(
-    userId: string,
-    measurement: any,
-    action: 'created' | 'updated' | 'deleted'
-  ): Promise<boolean> {
-    return this.sendToUser(userId, {
-      type: 'bioimpedance_update',
-      data: {
-        measurement,
-        action
-      }
-    });
-  }
+  public async shutdown(): Promise<void> {
+    // Parar todos os intervalos
+    this.metricsIntervals.forEach((interval) => clearInterval(interval));
+    this.metricsIntervals.clear();
 
-  /**
-   * Envia atualização de estatísticas
-   */
-  async sendStatsUpdate(
-    userId: string,
-    stats: any
-  ): Promise<boolean> {
-    return this.sendToUser(userId, {
-      type: 'stats_update',
-      data: stats
-    });
-  }
-
-  /**
-   * Obtém informações sobre clientes conectados
-   */
-  getConnectedClients(): {
-    total: number;
-    byTenant: Record<string, number>;
-    users: string[];
-  } {
-    const byTenant: Record<string, number> = {};
-    const users: string[] = [];
-
-    this.clients.forEach((client) => {
-      if (client.userId && client.tenantId) {
-        users.push(client.userId);
-        byTenant[client.tenantId] = (byTenant[client.tenantId] || 0) + 1;
-      }
-    });
-
-    return {
-      total: this.clients.size,
-      byTenant,
-      users
-    };
-  }
-
-  /**
-   * Verifica se um usuário está conectado
-   */
-  isUserConnected(userId: string): boolean {
-    const client = this.clients.get(userId);
-    return client ? client.readyState === WebSocket.OPEN : false;
-  }
-
-  /**
-   * Desconecta um usuário específico
-   */
-  disconnectUser(userId: string): boolean {
-    const client = this.clients.get(userId);
-    
-    if (client) {
-      client.close();
-      this.clients.delete(userId);
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Fecha todas as conexões
-   */
-  close(): void {
-    this.wss?.close();
-    this.clients.clear();
+    // Fechar conexões
+    await this.redis.quit();
+    this.io.close();
+    logger.info('WebSocket service shutdown');
   }
 }
-
-export default new WebSocketService();

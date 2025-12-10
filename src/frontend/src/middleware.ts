@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { UserRole, DEFAULT_ROLE_REDIRECTS } from './types/auth-middleware';
+import { UserRole, UserRoles, DEFAULT_ROLE_REDIRECTS } from './types/auth-middleware';
 
 // ============================================================================
 // CONFIGURAÇÕES DE ROTAS
@@ -44,43 +44,41 @@ const AUTH_ROUTES = [
 // Rotas protegidas por role
 const ROLE_PROTECTED_ROUTES: Record<string, UserRole[]> = {
   // Rotas do SUPER_ADMIN (acesso total)
-  '/super-admin': ['SUPER_ADMIN'],
-  '/empresas': ['SUPER_ADMIN'],
-  '/users': ['SUPER_ADMIN'],
-  '/clients': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'TRAINER'],
-  '/exercises': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'TRAINER'],
-  '/workouts': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'TRAINER'],
-  '/plans': ['SUPER_ADMIN'],
-  '/custom-plans': ['SUPER_ADMIN'],
-  '/ai-agents': ['SUPER_ADMIN'],
-  '/marketplace': ['SUPER_ADMIN'],
-  '/wearables': ['SUPER_ADMIN'],
-  '/analytics': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'TRAINER'],
-  
+  '/super-admin': [UserRoles.SUPER_ADMIN],
+  '/empresas': [UserRoles.SUPER_ADMIN],
+  '/users': [UserRoles.SUPER_ADMIN],
+  '/clients': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN, UserRoles.TRAINER],
+  '/exercises': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN, UserRoles.TRAINER],
+  '/workouts': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN, UserRoles.TRAINER],
+  '/plans': [UserRoles.SUPER_ADMIN],
+  '/corporate-plans': [UserRoles.SUPER_ADMIN],
+  '/ai-agents': [UserRoles.SUPER_ADMIN],
+  '/marketplace': [UserRoles.SUPER_ADMIN],
+  '/wearables': [UserRoles.SUPER_ADMIN],
+  '/analytics': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN],
+
   // Rotas do ADMIN (incluindo SUPER_ADMIN)
-  '/admin': ['SUPER_ADMIN', 'OWNER', 'ADMIN'],
-  
-  // Rotas do TRAINER (incluindo SUPER_ADMIN)
-  '/trainer': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'TRAINER'],
-  
-  // Rotas de NUTRITIONIST (apenas profissionais nutricionais)
-  '/nutritionist': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'NUTRITIONIST'],
-  
-  // Rotas de cliente nutricional (todos os usuários autenticados)
-  '/nutrition-client': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'NUTRITIONIST', 'CLIENT'],
-  
-  // Rotas de CRM (apenas profissionais)
-  '/professional/crm': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'NUTRITIONIST'],
-  
-  // Rotas de WhatsApp (apenas profissionais)
-  '/professional/whatsapp': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'NUTRITIONIST'],
-  
-  // Rotas de Marketing (apenas OWNER/ADMIN)
-  '/professional/marketing': ['SUPER_ADMIN', 'OWNER', 'ADMIN'],
-  
+  '/admin': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN],
+
+  // Rotas do PROFESSIONAL (incluindo SUPER_ADMIN e ADMIN)
+  '/professional': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.NUTRITIONIST],
+
+  // Rotas de Nutrition (profissionais têm acesso)
+  '/nutrition': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN, UserRoles.NUTRITIONIST, UserRoles.TRAINER],
+  '/nutrition-client': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN, UserRoles.NUTRITIONIST, UserRoles.TRAINER, UserRoles.CLIENT],
+
+  // Rotas de CRM (profissionais têm acesso)
+  '/professional/crm': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.NUTRITIONIST],
+
+  // Rotas de WhatsApp (profissionais têm acesso)
+  '/professional/whatsapp': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.NUTRITIONIST],
+
+  // Rotas de Marketing (apenas ADMIN)
+  '/professional/marketing': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN],
+
   // Rotas do CLIENT (todos podem acessar)
-  '/dashboard': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'TRAINER', 'CLIENT'],
-  '/client': ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'TRAINER', 'CLIENT']
+  '/dashboard': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.NUTRITIONIST, 'EMPLOYEE' as UserRole, UserRoles.CLIENT],
+  '/client': [UserRoles.SUPER_ADMIN, UserRoles.ADMIN, UserRoles.TRAINER, UserRoles.CLIENT]
 };
 
 // ============================================================================
@@ -172,9 +170,9 @@ function getUserFromToken(token: string): { role: string; tenantId: string } | n
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
+
   console.log('🔍 Middleware - Rota:', pathname);
-  
+
   // Permitir rotas públicas (otimização: verificação rápida)
   if (isPublicRoute(pathname)) {
     console.log('✅ Middleware - Rota pública, permitindo acesso');
@@ -182,9 +180,9 @@ export function middleware(request: NextRequest) {
   }
 
   // Obter token de autenticação (otimização: verificação única)
-  const token = request.cookies.get('accessToken')?.value || 
-                request.headers.get('authorization')?.replace('Bearer ', '');
-  
+  const token = request.cookies.get('accessToken')?.value ||
+    request.headers.get('authorization')?.replace('Bearer ', '');
+
   console.log('🔑 Middleware - Token encontrado:', token ? `${token.substring(0, 20)}...` : 'Nenhum');
 
   // Verificar se está em rota de autenticação
@@ -225,7 +223,7 @@ export function middleware(request: NextRequest) {
 
   // Verificar permissões por role
   const requiredRoles = getRequiredRole(pathname);
-  
+
   // SUPER_ADMIN tem acesso total a todas as rotas
   if (userData.role === 'SUPER_ADMIN') {
     console.log('✅ Middleware - SUPER_ADMIN, acesso total permitido');

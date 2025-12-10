@@ -1,10 +1,11 @@
 import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database';
 // import { stripeService } from '../../integrations/stripe';
 // import { mercadoPagoService } from '../../integrations/mercadopago';
 // import { notificationsService } from '../../integrations/notifications';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 export class PaymentService {
   private stripe: Stripe;
