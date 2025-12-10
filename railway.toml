@@ -7,12 +7,13 @@ startCommand = "npm run start:backend"
 nixPkgs = ["nodejs-20_x", "npm", "openssl"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm install --include=dev"]
 
 [phases.build]
 cmds = [
     "cd src/backend && npx prisma generate",
-    "npm run build:backend"
+    "npm run build:backend",
+    "ls -R src/backend/dist || echo 'Dist folder missing details'"
 ]
 
 [deploy]
