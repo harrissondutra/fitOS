@@ -3,6 +3,12 @@ builder = "nixpacks"
 buildCommand = "npm run build:backend"
 startCommand = "npm run start:backend"
 
+[phases.setup]
+nixPkgs = ["nodejs-20_x", "npm"]
+
+[phases.install]
+cmds = ["npm install"]
+
 [deploy]
 healthCheckPath = "/api/health"
 healthCheckTimeout = 100
