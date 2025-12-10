@@ -58,7 +58,8 @@ class EmailService {
         maxConnections: 1,
         maxMessages: 3,
         rateDelta: 20000,
-        rateLimit: 5
+        rateLimit: 5,
+        family: 4
       });
 
       // Verificar conexão apenas em produção
