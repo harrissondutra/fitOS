@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { User, UserRole, UserRoles, UserStatus } from './auth.types';
-export { User, UserRoles, type UserRole, type UserStatus };
+export type { User, UserRoles, type UserRole, type UserStatus };
 export * from './auth.types';
 
 // Re-export specific types if needed internally (though export * handles external consumers)
