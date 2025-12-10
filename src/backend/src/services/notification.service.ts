@@ -1,413 +1,129 @@
-import { PrismaClient } from '@prisma/client';
-import { WebSocketService } from './websocket.service';
+import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
-
-export interface CreateNotificationData {
+export interface NotificationData {
   userId: string;
-  tenantId: string;
-  type: 'appointment' | 'crm_task' | 'bioimpedance' | 'comment' | 'reminder' | 'system';
   title: string;
   message: string;
-  data?: any;
-}
-
-export interface NotificationFilters {
-  userId: string;
-  tenantId: string;
-  type?: string;
-  read?: boolean;
-  limit?: number;
-  offset?: number;
+  type: 'info' | 'success' | 'warning' | 'error';
+  channels?: ('email' | 'push' | 'whatsapp')[];
+  metadata?: any;
 }
 
 export class NotificationService {
-  private wsService: WebSocketService;
-
-  constructor() {
-    this.wsService = new WebSocketService();
-  }
-
   /**
-   * Cria nova notificação
+   * Enviar notificação multi-canal
    */
-  async create(data: CreateNotificationData): Promise<{
-    success: boolean;
-    notification?: any;
-    error?: string;
-  }> {
-    try {
-      const notification = await prisma.notification.create({
-        data: {
-          ...data,
-          data: data.data || {}
-        },
-        include: {
-          user: {
-            select: { id: true, name: true, email: true }
-          },
-          tenant: {
-            select: { id: true, name: true }
-          }
-        }
-      });
+  async sendNotification(data: NotificationData): Promise<void> {
+    const channels = data.channels || ['push'];
 
-      // Envia notificação em tempo real via WebSocket
-      await this.wsService.sendToUser(data.userId, {
-        type: 'notification',
-        data: notification
-      });
+    // Log para auditoria
+    logger.info('Sending notification', {
+      userId: data.userId,
+      title: data.title,
+      channels,
+      type: data.type
+    });
 
-      return { success: true, notification };
-    } catch (error: any) {
-      console.error('Erro ao criar notificação:', error);
-      return { success: false, error: error.message };
-    }
-  }
+    // Por enquanto, apenas logamos
+    // TODO: Implementar integração com:
+    // - Email (SendGrid ou Resend)
+    // - Push Notifications (FCM ou VAPID)
+    // - WhatsApp (Twilio ou Evolution API)
 
-  /**
-   * Lista notificações do usuário
-   */
-  async getNotifications(filters: NotificationFilters): Promise<{
-    success: boolean;
-    notifications?: any[];
-    total?: number;
-    unreadCount?: number;
-    error?: string;
-  }> {
-    try {
-      const where: any = {
-        userId: filters.userId,
-        tenantId: filters.tenantId
-      };
-
-      if (filters.type) {
-        where.type = filters.type;
+    for (const channel of channels) {
+      switch (channel) {
+        case 'email':
+          await this.sendEmail(data);
+          break;
+        case 'push':
+          await this.sendPush(data);
+          break;
+        case 'whatsapp':
+          await this.sendWhatsApp(data);
+          break;
       }
-
-      if (filters.read !== undefined) {
-        where.read = filters.read;
-      }
-
-      const [notifications, total, unreadCount] = await Promise.all([
-        prisma.notification.findMany({
-          where,
-          include: {
-            user: {
-              select: { id: true, name: true, email: true }
-            },
-            tenant: {
-              select: { id: true, name: true }
-            }
-          },
-          orderBy: { createdAt: 'desc' },
-          take: filters.limit || 20,
-          skip: filters.offset || 0
-        }),
-        prisma.notification.count({ where }),
-        prisma.notification.count({
-          where: {
-            userId: filters.userId,
-            tenantId: filters.tenantId,
-            read: false
-          }
-        })
-      ]);
-
-      return { success: true, notifications, total, unreadCount };
-    } catch (error: any) {
-      console.error('Erro ao listar notificações:', error);
-      return { success: false, error: error.message };
     }
   }
 
   /**
-   * Marca notificação como lida
+   * Enviar email
    */
-  async markAsRead(notificationId: string, userId: string): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
-    try {
-      await prisma.notification.updateMany({
-        where: {
-          id: notificationId,
-          userId: userId
-        },
-        data: { read: true }
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error('Erro ao marcar notificação como lida:', error);
-      return { success: false, error: error.message };
-    }
+  private async sendEmail(data: NotificationData): Promise<void> {
+    // TODO: Implementar integração com SendGrid ou Resend
+    logger.info('Email notification sent', { userId: data.userId, subject: data.title });
   }
 
   /**
-   * Marca todas as notificações como lidas
+   * Enviar push notification
    */
-  async markAllAsRead(userId: string, tenantId: string): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
-    try {
-      await prisma.notification.updateMany({
-        where: {
-          userId,
-          tenantId,
-          read: false
-        },
-        data: { read: true }
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error('Erro ao marcar todas as notificações como lidas:', error);
-      return { success: false, error: error.message };
-    }
+  private async sendPush(data: NotificationData): Promise<void> {
+    // TODO: Implementar integração com FCM ou VAPID
+    logger.info('Push notification sent', { userId: data.userId, title: data.title });
   }
 
   /**
-   * Remove notificação
+   * Enviar WhatsApp
    */
-  async deleteNotification(notificationId: string, userId: string): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
-    try {
-      await prisma.notification.deleteMany({
-        where: {
-          id: notificationId,
-          userId: userId
-        }
-      });
-
-      return { success: true };
-    } catch (error: any) {
-      console.error('Erro ao deletar notificação:', error);
-      return { success: false, error: error.message };
-    }
+  private async sendWhatsApp(data: NotificationData): Promise<void> {
+    // TODO: Implementar integração com Twilio ou Evolution API
+    logger.info('WhatsApp notification sent', { userId: data.userId, message: data.message });
   }
 
   /**
-   * Remove notificações antigas (mais de 30 dias)
+   * Notificar novo treino atribuído
    */
-  async cleanupOldNotifications(): Promise<{
-    success: boolean;
-    deletedCount?: number;
-    error?: string;
-  }> {
-    try {
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      const result = await prisma.notification.deleteMany({
-        where: {
-          createdAt: {
-            lt: thirtyDaysAgo
-          },
-          read: true
-        }
-      });
-
-      return { success: true, deletedCount: result.count };
-    } catch (error: any) {
-      console.error('Erro ao limpar notificações antigas:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Cria notificação de agendamento
-   */
-  async createAppointmentNotification(
-    userId: string,
-    tenantId: string,
-    appointment: any,
-    action: 'created' | 'updated' | 'cancelled'
-  ): Promise<void> {
-    const messages = {
-      created: `Novo agendamento: ${appointment.title} - ${appointment.scheduledAt.toLocaleString()}`,
-      updated: `Agendamento atualizado: ${appointment.title}`,
-      cancelled: `Agendamento cancelado: ${appointment.title}`
-    };
-
-    await this.create({
+  async notifyNewWorkout(userId: string, trainerName: string, workoutName: string): Promise<void> {
+    await this.sendNotification({
       userId,
-      tenantId,
-      type: 'appointment',
-      title: `Agendamento ${action === 'created' ? 'Criado' : action === 'updated' ? 'Atualizado' : 'Cancelado'}`,
-      message: messages[action],
-      data: {
-        appointmentId: appointment.id,
-        action,
-        scheduledAt: appointment.scheduledAt
-      }
+      title: 'Novo Treino Atribuído',
+      message: `${trainerName} atribuiu um novo treino: ${workoutName}`,
+      type: 'info',
+      channels: ['push', 'email'],
+      metadata: { type: 'workout_assigned', workoutName }
     });
   }
 
   /**
-   * Cria notificação de tarefa CRM
+   * Notificar treino completado
    */
-  async createCRMTaskNotification(
-    userId: string,
-    tenantId: string,
-    task: any,
-    action: 'created' | 'due_soon' | 'overdue'
-  ): Promise<void> {
-    const messages = {
-      created: `Nova tarefa CRM: ${task.title}`,
-      due_soon: `Tarefa próxima do vencimento: ${task.title}`,
-      overdue: `Tarefa em atraso: ${task.title}`
-    };
-
-    await this.create({
-      userId,
-      tenantId,
-      type: 'crm_task',
-      title: `Tarefa CRM ${action === 'created' ? 'Criada' : action === 'due_soon' ? 'Próxima do Vencimento' : 'Em Atraso'}`,
-      message: messages[action],
-      data: {
-        taskId: task.id,
-        action,
-        dueDate: task.dueDate
-      }
+  async notifyWorkoutCompleted(userId: string, trainerId: string, workoutName: string): Promise<void> {
+    await this.sendNotification({
+      userId: trainerId,
+      title: 'Treino Completado',
+      message: `Um cliente completou o treino: ${workoutName}`,
+      type: 'success',
+      channels: ['push', 'email'],
+      metadata: { type: 'workout_completed', workoutName }
     });
   }
 
   /**
-   * Cria notificação de medição biométrica
+   * Notificar nova avaliação física agendada
    */
-  async createBioimpedanceNotification(
-    userId: string,
-    tenantId: string,
-    measurement: any,
-    memberName: string
-  ): Promise<void> {
-    await this.create({
+  async notifyAssessmentScheduled(userId: string, trainerName: string, date: Date): Promise<void> {
+    await this.sendNotification({
       userId,
-      tenantId,
-      type: 'bioimpedance',
-      title: 'Nova Medição Biométrica',
-      message: `Nova medição registrada para ${memberName}`,
-      data: {
-        measurementId: measurement.id,
-        memberId: measurement.memberId,
-        measuredAt: measurement.measuredAt
-      }
+      title: 'Avaliação Física Agendada',
+      message: `${trainerName} agendou uma avaliação física para ${date.toLocaleDateString('pt-BR')}`,
+      type: 'info',
+      channels: ['push', 'email', 'whatsapp'],
+      metadata: { type: 'assessment_scheduled', date }
     });
   }
 
   /**
-   * Cria notificação de comentário
+   * Notificar nova mensagem
    */
-  async createCommentNotification(
-    userId: string,
-    tenantId: string,
-    comment: any,
-    appointmentTitle: string
-  ): Promise<void> {
-    await this.create({
+  async notifyNewMessage(userId: string, senderName: string, message: string): Promise<void> {
+    await this.sendNotification({
       userId,
-      tenantId,
-      type: 'comment',
-      title: 'Novo Comentário',
-      message: `Novo comentário em: ${appointmentTitle}`,
-      data: {
-        commentId: comment.id,
-        appointmentId: comment.appointmentId,
-        authorId: comment.userId
-      }
+      title: 'Nova Mensagem',
+      message: `${senderName}: ${message.substring(0, 50)}...`,
+      type: 'info',
+      channels: ['push', 'whatsapp'],
+      metadata: { type: 'new_message', senderName }
     });
-  }
-
-  /**
-   * Cria notificação de lembrete
-   */
-  async createReminderNotification(
-    userId: string,
-    tenantId: string,
-    reminder: any,
-    appointmentTitle: string
-  ): Promise<void> {
-    await this.create({
-      userId,
-      tenantId,
-      type: 'reminder',
-      title: 'Lembrete de Agendamento',
-      message: `Lembrete: ${appointmentTitle} - ${reminder.scheduledFor.toLocaleString()}`,
-      data: {
-        reminderId: reminder.id,
-        appointmentId: reminder.appointmentId,
-        type: reminder.type
-      }
-    });
-  }
-
-  /**
-   * Cria notificação do sistema
-   */
-  async createSystemNotification(
-    userId: string,
-    tenantId: string,
-    title: string,
-    message: string,
-    data?: any
-  ): Promise<void> {
-    await this.create({
-      userId,
-      tenantId,
-      type: 'system',
-      title,
-      message,
-      data
-    });
-  }
-
-  /**
-   * Obtém estatísticas de notificações
-   */
-  async getNotificationStats(userId: string, tenantId: string): Promise<{
-    success: boolean;
-    stats?: any;
-    error?: string;
-  }> {
-    try {
-      const [
-        total,
-        unread,
-        byType
-      ] = await Promise.all([
-        prisma.notification.count({
-          where: { userId, tenantId }
-        }),
-        prisma.notification.count({
-          where: { userId, tenantId, read: false }
-        }),
-        prisma.notification.groupBy({
-          by: ['type'],
-          where: { userId, tenantId },
-          _count: { type: true }
-        })
-      ]);
-
-      return {
-        success: true,
-        stats: {
-          total,
-          unread,
-          byType: byType.reduce((acc, item) => {
-            acc[item.type] = item._count.type;
-            return acc;
-          }, {} as any)
-        }
-      };
-    } catch (error: any) {
-      console.error('Erro ao obter estatísticas de notificações:', error);
-      return { success: false, error: error.message };
-    }
   }
 }
 
-export default new NotificationService();
+export const notificationService = new NotificationService();

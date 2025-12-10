@@ -388,4 +388,57 @@ export class CloudinaryService {
       return null;
     }
   }
+
+  /**
+   * Upload de vídeo de exercício para Cloudinary
+   */
+  static async uploadExerciseVideo(
+    file: Buffer | string,
+    exerciseId: string,
+    publicId?: string
+  ): Promise<{ url: string; publicId: string; duration: number; format: string }> {
+    try {
+      const folder = `fitos/exercises/${exerciseId}`;
+      const finalPublicId = publicId || `exercise_video_${exerciseId}_${Date.now()}`;
+      
+      // Converter Buffer para data URL se necessário
+      let uploadData: string;
+      if (Buffer.isBuffer(file)) {
+        uploadData = `data:video/mp4;base64,${file.toString('base64')}`;
+      } else {
+        uploadData = file;
+      }
+      
+      const result = await cloudinary.uploader.upload(uploadData, {
+        folder,
+        public_id: finalPublicId,
+        resource_type: 'video',
+        overwrite: true,
+        eager: [
+          { width: 800, crop: 'limit', quality: 'auto' },
+          { width: 400, crop: 'limit', quality: 'auto', format: 'mp4' }
+        ]
+      });
+
+      logger.info(`Exercise video uploaded successfully for exercise ${exerciseId}: ${result.public_id}`);
+      
+      // Rastrear custo do upload
+      try {
+        const fileSizeMB = (file.length || 0) / (1024 * 1024);
+        await costTrackerService.trackCloudinaryCost(fileSizeMB, 'video');
+      } catch (costError) {
+        logger.warn('Error tracking Cloudinary video cost:', costError);
+      }
+      
+      return {
+        url: result.secure_url,
+        publicId: result.public_id,
+        duration: result.duration || 0,
+        format: result.format || 'mp4'
+      };
+    } catch (error) {
+      logger.error('Error uploading exercise video to Cloudinary:', error);
+      throw new Error('Falha ao fazer upload do vídeo do exercício');
+    }
+  }
 }

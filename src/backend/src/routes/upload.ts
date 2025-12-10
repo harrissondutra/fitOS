@@ -3,6 +3,7 @@ import multer from 'multer';
 import { CloudinaryService, UploadType } from '../services/cloudinary.service';
 import { 
   uploadExerciseImage, 
+  uploadExerciseVideo,
   uploadWorkoutImage, 
   uploadGalleryImages, 
   uploadDocument,
@@ -54,6 +55,36 @@ router.post('/exercise/:exerciseId',
       return res.status(500).json({
         success: false,
         error: { message: 'Erro ao fazer upload da imagem do exercício' }
+      });
+    }
+  })
+);
+
+// POST /api/upload/exercise/:exerciseId/video - Upload de vídeo de exercício
+router.post('/exercise/:exerciseId/video', 
+  uploadExerciseVideo,
+  asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Nenhum arquivo enviado' }
+        });
+      }
+
+      const { exerciseId } = req.params;
+      const result = await CloudinaryService.uploadExerciseVideo(req.file.buffer, exerciseId);
+      
+      return res.json({
+        success: true,
+        data: result,
+        message: 'Vídeo do exercício enviado com sucesso'
+      });
+    } catch (error) {
+      logger.error('Error uploading exercise video:', error);
+      return res.status(500).json({
+        success: false,
+        error: { message: 'Erro ao fazer upload do vídeo do exercício' }
       });
     }
   })

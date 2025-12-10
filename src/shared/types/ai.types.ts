@@ -57,6 +57,13 @@ export enum AiServiceType {
   MEAL_PLAN_GENERATION = 'MEAL_PLAN_GENERATION',
   SUPPLEMENT_RECOMMENDATION = 'SUPPLEMENT_RECOMMENDATION',
   
+  // 🆕 Sprint 7 - Tracking Alimentar
+  FOOD_RECOGNITION = 'FOOD_RECOGNITION',           // Foto → alimentos (GPT-4 Vision)
+  NUTRITION_COACH_CHAT = 'NUTRITION_COACH_CHAT',   // Chat 24/7 assistente nutricional
+  AI_MEAL_PLANNER = 'AI_MEAL_PLANNER',             // Gerador de dietas personalizadas
+  PATTERN_ANALYSIS = 'PATTERN_ANALYSIS',           // Análise comportamental (30 dias)
+  FOOD_SWAP_SUGGESTIONS = 'FOOD_SWAP_SUGGESTIONS', // Substituições nutricionais inteligentes
+  
   // Saúde (4)
   MEDICAL_OCR = 'MEDICAL_OCR',
   SENTIMENT_ANALYSIS = 'SENTIMENT_ANALYSIS',

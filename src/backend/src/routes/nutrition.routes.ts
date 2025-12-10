@@ -22,6 +22,15 @@ import {
   laboratoryExamService,
   supplementPrescriptionService
 } from '../services/nutrition';
+import healthQuestionnaireService from '../services/nutrition/health-questionnaire.service';
+import maternalChildService from '../services/nutrition/maternal-child.service';
+import mealPlanTemplateService from '../services/nutrition/meal-plan-template.service';
+import examInterpretationService from '../services/nutrition/exam-interpretation.service';
+import anamnesisAIService from '../services/nutrition/anamnesis-ai.service';
+import pdfExportService from '../services/nutrition/pdf-export.service';
+import nutritionGoalsAIService from '../services/nutrition/nutrition-goals-ai.service';
+import { searchFoodByBarcode, saveFoodFromExternalSource } from '../services/nutrition/barcode-search.service';
+import cacheOptimization from '../config/cache-optimization.service';
 
 const router = Router();
 
@@ -39,6 +48,13 @@ router.get('/foods/search', authMiddleware.authenticateToken, async (req, res) =
     
     if (!query) {
       return res.status(400).json({ error: 'Query parameter is required' });
+    }
+    
+    // Cache check
+    const cacheKey = `search:${query}:${category}:${limit}:${offset}`;
+    const cached = await cacheOptimization.getCachedFoodSearch(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached, fromCache: true });
     }
 
     const results = await foodDatabaseService.searchFoods({
@@ -1409,6 +1425,414 @@ router.get('/health', authMiddleware.authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error checking nutrition module health:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// ============================================================================
+// HEALTH QUESTIONNAIRE ROUTES (Sprint 7)
+// ============================================================================
+
+/**
+ * GET /api/nutrition/questionnaires
+ * Lista questionários de saúde disponíveis
+ */
+router.get('/questionnaires', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { type, includePublic = true } = req.query;
+    
+    const questionnaires = await healthQuestionnaireService.list({
+      tenantId: req.user.tenantId,
+      type: type as string,
+      includePublic: includePublic === 'true'
+    });
+    
+    res.json({
+      success: true,
+      data: questionnaires
+    });
+  } catch (error) {
+    console.error('Error getting health questionnaires:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+/**
+ * POST /api/nutrition/questionnaires/submit
+ * Submete resposta de questionário
+ */
+router.post('/questionnaires/submit', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { questionnaireId, responses, score } = req.body;
+    
+    const response = await healthQuestionnaireService.submitResponse({
+      tenantId: req.user.tenantId,
+      clientId: req.body.clientId || req.user.id,
+      questionnaireId,
+      nutritionistId: req.user.id,
+      responses,
+      score
+    });
+    
+    res.json({
+      success: true,
+      data: response
+    });
+  } catch (error) {
+    console.error('Error submitting questionnaire response:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// ============================================================================
+// MATERNAL-CHILD ASSESSMENT ROUTES (Sprint 7)
+// ============================================================================
+
+/**
+ * POST /api/nutrition/maternal-assessment
+ * Cria avaliação gestacional
+ */
+router.post('/maternal-assessment', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const assessment = await maternalChildService.createMaternalAssessment({
+      ...req.body,
+      tenantId: req.user.tenantId
+    });
+    
+    res.status(201).json({
+      success: true,
+      data: assessment
+    });
+  } catch (error) {
+    console.error('Error creating maternal assessment:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+/**
+ * POST /api/nutrition/child-assessment
+ * Cria avaliação infantil
+ */
+router.post('/child-assessment', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const assessment = await maternalChildService.createChildAssessment({
+      ...req.body,
+      tenantId: req.user.tenantId
+    });
+    
+    res.status(201).json({
+      success: true,
+      data: assessment
+    });
+  } catch (error) {
+    console.error('Error creating child assessment:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// ============================================================================
+// PRESCRIPTION TEMPLATES ROUTES (Sprint 7)
+// ============================================================================
+
+/**
+ * GET /api/nutrition/prescription-templates
+ * Lista templates de prescrições
+ */
+router.get('/prescription-templates', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { category, style, isPublic } = req.query;
+    
+    const templates = await mealPlanTemplateService.list({
+      tenantId: req.user.tenantId,
+      category: category as string,
+      style: style as string,
+      isPublic: isPublic ? isPublic === 'true' : true
+    });
+    
+    res.json({
+      success: true,
+      data: templates
+    });
+  } catch (error) {
+    console.error('Error getting prescription templates:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+/**
+ * GET /api/nutrition/prescription-templates/:id
+ * Obtém template específico
+ */
+router.get('/prescription-templates/:id', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const template = await mealPlanTemplateService.getById(id);
+    
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        error: 'Template not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: template
+    });
+  } catch (error) {
+    console.error('Error getting prescription template:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// ============================================================================
+// LAB EXAM INTERPRETATION ROUTES (Sprint 7)
+// ============================================================================
+
+/**
+ * POST /api/nutrition/lab-exams/interpret
+ * Interpretar exame laboratorial com AI
+ */
+router.post('/lab-exams/interpret', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { examType, results, referenceValues } = req.body;
+    
+    const interpretation = await examInterpretationService.interpretExam({
+      examType,
+      results,
+      referenceValues
+    });
+    
+    res.json({
+      success: true,
+      data: interpretation
+    });
+  } catch (error) {
+    console.error('Error interpreting lab exam:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// ============================================================================
+// ANAMNESIS AI ROUTES (Sprint 7)
+// ============================================================================
+
+/**
+ * POST /api/nutrition/anamnesis/generate
+ * Gerar anamnese nutricional automática
+ */
+router.post('/anamnesis/generate', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { clientData } = req.body;
+    
+    const anamnesis = await anamnesisAIService.generateAnamnesis(clientData);
+    
+    res.json({
+      success: true,
+      data: anamnesis
+    });
+  } catch (error) {
+    console.error('Error generating anamnesis:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+/**
+ * POST /api/nutrition/anamnesis/analyze-goals
+ * Analisar compatibilidade de objetivos
+ */
+router.post('/anamnesis/analyze-goals', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { goals, clientData } = req.body;
+    
+    const analysis = await anamnesisAIService.analyzeGoalCompatibility(goals, clientData);
+    
+    res.json({
+      success: true,
+      data: analysis
+    });
+  } catch (error) {
+    console.error('Error analyzing goals:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// ============================================================================
+// PDF EXPORT ROUTES (Sprint 7)
+// ============================================================================
+
+/**
+ * POST /api/nutrition/export/pdf
+ * Gerar PDF profissional de prescrição
+ */
+router.post('/export/pdf', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { title, subtitle, clientName, professionalName, content } = req.body;
+    
+    const pdfBuffer = await pdfExportService.generateNutritionPrescription({
+      title,
+      subtitle,
+      clientName,
+      professionalName,
+      content,
+      watermark: true
+    });
+    
+    // Upload para Cloudinary
+    const pdfUrl = await pdfExportService.uploadToCloudinary(
+      pdfBuffer,
+      `prescription_${Date.now()}.pdf`
+    );
+    
+    res.json({
+      success: true,
+      data: {
+        url: pdfUrl,
+        size: pdfBuffer.length
+      }
+    });
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// ============================================================================
+// NUTRITION GOALS AI ROUTES (Sprint 7)
+// ============================================================================
+
+/**
+ * POST /api/nutrition/goals-ai/generate
+ * Gerar metas nutricionais automáticas com IA
+ */
+router.post('/goals-ai/generate', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { clientProfile } = req.body;
+    
+    const goals = await nutritionGoalsAIService.generateGoals(clientProfile);
+    
+    res.json({
+      success: true,
+      data: goals
+    });
+  } catch (error) {
+    console.error('Error generating nutrition goals:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+/**
+ * POST /api/nutrition/goals-ai/analyze-progress
+ * Analisar progresso de metas
+ */
+router.post('/goals-ai/analyze-progress', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { goals, progressData } = req.body;
+    
+    const analysis = await nutritionGoalsAIService.analyzeProgress(goals, progressData);
+    
+    res.json({
+      success: true,
+      data: analysis
+    });
+  } catch (error) {
+    console.error('Error analyzing progress:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// ============================================================================
+// BARCODE SEARCH ROUTES (Sprint 7)
+// ============================================================================
+
+/**
+ * POST /api/nutrition/foods/search-barcode
+ * Buscar alimento por código de barras
+ */
+router.post('/foods/search-barcode', authMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { barcode } = req.body;
+    
+    if (!barcode) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Barcode is required' 
+      });
+    }
+    
+    const result = await searchFoodByBarcode(barcode);
+    
+    // Se encontrado externamente, salvar no banco local (opcional)
+    if (result.source === 'openfoodfacts' && result.food) {
+      try {
+        await saveFoodFromExternalSource({
+          name: result.food.name,
+          barcode: result.food.barcode,
+          brand: result.food.brand,
+          category: result.food.category,
+          source: result.food.source,
+          calories: result.food.calories,
+          protein: result.food.protein,
+          carbs: result.food.carbs,
+          fat: result.food.fat,
+          fiber: result.food.fiber,
+          sugar: result.food.sugar,
+          sodium: result.food.sodium,
+          servingSize: result.food.servingSize,
+          servingUnit: result.food.servingUnit
+        });
+        result.source = 'saved';
+      } catch (error) {
+        // Ignorar erro de duplicata
+        logger.warn('Could not save external food:', error);
+      }
+    }
+    
+    res.json({
+      success: result.source !== 'not_found',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error searching barcode:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Internal server error' 

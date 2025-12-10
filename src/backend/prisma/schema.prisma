@@ -73,6 +73,11 @@ model Tenant {
   progressPhotos            ProgressPhoto[]
   bodyMeasurements          BodyMeasurement[]
   supplementPrescriptions   SupplementPrescription[]
+  
+  // Sprint 8: Personal Trainer System
+  physicalAssessments       PhysicalAssessment[]
+  trainerClientChats         TrainerClientChat[]
+  trainingPrograms           TrainingProgram[]
 
   @@map("tenants")
   @@schema("fitos")
@@ -128,6 +133,13 @@ model User {
   workouts                 Workout[]
   nutritionClient          NutritionClient?
   supplementPrescriptions  SupplementPrescription[]
+  
+  // Sprint 8: Personal Trainer System
+  createdExercises         Exercise[]                   @relation("ExerciseCreator")
+  physicalAssessments      PhysicalAssessment[]
+  sentMessages             TrainerClientChat[]           @relation("SentMessages")
+  receivedMessages         TrainerClientChat[]           @relation("ReceivedMessages")
+  trainingPrograms         TrainingProgram[]
 
   @@map("users")
   @@schema("fitos")
@@ -159,6 +171,10 @@ model Client {
   user                     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   googleCalendarTokens     GoogleCalendarToken[]
   workouts                 Workout[]
+  
+  // Sprint 8: Personal Trainer System
+  physicalAssessments      PhysicalAssessment[]
+  trainingPrograms         TrainingProgram[]
 
   @@map("clients")
   @@schema("fitos")
@@ -487,7 +503,10 @@ model Exercise {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator      User?    @relation("ExerciseCreator", fields: [createdBy], references: [id])
 
+  @@index([tenantId, category])
+  @@index([tenantId, isPublic])
   @@map("exercises")
   @@schema("fitos")
 }
@@ -537,6 +556,105 @@ model ClientTrainer {
 
   @@unique([clientId, trainerId])
   @@map("client_trainers")
+  @@schema("fitos")
+}
+
+// ========================================
+// NOVO: Avaliações Físicas
+// ========================================
+model PhysicalAssessment {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  clientId      String   @map("client_id")
+  trainerId     String   @map("trainer_id")
+  assessmentDate DateTime @map("assessment_date")
+  
+  // Medidas corporais
+  weight        Float?
+  height        Float?
+  bodyFat       Float?   @map("body_fat")
+  muscleMass    Float?   @map("muscle_mass")
+  
+  // Circunferências (cm)
+  measurements  Json     @default("{}")  // neck, chest, waist, hips, thigh, calf, biceps
+  
+  // Testes físicos
+  strength      Json     @default("{}")  // bench press, squat, deadlift
+  cardio        Json     @default("{}")  // vo2max, resting hr, cooper test
+  flexibility   Json     @default("{}")  // sit and reach, shoulder flexibility
+  
+  // Fotos de progresso
+  photos        String[] // URLs do Cloudinary
+  
+  // Observações
+  notes         String?
+  goals         Json     @default("{}")
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  trainer       User     @relation(fields: [trainerId], references: [id])
+  
+  @@index([tenantId, clientId])
+  @@index([trainerId])
+  @@map("physical_assessments")
+  @@schema("fitos")
+}
+
+// ========================================
+// NOVO: Chat Trainer-Cliente
+// ========================================
+model TrainerClientChat {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  senderId     String   @map("sender_id")
+  receiverId   String   @map("receiver_id")
+  message      String
+  attachments  String[] // URLs de imagens/vídeos
+  readAt       DateTime? @map("read_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sender       User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiver     User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  
+  @@index([tenantId, senderId, receiverId])
+  @@index([createdAt])
+  @@map("trainer_client_chats")
+  @@schema("fitos")
+}
+
+// ========================================
+// NOVO: Programas de Treino (Periodização)
+// ========================================
+model TrainingProgram {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  trainerId    String   @map("trainer_id")
+  clientId     String   @map("client_id")
+  name         String
+  description  String?
+  goal         String   // hypertrophy, strength, endurance, weight_loss
+  duration     Int      // semanas
+  frequency    Int      // treinos por semana
+  startDate    DateTime @map("start_date")
+  endDate      DateTime @map("end_date")
+  isActive     Boolean  @default(true) @map("is_active")
+  
+  phases       Json     @default("[]")  // fases da periodização
+  
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  trainer      User     @relation(fields: [trainerId], references: [id])
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  @@index([tenantId, trainerId])
+  @@index([clientId])
+  @@map("training_programs")
   @@schema("fitos")
 }
 
@@ -2329,16 +2447,21 @@ model FoodDiaryEntry {
   tenantId   String          @map("tenant_id")
   clientId   String          @map("client_id")
   food       String
+  foodId     String?         @map("food_id") // ID do alimento na base TBCA/TACO
   quantity   Float
   unit       String
   mealType   String          @map("meal_type")
   consumedAt DateTime        @map("consumed_at")
   calories   Float?
+  nutrients  Json?           @default("{}") // Macro e micronutrientes (JSON)
+  notes      String?         // Notas do cliente
   createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at") // updatedAt automático
   tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   client     NutritionClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, clientId, consumedAt])
+  @@index([foodId]) // Index para busca por alimento
   @@map("food_diary_entries")
   @@schema("fitos")
 }

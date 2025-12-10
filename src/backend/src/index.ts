@@ -78,6 +78,18 @@ import teamCalendarRoutes from './routes/team-calendar';
 // Nutrition routes (Sprint 4)
 import nutritionRoutes from './routes/nutrition.routes';
 
+// Nutrition Addon routes (Sprint 7)
+import nutritionAddonRoutes from './routes/nutrition-addon.routes';
+import injuryPreventionRoutes from './routes/injury-prevention.routes';
+import foodDiaryTrackingRoutes from './routes/food-diary-tracking.routes';
+
+// Sprint 8: Personal Trainer System routes
+import { physicalAssessmentRoutes } from './routes/physical-assessment.routes';
+import { trainerChatRoutes } from './routes/trainer-chat.routes';
+import { trainingProgramRoutes } from './routes/training-program.routes';
+import { trainerStatsRoutes } from './routes/trainer-stats.routes';
+import { trainerClientsRoutes } from './routes/trainer-clients.routes';
+
 // CRM routes (Sprint 4)
 import crmApiRoutes from './routes/crm.routes';
 
@@ -222,6 +234,22 @@ class FitOSServer {
 
     // Nutrition API routes (Sprint 4) - com autenticação obrigatória
     this.app.use('/api/nutrition', authMiddleware.requireAuth, nutritionRoutes);
+
+    // Nutrition Addon routes (Sprint 7) - com autenticação obrigatória
+    this.app.use('/api/nutrition-addon', authMiddleware.requireAuth, nutritionAddonRoutes);
+    
+    // Injury Prevention routes (Sprint 7)
+    this.app.use('/api/injury-prevention', authMiddleware.requireAuth, injuryPreventionRoutes);
+
+    // Food Diary Tracking routes (Sprint 7)
+    this.app.use('/api/nutrition/tracking', authMiddleware.requireAuth, foodDiaryTrackingRoutes);
+
+    // Sprint 8: Personal Trainer System routes (com autenticação obrigatória)
+    this.app.use('/api/assessments', authMiddleware.requireAuth, physicalAssessmentRoutes);
+    this.app.use('/api/trainer-chat', authMiddleware.requireAuth, trainerChatRoutes);
+    this.app.use('/api/training-programs', authMiddleware.requireAuth, trainingProgramRoutes);
+    this.app.use('/api/trainer', authMiddleware.requireAuth, trainerStatsRoutes);
+    this.app.use('/api/trainer', authMiddleware.requireAuth, trainerClientsRoutes);
 
     // CRM API routes (Sprint 4) - com autenticação obrigatória
     this.app.use('/api/crm', authMiddleware.requireAuth, crmApiRoutes);

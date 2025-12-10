@@ -5,6 +5,15 @@ const nextConfig = {
   // Configurações básicas
   reactStrictMode: true,
   
+  // Compressão (Sprint 7 Otimizações)
+  compress: true,
+  
+  // Experimental features
+  experimental: {
+    // Otimizações de bundle
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-*', 'chart.js', 'recharts'],
+  },
+  
   // Desabilitar erros de ESLint durante o build (temporário)
   eslint: {
     ignoreDuringBuilds: true,
@@ -71,6 +80,63 @@ const nextConfig = {
       tls: false,
       crypto: false,
     };
+    
+    // Code splitting otimizado - Sprint 7
+    if (!isServer) {
+      // Split vendor chunks
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            default: false,
+            vendors: false,
+            // React e Next.js separados
+            react: {
+              name: 'react-vendor',
+              test: /[\\/]node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/,
+              priority: 30,
+              chunks: 'all',
+            },
+            nextjs: {
+              name: 'nextjs-vendor',
+              test: /[\\/]node_modules[\\/](next)[\\/]/,
+              priority: 25,
+              chunks: 'all',
+            },
+            // UI libraries separadas
+            ui: {
+              name: 'ui-vendor',
+              test: /[\\/]node_modules[\\/]@radix-ui|lucide-react[\\/]/,
+              priority: 20,
+              chunks: 'all',
+            },
+            // Charts separados
+            charts: {
+              name: 'charts-vendor',
+              test: /[\\/]node_modules[\\/](chart\.js|recharts|chartjs-node-canvas)[\\/]/,
+              priority: 15,
+              chunks: 'all',
+            },
+            // Utilities separadas
+            utils: {
+              name: 'utils-vendor',
+              test: /[\\/]node_modules[\\/](axios|swr|zustand|date-fns|zod)[\\/]/,
+              priority: 10,
+              chunks: 'all',
+            },
+            // Resto
+            lib: {
+              name: 'libs-vendor',
+              minChunks: 2,
+              priority: 5,
+              reuseExistingChunk: true,
+              chunks: 'all',
+            },
+          },
+        },
+      };
+    }
     
     // Cache persistente para desenvolvimento (apenas se não estiver usando Turbopack)
     if (dev && !process.env.TURBOPACK) {

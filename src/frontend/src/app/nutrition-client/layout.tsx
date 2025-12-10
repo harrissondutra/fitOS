@@ -13,7 +13,10 @@ import {
   Search,
   Calendar,
   Target,
-  Activity
+  Activity,
+  QrCode,
+  Camera,
+  ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +30,12 @@ const clientNavItems = [
     url: "/nutrition-client/dashboard",
     icon: Home,
     isActive: true
+  },
+  {
+    title: "Minha Dieta",
+    url: "/nutrition-client/dieta",
+    icon: UtensilsCrossed,
+    badge: "NOVO"
   },
   {
     title: "Diário Alimentar",
@@ -44,6 +53,28 @@ const clientNavItems = [
     url: "/nutrition-client/progress",
     icon: TrendingUp
   },
+  // ============================================================================
+  // SPRINT 7 - NOVAS FUNCIONALIDADES CLIENTES
+  // ============================================================================
+  {
+    title: "Scanner Barcode",
+    url: "/nutrition-client/diary/barcode-scanner",
+    icon: QrCode,
+    badge: "NOVO"
+  },
+  {
+    title: "Questionários",
+    url: "/nutrition-client/questionnaires",
+    icon: ClipboardList,
+    badge: "NOVO"
+  },
+  {
+    title: "Foto da Refeição",
+    url: "/nutrition-client/diary/photo",
+    icon: Camera,
+    badge: "NOVO"
+  },
+  // ============================================================================
   {
     title: "Consultas",
     url: "/nutrition-client/consultations",

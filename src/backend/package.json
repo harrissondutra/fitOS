@@ -27,7 +27,10 @@
     "db:backup": "node backup-database.js",
     "db:restore": "node restore-database.js",
     "db:safe-migrate": "echo '🔄 Executando migração segura com backup...' && npm run db:backup && npm run migrate:dev && echo '✅ Migração concluída com backup salvo'",
-    "db:check-safety": "node check-database-safety.js"
+    "db:check-safety": "node check-database-safety.js",
+    "seed:prescriptions": "tsx scripts/seed-prescription-templates.ts",
+    "seed:questionnaires": "tsx scripts/seed-questionnaires.ts",
+    "import:tbca-taco": "tsx scripts/import-tbca-taco.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

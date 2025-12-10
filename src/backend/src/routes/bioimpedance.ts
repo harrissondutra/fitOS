@@ -5,6 +5,7 @@ import { AuthMiddleware } from '../middleware/auth.middleware';
 import { requireRole } from '../middleware/permissions';
 import { asyncHandler } from '../utils/async-handler';
 import BioimpedanceService from '../services/bioimpedance.service';
+import { requireNutritionAddon } from '../middleware/nutrition-addon-check';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -454,6 +455,75 @@ router.get('/client/:clientId',
           pages: Math.ceil((result.total || 0) / parseInt(limit))
         }
       }
+    });
+  })
+);
+
+/**
+ * @route POST /api/bioimpedance/analyze-photos
+ * @desc Análise corporal por fotos usando BodyScan AI (Sprint 7)
+ * @access NUTRITIONIST, ADMIN, OWNER, SUPER_ADMIN
+ * @requires Nutrition Add-on with bodyScanAI feature
+ */
+router.post('/analyze-photos',
+  requireRole(['NUTRITIONIST', 'ADMIN', 'OWNER', 'SUPER_ADMIN']),
+  requireNutritionAddon('bodyScanAI'), // ✅ VALIDAÇÃO DE ADD-ON
+  [
+    body('clientId').isString().notEmpty(),
+    body('frontPhotoUrl').isString().notEmpty(),
+    body('sidePhotoUrl').isString().notEmpty()
+  ],
+  asyncHandler(async (req: any, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          message: 'Validation failed',
+          details: errors.array()
+        }
+      });
+    }
+
+    const { clientId, frontPhotoUrl, sidePhotoUrl } = req.body;
+    const tenantId = req.user.tenantId;
+    const professionalId = req.user.id;
+
+    // Verificar se cliente existe e pertence ao tenant
+    const client = await prisma.client.findFirst({
+      where: {
+        id: clientId,
+        tenantId
+      }
+    });
+
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        error: 'Cliente não encontrado ou não pertence ao seu tenant'
+      });
+    }
+
+    // Chamar serviço de análise por fotos
+    const result = await BioimpedanceService.analyzeByPhotos({
+      tenantId,
+      clientId,
+      professionalId,
+      frontPhotoUrl,
+      sidePhotoUrl
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      data: result.measurement,
+      message: 'Análise por fotos concluída com sucesso'
     });
   })
 );

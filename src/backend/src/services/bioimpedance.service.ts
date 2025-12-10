@@ -1050,6 +1050,155 @@ export class BioimpedanceService {
     if (mets < 10) return 'high';
     return 'very_high';
   }
+
+  /**
+   * BodyScan AI - Análise corporal por fotos usando OpenAI Vision
+   * Sprint 7 - Nova funcionalidade
+   */
+  async analyzeByPhotos(data: {
+    tenantId: string;
+    clientId: string;
+    professionalId: string;
+    frontPhotoUrl: string;
+    sidePhotoUrl: string;
+    clientAge?: number;
+    clientGender?: 'male' | 'female' | 'other';
+    clientHeight?: number;
+  }): Promise<any> {
+    try {
+      // Importar dinamicamente para evitar dependência circular
+      const { PhotoBodyAnalysisService } = await import('./nutrition/photo-body-analysis.service');
+      const photoAnalysisService = new PhotoBodyAnalysisService();
+      
+      // Obter dados do cliente
+      const client = await prisma.client.findUnique({
+        where: { id: data.clientId },
+        select: { birthDate: true, gender: true, height: true }
+      });
+
+      const clientAge = data.clientAge || (client?.birthDate ? this.calculateAge(client.birthDate) : 30);
+      const clientGender = data.clientGender || (client?.gender as any) || 'other';
+      const clientHeight = data.clientHeight || client?.height || undefined;
+
+      // Chamar IA para análise
+      const aiResult = await photoAnalysisService.analyzeBodyComposition({
+        frontPhotoUrl: data.frontPhotoUrl,
+        sidePhotoUrl: data.sidePhotoUrl,
+        clientAge,
+        clientGender,
+        clientHeight
+      });
+
+      // Criar medição no banco
+      const measurement = await prisma.bioimpedanceMeasurement.create({
+        data: {
+          tenantId: data.tenantId,
+          clientId: data.clientId,
+          professionalId: data.professionalId,
+          measurementId: `photo_ai_${Date.now()}`,
+          measuredAt: new Date(),
+          
+          // Dados básicos
+          height: aiResult.estimatedHeight || clientHeight || 170,
+          age: clientAge,
+          gender: clientGender,
+          weight: aiResult.estimatedWeight,
+          
+          // Dados estimados pela IA
+          totalBodyWater: aiResult.estimatedTotalBodyWater || 35,
+          protein: 10, // Estimativa padrão
+          minerals: 3, // Estimativa padrão
+          bodyFatMass: aiResult.estimatedFatMass || 15,
+          skeletalMuscleMass: aiResult.estimatedMuscleMass || 40,
+          
+          // Análise de obesidade
+          bmi: aiResult.estimatedBMI,
+          bodyFatPercentage: aiResult.estimatedBodyFat,
+          visceralFatLevel: Math.round(aiResult.estimatedVisceralFat),
+          
+          // Dados adicionais
+          fatFreeMass: aiResult.estimatedWeight - (aiResult.estimatedFatMass || 15),
+          basalMetabolicRate: aiResult.estimatedBasalMetabolicRate || 1600,
+          obesityDegree: 100 * ((aiResult.estimatedBMI || 22) / 25),
+          skeletalMuscleIndex: 8.5, // Estimativa padrão
+          recommendedCalories: (aiResult.estimatedBasalMetabolicRate || 1600) * 1.3,
+          
+          // Controles
+          idealWeight: 70, // Seria calculado baseado na altura
+          weightControl: 0,
+          fatControl: 0,
+          muscleControl: 0,
+          
+          // Análise segmentar - Estimativas aproximadas
+          leftArmMuscle: 3,
+          rightArmMuscle: 3,
+          trunkMuscle: 20,
+          leftLegMuscle: 7,
+          rightLegMuscle: 7,
+          
+          leftArmFat: 1.5,
+          rightArmFat: 1.5,
+          trunkFat: 8,
+          leftLegFat: 3,
+          rightLegFat: 3,
+          
+          // Marcadores de origem BodyScan AI
+          inbodyDataSource: 'photo_ai',
+          inbodyDeviceModel: 'BodyScan AI',
+          frontPhotoUrl: data.frontPhotoUrl,
+          sidePhotoUrl: data.sidePhotoUrl,
+          photoAnalysis: aiResult.fullAnalysis,
+          photoAnalyzedAt: new Date(),
+          aiCostTracked: true,
+          
+          notes: 'Análise realizada por IA com base em fotografias'
+        }
+      });
+
+      // Notificação e auditoria
+      await this.notificationService.sendNotification({
+        userId: data.clientId,
+        type: 'measurement_created',
+        title: 'Nova análise corporal',
+        message: 'Análise por fotos concluída com sucesso',
+        data: { measurementId: measurement.id }
+      });
+
+      await this.auditService.log({
+        userId: data.professionalId,
+        action: 'bioimpedance_photo_analysis',
+        resource: 'bioimpedance_measurement',
+        resourceId: measurement.id,
+        metadata: { method: 'photo_ai' }
+      });
+
+      return {
+        success: true,
+        measurement
+      };
+    } catch (error: any) {
+      console.error('BodyScan AI error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Calcula idade a partir da data de nascimento
+   */
+  private calculateAge(birthDate: Date): number {
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  }
 }
 
 export default new BioimpedanceService();

@@ -69,6 +69,20 @@ const createUploadMiddleware = (type: keyof typeof uploadConfigs) => {
 export const uploadAvatar = createUploadMiddleware('avatar').single('avatar');
 export const uploadLogo = createUploadMiddleware('logo').single('logo');
 export const uploadExerciseImage = createUploadMiddleware('exercise').single('image');
+export const uploadExerciseVideo = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = ['video/mp4', 'video/quicktime', 'video/webm'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Formato de vídeo não suportado'));
+    }
+  }
+}).single('video');
 export const uploadWorkoutImage = createUploadMiddleware('workout').single('image');
 export const uploadGalleryImages = createUploadMiddleware('gallery').array('images', 10);
 export const uploadDocument = createUploadMiddleware('document').single('document');

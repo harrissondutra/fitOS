@@ -98,29 +98,39 @@ npm run seed:dev
 
 ## 📱 Funcionalidades
 
-### ✅ Implementado (Sprint 1)
-- ✅ **Multi-Tenancy Completo** - Isolamento por academia
-- ✅ **Autenticação JWT** - Sistema seguro de autenticação
-- ✅ **API REST Completa** - Endpoints para todas as funcionalidades
-- ✅ **Sistema de Tenants** - Gerenciamento de organizações
-- ✅ **Middleware de Autenticação** - Controle de acesso por roles
-- ✅ **Testes Automatizados** - Cobertura completa de testes
-- ✅ **CI/CD Pipeline** - Deploy automático com GitHub Actions
-- ✅ **Docker Support** - Containerização completa
-- ✅ **Health Checks** - Monitoramento de saúde da aplicação
-- ✅ **Logs Estruturados** - Sistema de logging avançado
+### ✅ Completado - 7 Sprints (95% do MVP)
+- ✅ **Sprint 1**: Setup CI/CD + Multi-Tenancy (Completo)
+- ✅ **Sprint 2**: Billing + Deploy Automático (Completo)
+- ✅ **Sprint 3**: IA Multiagente + Limites (Completo)
+- ✅ **Sprint 4**: Integração Nutricional + CRM + Bioimpedância (Completo)
+- ✅ **Sprint 5**: Admin Dashboard + Deploy Final (Completo)
+- ✅ **Sprint 6**: Sistema de Preferências e Gamificação (Completo)
+- ✅ **Sprint 7**: Recursos Avançados para Nutricionistas (Backend Completo)
 
-### 🚧 Em Desenvolvimento (Sprint 2)
-- 🚧 **Sistema de Billing** - Stripe + Mercado Pago
-- 🚧 **Self-Service Onboarding** - Cadastro automático de academias
-- 🚧 **Deploy Automático** - Staging e produção
+### 📋 Sprint 7 - Funcionalidades Implementadas
 
-### 📋 Planejado (Sprint 3+)
-- 📋 **IA Multiagente** - Coach, Nutrition, Business
-- 📋 **Integração com Wearables** - Apple Health, Google Fit
-- 📋 **Dashboard Preditivo** - Analytics avançados
-- 📋 **Sistema de Limites** - Controle por planos
-- 📋 **Marketplace de Profissionais** - Personal trainers e nutricionistas
+- ✅ **BodyScan AI** - Análise corporal por fotografias (OpenAI Vision)
+- ✅ **Sistema de Monetização** - Add-ons (Basic R$49,90 / Pro R$99,90) com trial
+- ✅ **Biblioteca de Prescrições** - 50+ templates prontos (seed automático)
+- ✅ **Avaliação Materno-Infantil** - Curvas WHO integradas
+- ✅ **Questionários de Saúde** - Backend completo
+- ✅ **Scanner de Código de Barras** - Open Food Facts (API gratuita)
+- ✅ **Página de Upgrade** - Frontend para compra de add-ons
+
+### 🔄 Em Planejamento - Sprint 8 (Finalização)
+
+- 🔄 **Clara IA Expandido** - Interpretação exames, anamnese completa
+- 🔄 **Base TBCA/TACO** - Importação completa (3000+ alimentos)
+- 🔄 **Exportação PDF Profissional** - Gráficos e relatórios
+- 🔄 **IA Prevenção de Lesões** - Análise de movimento
+- 🔄 **Testes E2E** - Cobertura completa
+- 🔄 **Otimizações de Performance** - Cache, bundle, lazy loading
+
+### 📋 Futuro - Expansão
+- 📋 **Mobile App Nativo** - iOS/Android
+- 📋 **Internacionalização** - Multi-idiomas
+- 📋 **Novos AI Agents** - Especializados por área
+- 📋 **Computer Vision** - Análise de vídeo
 
 ## 🔧 Scripts Disponíveis
 
@@ -284,7 +294,8 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para de
 - [ ] App mobile (React Native)
 - [ ] Marketplace de exercícios
 - [ ] Sistema de pagamentos
-- [ ] Certificações blockchain
+- [ ] IA para prevenção de lesões
+- [ ] Sistema de sustentabilidade ESG
 
 ---
 

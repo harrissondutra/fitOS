@@ -236,13 +236,13 @@ export default function ClientsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => window.location.href = `/nutritionist/clients/${client.id}/diary`}>
                                 <Eye className="mr-2 h-4 w-4" />
-                                Ver Perfil
+                                Ver Diário Alimentar
                               </DropdownMenuItem>
                               <DropdownMenuItem>
                                 <Edit className="mr-2 h-4 w-4" />
-                                Editar
+                                Editar Perfil
                               </DropdownMenuItem>
                               <DropdownMenuItem>
                                 <MessageSquare className="mr-2 h-4 w-4" />

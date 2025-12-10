@@ -1,60 +1,71 @@
 'use client';
 
-// Configurações SSR
-export const dynamic = 'force-dynamic'
-export const fetchCache = 'force-no-store'
-export const runtime = 'nodejs'
-export const preferredRegion = 'auto'
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ExerciseCard } from '@/components/exercises/exercise-card';
-import { useExercises } from '@/hooks/use-exercises';
-import { ExerciseFilters } from '@/shared/types';
-import { Search, Filter, Plus, Dumbbell, Target, Clock, Users } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Search, Plus, Play, Dumbbell, Filter } from 'lucide-react';
+import { api } from '@/lib/api';
+import { toast } from 'react-hot-toast';
+
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
+interface Exercise {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  muscleGroups: string[];
+  difficulty: string;
+  equipment?: string[];
+  videoUrl?: string;
+  thumbnailUrl?: string;
+}
 
 export default function TrainerExercisesPage() {
-  const [filters, setFilters] = useState<ExerciseFilters>({
-    search: '',
-    category: '',
-    muscleGroup: '',
-    difficulty: '',
-    equipment: '',
+  const router = useRouter();
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState({
+    category: 'all',
+    difficulty: 'all',
+    muscleGroup: 'all'
   });
 
-  const { exercises, loading, error, refetch } = useExercises(filters);
+  useEffect(() => {
+    fetchExercises();
+  }, []);
 
-  const handleFilterChange = (key: keyof ExerciseFilters, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+  const fetchExercises = async () => {
+    try {
+      const response = await api.get('/api/exercises');
+      setExercises(response.data.data?.exercises || []);
+    } catch (error) {
+      console.error('Error fetching exercises:', error);
+      toast.error('Erro ao carregar exercícios');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const clearFilters = () => {
-    setFilters({
-      search: '',
-      category: '',
-      muscleGroup: '',
-      difficulty: '',
-      equipment: '',
-    });
-  };
-
-  const strengthExercises = exercises?.filter(exercise => exercise.category === 'strength') || [];
-  const cardioExercises = exercises?.filter(exercise => exercise.category === 'cardio') || [];
-  const flexibilityExercises = exercises?.filter(exercise => exercise.category === 'flexibility') || [];
+  const filteredExercises = exercises.filter(exercise => {
+    const matchesSearch = exercise.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         exercise.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = filters.category === 'all' || exercise.category === filters.category;
+    const matchesDifficulty = filters.difficulty === 'all' || exercise.difficulty === filters.difficulty;
+    
+    return matchesSearch && matchesCategory && matchesDifficulty;
+  });
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Exercise Library</h1>
-            <p className="text-muted-foreground">Browse and manage exercises for your workouts</p>
-          </div>
-        </div>
+        <h1 className="text-3xl font-bold">Biblioteca de Exercícios</h1>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse">
@@ -69,279 +80,170 @@ export default function TrainerExercisesPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Exercise Library</h1>
-            <p className="text-muted-foreground">Browse and manage exercises for your workouts</p>
-          </div>
-        </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center">
-              <Dumbbell className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">Error loading exercises</h3>
-              <p className="text-muted-foreground mb-4">{error}</p>
-              <Button onClick={() => refetch()}>Try Again</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Exercise Library</h1>
-          <p className="text-muted-foreground">Browse and manage exercises for your workouts</p>
+          <h1 className="text-3xl font-bold">Biblioteca de Exercícios</h1>
+          <p className="text-muted-foreground">Explore e gerencie exercícios para criar treinos</p>
         </div>
-        <Button>
+        <Button onClick={() => router.push('/trainer/exercises/create')}>
           <Plus className="h-4 w-4 mr-2" />
-          Create Exercise
+          Criar Exercício
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Exercises</CardTitle>
-            <Dumbbell className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{exercises?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Available exercises
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Strength</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{strengthExercises.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Strength exercises
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cardio</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{cardioExercises.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Cardio exercises
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Flexibility</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{flexibilityExercises.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Flexibility exercises
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
+      {/* Search and Filters */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            Filters
+            Filtros
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-5">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search exercises..."
-                  value={filters.search}
-                  onChange={(e) => handleFilterChange('search', e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar exercício..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
-              <Select value={filters.category || "all"} onValueChange={(value) => setFilters(prev => ({ ...prev, category: value === "all" ? "" : value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  <SelectItem value="strength">Strength</SelectItem>
-                  <SelectItem value="cardio">Cardio</SelectItem>
-                  <SelectItem value="flexibility">Flexibility</SelectItem>
-                  <SelectItem value="balance">Balance</SelectItem>
-                  <SelectItem value="sports">Sports</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select
+              value={filters.category}
+              onValueChange={(v) => setFilters({ ...filters, category: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Categoria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="strength">Força</SelectItem>
+                <SelectItem value="cardio">Cardio</SelectItem>
+                <SelectItem value="flexibility">Flexibilidade</SelectItem>
+                <SelectItem value="balance">Equilíbrio</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Muscle Group</label>
-              <Select value={filters.muscleGroup || "all"} onValueChange={(value) => setFilters(prev => ({ ...prev, muscleGroup: value === "all" ? "" : value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All muscles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All muscles</SelectItem>
-                  <SelectItem value="chest">Chest</SelectItem>
-                  <SelectItem value="back">Back</SelectItem>
-                  <SelectItem value="shoulders">Shoulders</SelectItem>
-                  <SelectItem value="arms">Arms</SelectItem>
-                  <SelectItem value="legs">Legs</SelectItem>
-                  <SelectItem value="core">Core</SelectItem>
-                  <SelectItem value="full-body">Full Body</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select
+              value={filters.difficulty}
+              onValueChange={(v) => setFilters({ ...filters, difficulty: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Dificuldade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="beginner">Iniciante</SelectItem>
+                <SelectItem value="intermediate">Intermediário</SelectItem>
+                <SelectItem value="advanced">Avançado</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Difficulty</label>
-              <Select value={filters.difficulty || "all"} onValueChange={(value) => setFilters(prev => ({ ...prev, difficulty: value === "all" ? "" : value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All levels" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All levels</SelectItem>
-                  <SelectItem value="beginner">Beginner</SelectItem>
-                  <SelectItem value="intermediate">Intermediate</SelectItem>
-                  <SelectItem value="advanced">Advanced</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Actions</label>
-              <Button variant="outline" onClick={clearFilters} className="w-full">
-                Clear Filters
-              </Button>
-            </div>
+            <Button variant="outline" onClick={() => {
+              setFilters({ category: 'all', difficulty: 'all', muscleGroup: 'all' });
+              setSearchTerm('');
+            }}>
+              Limpar Filtros
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Exercises List */}
-      <Tabs defaultValue="all" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all">All Exercises ({exercises?.length || 0})</TabsTrigger>
-          <TabsTrigger value="strength">Strength ({strengthExercises.length})</TabsTrigger>
-          <TabsTrigger value="cardio">Cardio ({cardioExercises.length})</TabsTrigger>
-          <TabsTrigger value="flexibility">Flexibility ({flexibilityExercises.length})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all" className="space-y-4">
-          {exercises && exercises.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {exercises.map((exercise) => (
-                <ExerciseCard key={exercise.id} exercise={exercise} />
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center">
-                  <Dumbbell className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold mb-2">No exercises found</h3>
-                  <p className="text-muted-foreground mb-4">
-                    {filters.search || filters.category || filters.muscleGroup || filters.difficulty
-                      ? 'Try adjusting your filters to see more results.'
-                      : 'No exercises available in the library.'}
-                  </p>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create First Exercise
+      {/* Exercises Grid */}
+      {filteredExercises.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredExercises.map((exercise) => (
+            <Card key={exercise.id} className="overflow-hidden transition-all hover:shadow-lg">
+              <div className="aspect-video bg-muted relative">
+                {exercise.thumbnailUrl ? (
+                  <img src={exercise.thumbnailUrl} alt={exercise.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <Dumbbell className="h-12 w-12 text-muted-foreground" />
+                  </div>
+                )}
+                {exercise.videoUrl && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="absolute bottom-2 right-2"
+                    onClick={() => window.open(exercise.videoUrl, '_blank')}
+                  >
+                    <Play className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              <CardHeader>
+                <CardTitle className="line-clamp-1">{exercise.name}</CardTitle>
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {exercise.description || 'Sem descrição'}
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">{exercise.category}</Badge>
+                  <Badge variant="outline">{exercise.difficulty}</Badge>
+                </div>
+                {exercise.muscleGroups && exercise.muscleGroups.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {exercise.muscleGroups.slice(0, 3).map((mg, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">
+                        {mg}
+                      </Badge>
+                    ))}
+                    {exercise.muscleGroups.length > 3 && (
+                      <Badge variant="outline" className="text-xs">
+                        +{exercise.muscleGroups.length - 3}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => router.push(`/trainer/exercises/${exercise.id}`)}
+                  >
+                    Ver Detalhes
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => router.push(`/trainer/workouts/create?exerciseId=${exercise.id}`)}
+                  >
+                    Usar em Treino
                   </Button>
                 </div>
               </CardContent>
             </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="strength" className="space-y-4">
-          {strengthExercises.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {strengthExercises.map((exercise) => (
-                <ExerciseCard key={exercise.id} exercise={exercise} />
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center">
-                  <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold mb-2">No strength exercises</h3>
-                  <p className="text-muted-foreground">No strength exercises found with current filters.</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="cardio" className="space-y-4">
-          {cardioExercises.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {cardioExercises.map((exercise) => (
-                <ExerciseCard key={exercise.id} exercise={exercise} />
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center">
-                  <Clock className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold mb-2">No cardio exercises</h3>
-                  <p className="text-muted-foreground">No cardio exercises found with current filters.</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="flexibility" className="space-y-4">
-          {flexibilityExercises.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {flexibilityExercises.map((exercise) => (
-                <ExerciseCard key={exercise.id} exercise={exercise} />
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center">
-                  <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold mb-2">No flexibility exercises</h3>
-                  <p className="text-muted-foreground">No flexibility exercises found with current filters.</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Dumbbell className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">Nenhum exercício encontrado</h3>
+            <p className="text-muted-foreground mb-4">
+              {searchTerm || filters.category !== 'all' || filters.difficulty !== 'all'
+                ? 'Tente ajustar os filtros de busca'
+                : 'Comece criando seu primeiro exercício'}
+            </p>
+            {!searchTerm && filters.category === 'all' && filters.difficulty === 'all' && (
+              <Button onClick={() => router.push('/trainer/exercises/create')}>
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Primeiro Exercício
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

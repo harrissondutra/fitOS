@@ -25,10 +25,38 @@ import {
 export default function TrainerDashboardPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [stats, setStats] = useState({
+    activeClients: 0,
+    totalWorkouts: 0,
+    completedToday: 0,
+    upcomingAssessments: 0
+  });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    fetchStats();
   }, []);
+
+  const fetchStats = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/trainer/stats', {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data.stats) {
+          setStats(data.data.stats);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!mounted) {
     return null;
@@ -72,7 +100,7 @@ export default function TrainerDashboardPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{stats.activeClients}</div>
               <p className="text-xs text-muted-foreground">
                 +0% este mês
               </p>
@@ -85,7 +113,7 @@ export default function TrainerDashboardPage() {
               <Dumbbell className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{stats.completedToday}</div>
               <p className="text-xs text-muted-foreground">
                 +0% em relação à semana passada
               </p>
@@ -94,26 +122,26 @@ export default function TrainerDashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Horários Agendados</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Total de Treinos</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{stats.totalWorkouts}</div>
               <p className="text-xs text-muted-foreground">
-                Próximas 24h
+                Todos os treinos
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Objetivos Alcançados</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Avaliações Agendadas</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0/0</div>
+              <div className="text-2xl font-bold">{stats.upcomingAssessments}</div>
               <p className="text-xs text-muted-foreground">
-                Este mês
+                Próximas 7 dias
               </p>
             </CardContent>
           </Card>
@@ -129,17 +157,17 @@ export default function TrainerDashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
+              <Button className="w-full" onClick={() => router.push('/trainer/clients')}>
                 <Users className="mr-2 h-4 w-4" />
                 Ver Clientes
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
+              <Button variant="outline" className="w-full" onClick={() => router.push('/trainer/clients/assign')}>
                 <UserCheck className="mr-2 h-4 w-4" />
-                Adicionar Cliente
+                Atribuir Cliente
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
+              <Button variant="outline" className="w-full" onClick={() => router.push('/trainer/analytics')}>
                 <Activity className="mr-2 h-4 w-4" />
-                Progresso dos Clientes
+                Analytics
               </Button>
             </CardContent>
           </Card>
@@ -152,17 +180,17 @@ export default function TrainerDashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
+              <Button className="w-full" onClick={() => router.push('/trainer/workouts/create')}>
                 <Dumbbell className="mr-2 h-4 w-4" />
                 Criar Treino
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
-                <Calendar className="mr-2 h-4 w-4" />
-                Agendar Sessão
+              <Button variant="outline" className="w-full" onClick={() => router.push('/trainer/workouts')}>
+                <Dumbbell className="mr-2 h-4 w-4" />
+                Ver Treinos
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => toastUtils.comingSoon('Funcionalidade')}>
-                <Clock className="mr-2 h-4 w-4" />
-                Histórico de Treinos
+              <Button variant="outline" className="w-full" onClick={() => router.push('/trainer/exercises')}>
+                <Target className="mr-2 h-4 w-4" />
+                Biblioteca de Exercícios
               </Button>
             </CardContent>
           </Card>

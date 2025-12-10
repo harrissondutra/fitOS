@@ -12,7 +12,17 @@ import {
   BarChart3,
   Settings,
   Bell,
-  Search
+  Search,
+  FileText,
+  Stethoscope,
+  ClipboardList,
+  Baby,
+  Camera,
+  QrCode,
+  Sparkles,
+  Zap,
+  Crown,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +60,56 @@ const nutritionistNavItems = [
     icon: MessageSquare,
     badge: "3"
   },
+  // ============================================================================
+  // SPRINT 7 - NOVAS FUNCIONALIDADES NUTRICIONAIS
+  // ============================================================================
+  {
+    title: "BodyScan AI",
+    url: "/nutritionist/bioimpedance/photo-analysis",
+    icon: Camera,
+    badge: "NOVO"
+  },
+  {
+    title: "Scanner Código de Barras",
+    url: "/nutritionist/food-database/barcode-scanner",
+    icon: QrCode,
+    badge: "NOVO"
+  },
+  {
+    title: "Questionários",
+    url: "/nutritionist/questionnaires",
+    icon: ClipboardList,
+    badge: "NOVO"
+  },
+  {
+    title: "Materno-Infantil",
+    url: "/nutritionist/maternal-child",
+    icon: Baby,
+    badge: "NOVO"
+  },
+  {
+    title: "Prescrições",
+    url: "/nutritionist/prescriptions",
+    icon: FileText,
+    badge: "NOVO"
+  },
+  {
+    title: "Bioimpedância Avançada",
+    url: "/nutritionist/bioimpedance",
+    icon: Stethoscope
+  },
+  {
+    title: "Clara IA",
+    url: "/nutritionist/ai-assistant",
+    icon: Sparkles
+  },
+  {
+    title: "Upgrade Premium",
+    url: "/nutritionist/upgrade",
+    icon: Crown,
+    badge: "PRO"
+  },
+  // ============================================================================
   {
     title: "Analytics",
     url: "/nutritionist/analytics",

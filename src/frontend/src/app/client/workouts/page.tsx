@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ export const runtime = 'nodejs'
 export const preferredRegion = 'auto'
 
 export default function MemberWorkoutsPage() {
+  const router = useRouter();
   // Auth removed - using default values
   const user = { role: 'CLIENT' as const, id: 'default-member-id' };
   const [filters, setFilters] = useState<TreinoFilters>({
@@ -28,6 +30,10 @@ export default function MemberWorkoutsPage() {
   });
 
   const { treinos, loading, error, refetch } = useWorkouts({ filters });
+
+  const startWorkout = (workoutId: string) => {
+    router.push(`/client/workouts/${workoutId}/execute`);
+  };
 
   const handleFilterChange = (key: keyof TreinoFilters, value: string | boolean | undefined) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -225,7 +231,12 @@ export default function MemberWorkoutsPage() {
           {treinos && treinos.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {treinos.map((treino) => (
-                <WorkoutCard key={treino.id} treino={treino} />
+                <WorkoutCard 
+                  key={treino.id} 
+                  treino={treino} 
+                  onStart={(t) => startWorkout(t.id)}
+                  showActions={true}
+                />
               ))}
             </div>
           ) : (
@@ -249,7 +260,12 @@ export default function MemberWorkoutsPage() {
           {completedWorkouts.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {completedWorkouts.map((treino) => (
-                <WorkoutCard key={treino.id} treino={treino} />
+                <WorkoutCard 
+                  key={treino.id} 
+                  treino={treino} 
+                  onStart={(t) => startWorkout(t.id)}
+                  showActions={true}
+                />
               ))}
             </div>
           ) : (
@@ -269,7 +285,12 @@ export default function MemberWorkoutsPage() {
           {pendingWorkouts.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {pendingWorkouts.map((treino) => (
-                <WorkoutCard key={treino.id} treino={treino} />
+                <WorkoutCard 
+                  key={treino.id} 
+                  treino={treino} 
+                  onStart={(t) => startWorkout(t.id)}
+                  showActions={true}
+                />
               ))}
             </div>
           ) : (
@@ -289,7 +310,12 @@ export default function MemberWorkoutsPage() {
           {thisWeekWorkouts.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {thisWeekWorkouts.map((treino) => (
-                <WorkoutCard key={treino.id} treino={treino} />
+                <WorkoutCard 
+                  key={treino.id} 
+                  treino={treino} 
+                  onStart={(t) => startWorkout(t.id)}
+                  showActions={true}
+                />
               ))}
             </div>
           ) : (
