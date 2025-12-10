@@ -70,7 +70,7 @@ class EmailService {
         rateDelta: 20000,
         rateLimit: 5,
         family: 4
-      });
+      } as any);
 
       // Verificar conexão apenas em produção
       if (config.isProduction) {
