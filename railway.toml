@@ -11,9 +11,7 @@ cmds = ["npm install --include=dev"]
 
 [phases.build]
 cmds = [
-    "cd src/backend && npx prisma generate",
-    "npm run build:backend",
-    "ls -R src/backend/dist || echo 'Dist folder missing details'"
+    "cd src/backend && npx prisma generate"
 ]
 
 [deploy]

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch --clear-screen=false --ignore node_modules --ignore dist src/index.ts",
     "build": "tsc || true",
-    "start": "npx prisma generate && node dist/src/backend/src/index.js",
+    "start": "npx prisma generate && tsx src/index.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -86,7 +86,8 @@
     "uuid": "^9.0.1",
     "web-push": "^3.6.7",
     "winston": "^3.11.0",
-    "ws": "^8.16.0"
+    "ws": "^8.16.0",
+    "tsx": "^4.6.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
