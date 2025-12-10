@@ -4,10 +4,16 @@ buildCommand = "npm run build:backend"
 startCommand = "npm run start:backend"
 
 [phases.setup]
-nixPkgs = ["nodejs-20_x", "npm"]
+nixPkgs = ["nodejs-20_x", "npm", "openssl"]
 
 [phases.install]
 cmds = ["npm install"]
+
+[phases.build]
+cmds = [
+    "cd src/backend && npx prisma generate",
+    "npm run build:backend"
+]
 
 [deploy]
 healthCheckPath = "/api/health"
