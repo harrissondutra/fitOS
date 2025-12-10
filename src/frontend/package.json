@@ -92,7 +92,10 @@
     "web-push": "^3.6.7",
     "workbox-window": "^7.0.0",
     "zod": "^3.25.76",
-    "zustand": "^4.4.7"
+    "zustand": "^4.4.7",
+    "canvas-confetti": "^1.6.0",
+    "qrcode.react": "^3.1.0",
+    "react-dropzone": "^14.2.3"
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^16.0.8",
@@ -102,6 +105,8 @@
     "@types/js-cookie": "^3.0.6",
     "@types/node": "^20.10.0",
     "@types/react": "^18.3.26",
+    "@types/canvas-confetti": "^1.6.0",
+    "@types/react-dropzone": "^5.1.0",
     "@types/react-dom": "^18.3.7",
     "@types/react-syntax-highlighter": "^15.5.11",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
