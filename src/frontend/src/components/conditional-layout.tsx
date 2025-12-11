@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge'
 import { LayoutDashboard, Cog } from 'lucide-react'
 import { AdHeader } from '@/components/advertisements/AdHeader'
 import { AdFooter } from '@/components/advertisements/AdFooter'
+import { MobileNav } from '@/components/mobile-nav'
+import { InstallPrompt } from '@/components/install-prompt'
 
 interface ConditionalLayoutProps {
   children: React.ReactNode
@@ -60,6 +62,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
     return (
       <div className="min-h-screen">
         {children}
+        <InstallPrompt />
       </div>
     )
   }
@@ -69,6 +72,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
     return (
       <div className="min-h-screen">
         {children}
+        <InstallPrompt />
       </div>
     )
   }
@@ -112,11 +116,14 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
             </div>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 min-h-screen">
+        {/* Adicionado padding bottom no mobile para não cobrir conteudo com a nav bar */}
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 min-h-screen pb-28 md:pb-4">
           {children}
         </div>
         <AdFooter />
       </SidebarInset>
+      <MobileNav />
+      <InstallPrompt />
     </SidebarProvider>
   )
 }
