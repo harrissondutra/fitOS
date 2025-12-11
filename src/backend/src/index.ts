@@ -165,6 +165,7 @@ class FitOSServer {
     }));
 
     // CORS configuration
+    logger.info(`🛡️ CORS Origins configured: ${Array.isArray(config.cors.origins) ? config.cors.origins.map(o => o.toString()).join(', ') : config.cors.origins}`);
     this.app.use(cors({
       origin: config.cors.origins,
       credentials: true,

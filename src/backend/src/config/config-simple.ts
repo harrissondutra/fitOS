@@ -37,7 +37,15 @@ export const config = {
 
   // CORS
   cors: {
-    origins: process.env.CORS_ORIGINS?.split(',') || ["http://localhost:3000", "http://localhost:3001"],
+    origins: (process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : []).map(origin => {
+      const trimmed = origin.trim();
+      // Se tiver wildcard, converte para Regex
+      if (trimmed.includes('*')) {
+        // Escapa caracteres especiais exceto * e converte * para .*
+        return new RegExp('^' + trimmed.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+      }
+      return trimmed;
+    }),
   },
 
   // AI Services
