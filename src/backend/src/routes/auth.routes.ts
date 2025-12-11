@@ -344,7 +344,20 @@ export class AuthRoutes {
         }
       });
 
-      const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000';
+      // Garantir que a URL nunca seja localhost em produção
+      let frontendUrl = process.env.FRONTEND_URL;
+
+      if (!frontendUrl) {
+        if (process.env.NODE_ENV === 'production') {
+          // Fallback seguro de produção
+          frontendUrl = 'https://fitnessos.sistudo.com.br';
+          console.warn('⚠️ FRONTEND_URL not set in production. Using fallback:', frontendUrl);
+        } else {
+          // Fallback de desenvolvimento
+          frontendUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:3000';
+        }
+      }
+
       const verifyUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
 
       try {

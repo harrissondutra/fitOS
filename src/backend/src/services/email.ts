@@ -90,12 +90,30 @@ class EmailService {
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
+    // 0. Safety check for Development Mode + Resend
+    let finalTo = options.to;
+
+    // Check if we are in development/test mode AND using Resend
+    // (Resend free tier only allows sending to the registered email)
+    if (!config.isProduction && this.resend) {
+      // Hardcoded safe email for testing
+      // We'll use harrissondutra@gmail.com as requested by the error message
+      const SAFE_DEV_EMAIL = 'harrissondutra@gmail.com';
+
+      const toAddress = Array.isArray(options.to) ? options.to.join(', ') : options.to;
+
+      if (toAddress !== SAFE_DEV_EMAIL && !((Array.isArray(options.to) && options.to.includes(SAFE_DEV_EMAIL)))) {
+        logger.warn(`⚠️ [DEV MODE] Redirecting email from [${toAddress}] to [${SAFE_DEV_EMAIL}] to comply with Resend restrictions.`);
+        finalTo = SAFE_DEV_EMAIL;
+      }
+    }
+
     // 1. Tentar via Resend API se disponível
     if (this.resend) {
       try {
         const { data, error } = await this.resend.emails.send({
           from: config.email.from || 'onboarding@resend.dev',
-          to: options.to,
+          to: finalTo,
           subject: options.subject,
           html: options.html || options.text || '',
           text: options.text,
@@ -106,13 +124,19 @@ class EmailService {
         });
 
         if (error) {
+          // If error is 403, log a specific helpful message instead of generic error
+          if (error.name === 'validation_error' || (error as any).statusCode === 403) {
+            logger.warn(`⚠️ Resend API Restriction: ${error.message}. Ensure you are sending to a verified domain or the account email.`);
+            return false;
+          }
+
           logger.error('Resend API Error:', error);
           return false;
         }
 
         logger.info('Email sent successfully via Resend API', { id: data?.id });
         return true;
-      } catch (err) {
+      } catch (err: any) {
         logger.error('Failed to send email via Resend API:', err);
         return false;
       }
