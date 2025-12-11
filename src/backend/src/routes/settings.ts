@@ -83,7 +83,7 @@ router.get('/system', requireAdminRole, asyncHandler(async (req: RequestWithTena
     }
 
     const settings = await settingsService.getSystemSettings(req.tenantId);
-    
+
     return res.json({
       success: true,
       data: settings
@@ -116,7 +116,7 @@ router.put('/system', requireAdminRole, validateSystemSettings, asyncHandler(asy
     }
 
     const settings = await settingsService.updateSystemSettings(req.tenantId, req.body);
-    
+
     return res.json({
       success: true,
       data: settings,
@@ -142,7 +142,7 @@ router.get('/profile', asyncHandler(async (req: RequestWithTenantAndAuth, res: R
     }
 
     const settings = await settingsService.getUserProfileSettings(req.user.id);
-    
+
     return res.json({
       success: true,
       data: settings
@@ -175,7 +175,7 @@ router.put('/profile', validateProfileSettings, asyncHandler(async (req: Request
     }
 
     const settings = await settingsService.updateUserProfileSettings(req.user.id, req.body);
-    
+
     return res.json({
       success: true,
       data: settings,
@@ -191,7 +191,7 @@ router.put('/profile', validateProfileSettings, asyncHandler(async (req: Request
 }));
 
 // POST /api/settings/profile/avatar - Upload de avatar
-router.post('/profile/avatar', uploadAvatar, validateImageDimensions, handleUploadError, asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
+router.post('/profile/avatar', uploadAvatar as any, validateImageDimensions, handleUploadError, asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
   try {
     if (!req.user) {
       return res.status(401).json({
@@ -208,7 +208,7 @@ router.post('/profile/avatar', uploadAvatar, validateImageDimensions, handleUplo
     }
 
     const avatarUrl = await settingsService.uploadAvatarToCloudinary(req.file, req.user.id);
-    
+
     return res.json({
       success: true,
       data: { avatarUrl },
@@ -245,7 +245,7 @@ router.put('/profile/avatar/social', [
 
     const { provider } = req.body;
     const avatarUrl = await settingsService.syncSocialAvatar(req.user.id, provider);
-    
+
     return res.json({
       success: true,
       data: { avatarUrl },
@@ -261,7 +261,7 @@ router.put('/profile/avatar/social', [
 }));
 
 // POST /api/upload/logo - Upload de logo da empresa
-router.post('/upload/logo', requireAdminRole, uploadLogo, validateImageDimensions, handleUploadError, asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
+router.post('/upload/logo', requireAdminRole, uploadLogo as any, validateImageDimensions, handleUploadError, asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
   try {
     if (!req.tenantId) {
       return res.status(400).json({
@@ -278,7 +278,7 @@ router.post('/upload/logo', requireAdminRole, uploadLogo, validateImageDimension
     }
 
     const logoUrl = await settingsService.uploadLogoToCloudinary(req.file, req.tenantId);
-    
+
     return res.json({
       success: true,
       data: { url: logoUrl },

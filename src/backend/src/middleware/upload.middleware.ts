@@ -9,7 +9,7 @@ const storage = multer.memoryStorage();
 const fileFilter = (req: Request, file: any, cb: multer.FileFilterCallback) => {
   // Verificar tipo de arquivo
   const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-  
+
   if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -54,10 +54,10 @@ const uploadConfigs = {
 // Função para criar middleware de upload
 const createUploadMiddleware = (type: keyof typeof uploadConfigs) => {
   const config = uploadConfigs[type];
-  
+
   return multer({
     storage,
-    fileFilter,
+    fileFilter: fileFilter as any,
     limits: {
       fileSize: config.fileSize,
       files: config.maxFiles,
@@ -91,7 +91,7 @@ export const uploadDocument = createUploadMiddleware('document').single('documen
 export const createUpload = (type: keyof typeof uploadConfigs, fieldName?: string) => {
   const config = uploadConfigs[type];
   const finalFieldName = fieldName || config.fieldName;
-  
+
   if (config.maxFiles === 1) {
     return createUploadMiddleware(type).single(finalFieldName);
   } else {
@@ -103,7 +103,7 @@ export const createUpload = (type: keyof typeof uploadConfigs, fieldName?: strin
 export const validateImageDimensions = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const files = req.files as any[] || (req.file ? [req.file] : []);
-    
+
     if (files.length === 0) {
       return next();
     }
@@ -111,7 +111,7 @@ export const validateImageDimensions = async (req: Request, res: Response, next:
     for (const file of files) {
       // Verificar dimensões usando sharp
       const metadata = await sharp(file.buffer).metadata();
-      
+
       if (!metadata.width || !metadata.height) {
         return res.status(400).json({
           success: false,
@@ -149,7 +149,7 @@ export const validateImageDimensionsByType = (type: 'avatar' | 'logo' | 'exercis
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const files = req.files as any[] || (req.file ? [req.file] : []);
-      
+
       if (files.length === 0) {
         return next();
       }
@@ -167,7 +167,7 @@ export const validateImageDimensionsByType = (type: 'avatar' | 'logo' | 'exercis
 
       for (const file of files) {
         const metadata = await sharp(file.buffer).metadata();
-        
+
         if (!metadata.width || !metadata.height) {
           return res.status(400).json({
             success: false,
@@ -203,7 +203,7 @@ export const handleUploadError = (error: any, req: Request, res: Response, next:
         error: { message: 'Arquivo muito grande. Verifique o tamanho máximo permitido.' }
       });
     }
-    
+
     if (error.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({
         success: false,
@@ -235,14 +235,14 @@ export const handleUploadErrorByType = (type: keyof typeof uploadConfigs) => {
     if (error instanceof multer.MulterError) {
       const config = uploadConfigs[type];
       const maxSizeMB = Math.round(config.fileSize / (1024 * 1024));
-      
+
       if (error.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({
           success: false,
           error: { message: `Arquivo muito grande. Máximo ${maxSizeMB}MB para ${type}.` }
         });
       }
-      
+
       if (error.code === 'LIMIT_FILE_COUNT') {
         return res.status(400).json({
           success: false,

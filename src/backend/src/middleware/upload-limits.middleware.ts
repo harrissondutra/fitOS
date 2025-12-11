@@ -68,8 +68,8 @@ export const uploadWithLimits = (options: {
       }
 
       // 4. Configurar multer com limites dinâmicos
-      const maxFileSize = options.maxFileSizeMB 
-        ? options.maxFileSizeMB * 1024 * 1024 
+      const maxFileSize = options.maxFileSizeMB
+        ? options.maxFileSizeMB * 1024 * 1024
         : (limits.overrides.uploadLimits?.maxFileSize || 100) * 1024 * 1024;
 
       const allowedTypes = options.allowedFileTypes || limits.overrides.uploadLimits?.allowedFileTypes || ['jpg', 'jpeg', 'png', 'pdf'];
@@ -79,7 +79,7 @@ export const uploadWithLimits = (options: {
       const quotaLimit = (limits.overrides.uploadLimits?.monthlyUploadQuota || 1000) * 1024 * 1024 * 1024; // Convert to bytes
 
       if (monthlyUsage >= quotaLimit) {
-        res.status(413).json({ 
+        res.status(413).json({
           message: 'Monthly upload quota exceeded',
           usage: monthlyUsage,
           limit: quotaLimit
@@ -96,7 +96,7 @@ export const uploadWithLimits = (options: {
         },
         fileFilter: (req, file, cb) => {
           const fileExtension = file.originalname.split('.').pop()?.toLowerCase();
-          
+
           if (!fileExtension || !allowedTypes.includes(fileExtension)) {
             return cb(new Error(`File type .${fileExtension} is not allowed. Allowed types: ${allowedTypes.join(', ')}`));
           }
@@ -105,7 +105,7 @@ export const uploadWithLimits = (options: {
           if (fileExtension === 'pdf' && file.mimetype !== 'application/pdf') {
             return cb(new Error('Invalid PDF file'));
           }
-          
+
           if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
             if (!file.mimetype.startsWith('image/')) {
               return cb(new Error('Invalid image file'));
@@ -117,34 +117,34 @@ export const uploadWithLimits = (options: {
       });
 
       // 7. Processar upload
-      dynamicUpload.array('files', 10)(req, res, async (err): Promise<void> => {
+      (dynamicUpload as any).array('files', 10)(req, res, async (err: any): Promise<void> => {
         if (err) {
           if (err instanceof multer.MulterError) {
             switch (err.code) {
               case 'LIMIT_FILE_SIZE':
-                res.status(413).json({ 
-                  message: `File too large. Maximum size: ${maxFileSize / (1024 * 1024)}MB` 
+                res.status(413).json({
+                  message: `File too large. Maximum size: ${maxFileSize / (1024 * 1024)}MB`
                 });
                 return;
               case 'LIMIT_FILE_COUNT':
-                res.status(413).json({ 
-                  message: 'Too many files. Maximum: 10 files per request' 
+                res.status(413).json({
+                  message: 'Too many files. Maximum: 10 files per request'
                 });
                 return;
               case 'LIMIT_UNEXPECTED_FILE':
-                res.status(400).json({ 
-                  message: 'Unexpected file field' 
+                res.status(400).json({
+                  message: 'Unexpected file field'
                 });
                 return;
               default:
-                res.status(400).json({ 
-                  message: `Upload error: ${err.message}` 
+                res.status(400).json({
+                  message: `Upload error: ${err.message}`
                 });
                 return;
             }
           }
-          res.status(400).json({ 
-            message: `File validation error: ${err.message}` 
+          res.status(400).json({
+            message: `File validation error: ${err.message}`
           });
           return;
         }
@@ -160,7 +160,7 @@ export const uploadWithLimits = (options: {
 
         // 9. Verificar se o upload não excede a quota mensal
         if (monthlyUsage + totalSize > quotaLimit) {
-          res.status(413).json({ 
+          res.status(413).json({
             message: 'Upload would exceed monthly quota',
             currentUsage: monthlyUsage,
             uploadSize: totalSize,
@@ -183,16 +183,16 @@ export const uploadWithLimits = (options: {
 
           // Validar tamanho individual
           if (multerFile.size > maxFileSize) {
-            res.status(413).json({ 
-              message: `File ${multerFile.originalname} exceeds maximum size of ${maxFileSize / (1024 * 1024)}MB` 
+            res.status(413).json({
+              message: `File ${multerFile.originalname} exceeds maximum size of ${maxFileSize / (1024 * 1024)}MB`
             });
             return;
           }
 
           // Validar tipo de arquivo
           if (!allowedTypes.includes(uploadInfo.fileType)) {
-            res.status(400).json({ 
-              message: `File type .${uploadInfo.fileType} is not allowed for ${multerFile.originalname}` 
+            res.status(400).json({
+              message: `File type .${uploadInfo.fileType} is not allowed for ${multerFile.originalname}`
             });
             return;
           }
@@ -200,8 +200,8 @@ export const uploadWithLimits = (options: {
           // Validações específicas por tipo
           const validationResult = await validateFileContent(multerFile, uploadInfo.fileType);
           if (!validationResult.valid) {
-            res.status(400).json({ 
-              message: `File validation failed for ${multerFile.originalname}: ${validationResult.error}` 
+            res.status(400).json({
+              message: `File validation failed for ${multerFile.originalname}: ${validationResult.error}`
             });
             return;
           }
@@ -234,7 +234,7 @@ export const uploadWithLimits = (options: {
 
     } catch (error) {
       console.error('Upload middleware error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Internal server error during upload validation',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -288,34 +288,34 @@ async function validateFileContent(file: any, fileType: string): Promise<{ valid
       case 'jpg':
       case 'jpeg':
         // Verificar assinatura JPEG
-        if (file.buffer.length < 3 || 
-            (file.buffer[0] !== 0xFF || file.buffer[1] !== 0xD8 || file.buffer[2] !== 0xFF)) {
+        if (file.buffer.length < 3 ||
+          (file.buffer[0] !== 0xFF || file.buffer[1] !== 0xD8 || file.buffer[2] !== 0xFF)) {
           return { valid: false, error: 'Invalid JPEG file signature' };
         }
         break;
 
       case 'png':
         // Verificar assinatura PNG
-        if (file.buffer.length < 8 || 
-            file.buffer.toString('hex', 0, 8) !== '89504e470d0a1a0a') {
+        if (file.buffer.length < 8 ||
+          file.buffer.toString('hex', 0, 8) !== '89504e470d0a1a0a') {
           return { valid: false, error: 'Invalid PNG file signature' };
         }
         break;
 
       case 'gif':
         // Verificar assinatura GIF
-        if (file.buffer.length < 6 || 
-            !file.buffer.toString('ascii', 0, 6).startsWith('GIF87a') && 
-            !file.buffer.toString('ascii', 0, 6).startsWith('GIF89a')) {
+        if (file.buffer.length < 6 ||
+          !file.buffer.toString('ascii', 0, 6).startsWith('GIF87a') &&
+          !file.buffer.toString('ascii', 0, 6).startsWith('GIF89a')) {
           return { valid: false, error: 'Invalid GIF file signature' };
         }
         break;
 
       case 'webp':
         // Verificar assinatura WebP
-        if (file.buffer.length < 12 || 
-            file.buffer.toString('ascii', 0, 4) !== 'RIFF' ||
-            file.buffer.toString('ascii', 8, 12) !== 'WEBP') {
+        if (file.buffer.length < 12 ||
+          file.buffer.toString('ascii', 0, 4) !== 'RIFF' ||
+          file.buffer.toString('ascii', 8, 12) !== 'WEBP') {
           return { valid: false, error: 'Invalid WebP file signature' };
         }
         break;
@@ -330,8 +330,8 @@ async function validateFileContent(file: any, fileType: string): Promise<{ valid
           }
         } else {
           // DOC tem assinatura específica
-          if (file.buffer.length < 8 || 
-              file.buffer.toString('hex', 0, 8) !== 'd0cf11e0a1b11ae1') {
+          if (file.buffer.length < 8 ||
+            file.buffer.toString('hex', 0, 8) !== 'd0cf11e0a1b11ae1') {
             return { valid: false, error: 'Invalid DOC file signature' };
           }
         }
@@ -347,8 +347,8 @@ async function validateFileContent(file: any, fileType: string): Promise<{ valid
           }
         } else {
           // XLS tem assinatura específica
-          if (file.buffer.length < 8 || 
-              file.buffer.toString('hex', 0, 8) !== 'd0cf11e0a1b11ae1') {
+          if (file.buffer.length < 8 ||
+            file.buffer.toString('hex', 0, 8) !== 'd0cf11e0a1b11ae1') {
             return { valid: false, error: 'Invalid XLS file signature' };
           }
         }
@@ -373,9 +373,9 @@ async function validateFileContent(file: any, fileType: string): Promise<{ valid
 
     return { valid: true };
   } catch (error) {
-    return { 
-      valid: false, 
-      error: `File validation error: ${error instanceof Error ? error.message : 'Unknown error'}` 
+    return {
+      valid: false,
+      error: `File validation error: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }
@@ -408,7 +408,7 @@ export const logUploadUsage = async (req: Request, res: Response, next: NextFunc
 export const checkUploadLimits = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user?.tenantId || req.headers['x-tenant-id'] as string;
-    
+
     if (!tenantId) {
       res.status(400).json({ message: 'Tenant ID is required' });
       return;
@@ -417,8 +417,8 @@ export const checkUploadLimits = async (req: Request, res: Response, next: NextF
     // Verificar se o tenant pode fazer uploads
     const limits = await globalLimitsService.getTenantOverride(tenantId);
     if (!limits || !limits.overrides.featureLimits?.apiAccess) {
-      res.status(403).json({ 
-        message: 'File upload is not allowed for this tenant' 
+      res.status(403).json({
+        message: 'File upload is not allowed for this tenant'
       });
       return;
     }
@@ -429,7 +429,7 @@ export const checkUploadLimits = async (req: Request, res: Response, next: NextF
     return next();
   } catch (error) {
     console.error('Error checking upload limits:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error checking upload limits',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -454,7 +454,7 @@ export const cleanupTempFiles = (req: Request, res: Response, next: NextFunction
 export const getUploadStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = req.user?.tenantId || req.headers['x-tenant-id'] as string;
-    
+
     if (!tenantId) {
       res.status(400).json({ message: 'Tenant ID is required' });
       return;
@@ -462,11 +462,11 @@ export const getUploadStats = async (req: Request, res: Response, next: NextFunc
 
     const stats = await getTenantUploadStats(tenantId);
     req.uploadStats = stats;
-    
+
     return next();
   } catch (error) {
     console.error('Error getting upload stats:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Error getting upload statistics',
       error: error instanceof Error ? error.message : 'Unknown error'
     });

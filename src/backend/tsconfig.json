@@ -40,6 +40,15 @@
       ],
       "@/shared/*": [
         "../shared/*"
+      ],
+      "express": [
+        "node_modules/express"
+      ],
+      "@types/express": [
+        "node_modules/@types/express"
+      ],
+      "express-serve-static-core": [
+        "node_modules/express-serve-static-core"
       ]
     },
     "moduleResolution": "node",

@@ -176,7 +176,7 @@ class FitOSServer {
     }));
 
     // Compression
-    this.app.use(compression());
+    this.app.use(compression() as any);
 
     // Logging - Desabilitado para reduzir logs de requisições HTTP
     // this.app.use(morgan('combined', {

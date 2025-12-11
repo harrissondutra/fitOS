@@ -57,26 +57,39 @@ export function InstallPrompt() {
     const handleInstallClick = async () => {
         if (!deferredPrompt) {
             // Fallback: If no event captured (browser restriction or already dismissed),
-            // we should show instructions or just alert the user.
-            // For now, let's open a localized instruction tooltip or alert.
-            // Simulating "iOS" behavior for Android if event is missing.
+            // we should show instructions.
+
+            // Check if it's likely a "not ready yet" vs "blocked" scenario?
+            // For now, we immediately show the fallback instructions to not leave user clicking with no response.
+
             if (platform === 'android') {
-                alert("Para instalar, toque nos 3 pontinhos do navegador e selecione 'Instalar aplicativo' ou 'Adicionar à tela inicial'.");
+                alert("O navegador não permitiu a instalação automática.\n\nPara instalar manualmente:\n1. Toque nos 3 pontinhos do navegador (canto superior direito)\n2. Selecione 'Instalar aplicativo' ou 'Adicionar à tela inicial'.");
             } else if (platform === 'ios') {
                 alert("Para instalar no iOS:\n\n1. Toque no botão de Compartilhar (Share) abaixo.\n2. Role para baixo e selecione 'Adicionar à Tela de Início'.");
             } else {
-                alert("Para instalar, procure a opção 'Instalar' no menu do seu navegador.");
+                alert("Para instalar, procure a opção 'Instalar' na barra de endereço do seu navegador.");
             }
             return;
         }
 
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
+        try {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
 
-        if (outcome === 'accepted') {
-            setShowPrompt(false);
+            if (outcome === 'accepted') {
+                console.log('User accepted the install prompt');
+                setShowPrompt(false);
+            } else {
+                console.log('User dismissed the install prompt');
+            }
+            setDeferredPrompt(null);
+        } catch (err) {
+            console.error('Error showing install prompt:', err);
+            // Last resort fallback
+            if (platform === 'android') {
+                alert("Erro ao abrir instalação automática. Tente pelo menu do navegador.");
+            }
         }
-        setDeferredPrompt(null);
     };
 
     const handleDismiss = () => {
