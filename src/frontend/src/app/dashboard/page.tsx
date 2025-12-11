@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { useWorkouts } from '@/hooks/use-workouts';
 import { useAnalytics } from '@/hooks/use-analytics';
+import { PushNotificationSetup } from '@/components/pwa/PushNotificationSetup';
 import {
   Dumbbell,
   Zap,
@@ -194,6 +195,11 @@ export default function DashboardPage() {
         initial="hidden"
         animate="visible"
       >
+        {/* Push Notification Setup */}
+        <div className="w-full">
+          <PushNotificationSetup onDismiss={() => { }} />
+        </div>
+
         {/* Header Clean */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>

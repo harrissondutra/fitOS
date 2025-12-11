@@ -189,9 +189,62 @@ const withPWA = require("@ducanh2912/next-pwa").default({
   skipWaiting: true,
   workboxOptions: {
     disableDevLogs: true,
+    importScripts: ['/custom-sw.js'],
   },
   // Estratégias de cache otimizadas
   runtimeCaching: [
+    {
+      urlPattern: /\/api\/.*/i,
+      method: 'POST',
+      handler: 'NetworkOnly',
+      options: {
+        backgroundSync: {
+          name: 'api-mutation-queue',
+          options: {
+            maxRetentionTime: 24 * 60,
+          },
+        },
+      },
+    },
+    {
+      urlPattern: /\/api\/.*/i,
+      method: 'PUT',
+      handler: 'NetworkOnly',
+      options: {
+        backgroundSync: {
+          name: 'api-mutation-queue',
+          options: {
+            maxRetentionTime: 24 * 60,
+          },
+        },
+      },
+    },
+    {
+      urlPattern: /\/api\/.*/i,
+      method: 'DELETE',
+      handler: 'NetworkOnly',
+      options: {
+        backgroundSync: {
+          name: 'api-mutation-queue',
+          options: {
+            maxRetentionTime: 24 * 60,
+          },
+        },
+      },
+    },
+    {
+      urlPattern: /\/api\/.*/i,
+      method: 'PATCH',
+      handler: 'NetworkOnly',
+      options: {
+        backgroundSync: {
+          name: 'api-mutation-queue',
+          options: {
+            maxRetentionTime: 24 * 60,
+          },
+        },
+      },
+    },
     {
       urlPattern: /^https:\/\/fonts\.(?:gstatic|googleapis)\.com\/.*/i,
       handler: 'CacheFirst',

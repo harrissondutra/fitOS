@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import { OfflineIndicator } from './OfflineIndicator';
+import { UpdateNotification } from './UpdateNotification';
 
 interface PWAWrapperProps {
   children: React.ReactNode;
@@ -17,7 +18,11 @@ export function PWAWrapper({
   enableOfflineIndicator = true,
   showOfflineDetails = false,
 }: PWAWrapperProps) {
-  // Renderizar apenas o children para evitar problemas de hidratação
-  // Os recursos PWA serão inicializados em um componente separado
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {enableUpdateNotification && <UpdateNotification />}
+      {enableOfflineIndicator && <OfflineIndicator showDetails={showOfflineDetails} />}
+    </>
+  );
 }

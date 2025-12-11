@@ -7,57 +7,66 @@ import { motion, AnimatePresence } from "framer-motion"
 
 export function InstallPrompt() {
     const [showPrompt, setShowPrompt] = useState(false)
+    const [isIOS, setIsIOS] = useState(false);
     const [platform, setPlatform] = useState<"ios" | "android" | "desktop" | null>(null)
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
 
     useEffect(() => {
-        // Prevent default browser install prompt
-        const handleBeforeInstallPrompt = (e: Event) => {
-            e.preventDefault();
-            setDeferredPrompt(e);
-            // Only show if on Android or Desktop (Chrome/Edge)
-            if (!platform || platform === 'android' || platform === 'desktop') {
-                setShowPrompt(true);
-            }
-        };
-
-        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
         // Detect Platform
         const userAgent = window.navigator.userAgent.toLowerCase();
-        const isIOS = /iphone|ipad|ipod/.test(userAgent);
-        const isAndroid = /android/.test(userAgent);
+        const ios = /iphone|ipad|ipod/.test(userAgent);
+        const android = /android/.test(userAgent);
+        setIsIOS(ios);
 
-        // Check standalone
+        if (ios) setPlatform("ios");
+        else if (android) setPlatform("android");
+        else setPlatform("desktop");
+
+        // Check if running in standalone mode (already installed)
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
             (window.navigator as any).standalone === true;
 
         if (isStandalone) {
-            setShowPrompt(false);
+            console.log("App is in standalone mode");
             return;
         }
 
-        if (isIOS) {
-            setPlatform("ios");
-            // iOS: Always show prompt after delay (since we can't detect installability easily reliably without user action)
-            const timer = setTimeout(() => setShowPrompt(true), 2000);
-            return () => {
-                clearTimeout(timer);
-                window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-            };
-        } else if (isAndroid) {
-            setPlatform("android");
-        } else {
-            setPlatform("desktop");
-        }
+        // Always show prompt after a small delay to allow animation "drop down"
+        // This fulfills "Always display" even if browser event is lazy
+        const timer = setTimeout(() => {
+            setShowPrompt(true);
+        }, 1500);
+
+        // Capture the PWA install prompt event (Android/Desktop)
+        // Note: Chrome on Android might block this if user declined recently.
+        // But we still want to show our UI.
+        const handleBeforeInstallPrompt = (e: Event) => {
+            e.preventDefault();
+            console.log("beforeinstallprompt fired");
+            setDeferredPrompt(e);
+        };
+
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
         return () => {
+            clearTimeout(timer);
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         };
-    }, [platform]);
+    }, []);
 
     const handleInstallClick = async () => {
         if (!deferredPrompt) {
+            // Fallback: If no event captured (browser restriction or already dismissed),
+            // we should show instructions or just alert the user.
+            // For now, let's open a localized instruction tooltip or alert.
+            // Simulating "iOS" behavior for Android if event is missing.
+            if (platform === 'android') {
+                alert("Para instalar, toque nos 3 pontinhos do navegador e selecione 'Instalar aplicativo' ou 'Adicionar à tela inicial'.");
+            } else if (platform === 'ios') {
+                alert("Para instalar no iOS:\n\n1. Toque no botão de Compartilhar (Share) abaixo.\n2. Role para baixo e selecione 'Adicionar à Tela de Início'.");
+            } else {
+                alert("Para instalar, procure a opção 'Instalar' no menu do seu navegador.");
+            }
             return;
         }
 
@@ -82,9 +91,9 @@ export function InstallPrompt() {
                 initial={{ y: -100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: -100, opacity: 0 }}
-                className="fixed top-0 left-0 right-0 z-[100] p-4 md:hidden print:hidden pointer-events-none"
+                className="fixed top-0 left-0 right-0 z-[9999] p-4 print:hidden pointer-events-none"
             >
-                <div className="bg-white/80 dark:bg-black/80 backdrop-blur-xl border border-white/20 shadow-2xl rounded-[2rem] p-4 flex items-center gap-4 pointer-events-auto ring-1 ring-black/5">
+                <div className="bg-white/90 dark:bg-black/90 backdrop-blur-xl border border-white/20 shadow-2xl rounded-[1.5rem] p-3 md:p-4 flex items-center gap-3 md:gap-4 pointer-events-auto ring-1 ring-black/5 max-w-md mx-auto">
                     <button
                         onClick={handleDismiss}
                         className="absolute -top-2 -right-2 p-1.5 bg-white dark:bg-zinc-800 rounded-full text-muted-foreground shadow-sm border border-border"
@@ -103,21 +112,13 @@ export function InstallPrompt() {
                         </p>
                     </div>
 
-                    {(platform === "ios") ? (
-                        <div className="flex flex-col items-end gap-1">
-                            <span className="text-[10px] font-medium text-blue-500 whitespace-nowrap animate-pulse">
-                                Toque em <Share className="inline w-3 h-3" /> ↓
-                            </span>
-                        </div>
-                    ) : (
-                        <Button
-                            onClick={handleInstallClick}
-                            size="sm"
-                            className="rounded-full h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-blue-500/20 shadow-lg text-xs"
-                        >
-                            Instalar
-                        </Button>
-                    )}
+                    <Button
+                        onClick={handleInstallClick}
+                        size="sm"
+                        className="rounded-full h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-blue-500/20 shadow-lg text-xs"
+                    >
+                        Instalar
+                    </Button>
                 </div>
             </motion.div>
         </AnimatePresence>
