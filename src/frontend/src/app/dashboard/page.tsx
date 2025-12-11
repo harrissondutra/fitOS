@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button'; // Added Button import
 import { useAuth } from '@/hooks/use-auth';
 import { useWorkouts } from '@/hooks/use-workouts';
 import { useAnalytics } from '@/hooks/use-analytics';
@@ -39,7 +40,9 @@ import {
   Area,
   AreaChart,
   ReferenceLine,
-  Cell
+  Cell,
+  LineChart, // Added LineChart import
+  Line // Added Line import
 } from 'recharts';
 import { format, subDays, startOfWeek, isAfter, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -48,9 +51,14 @@ import './animations.css';
 export default function DashboardPage() {
   const { user } = useAuth();
 
+  // Estabilizar filtros com useMemo para evitar loop infinito de requisições
+  const workoutFilters = useMemo(() => ({
+    clientId: user?.id
+  }), [user?.id]);
+
   // Buscar dados reais de workouts
   const { treinos: workouts, loading: workoutsLoading } = useWorkouts({
-    filters: { clientId: user?.id },
+    filters: workoutFilters,
     enabled: !!user?.id
   });
 
@@ -123,22 +131,22 @@ export default function DashboardPage() {
     }
 
     // Peso atual e meta (do analytics ou user profile)
-    const weightCurrent = analytics?.currentWeight || user?.profile?.weight || 0;
-    const weightGoal = analytics?.goalWeight || user?.profile?.goalWeight || 0;
-    const weightChange = analytics?.weightChange || 0;
+    const weightCurrent = (analytics as any)?.currentWeight || user?.profile?.weight || 0;
+    const weightGoal = (analytics as any)?.goalWeight || user?.profile?.goalWeight || 0;
+    const weightChange = (analytics as any)?.weightChange || 0;
 
     // Alterações percentuais (comparar com mês anterior)
-    const lastMonthWorkouts = analytics?.lastMonthWorkouts || 0;
+    const lastMonthWorkouts = (analytics as any)?.lastMonthWorkouts || 0;
     const workoutsChange = lastMonthWorkouts > 0
       ? Math.round(((totalWorkouts - lastMonthWorkouts) / lastMonthWorkouts) * 100)
       : 0;
 
-    const lastMonthCalories = analytics?.lastMonthCalories || 0;
+    const lastMonthCalories = (analytics as any)?.lastMonthCalories || 0;
     const caloriesChange = lastMonthCalories > 0
       ? Math.round(((totalCalories - lastMonthCalories) / lastMonthCalories) * 100)
       : 0;
 
-    const lastMonthTime = analytics?.lastMonthTime || 0;
+    const lastMonthTime = (analytics as any)?.lastMonthTime || 0;
     const timeChange = lastMonthTime > 0
       ? Math.round(((totalTime - lastMonthTime) / lastMonthTime) * 100)
       : 0;
@@ -349,40 +357,41 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={weightData}>
-                    <defs>
-                      <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="opacity-50" />
-                    <XAxis dataKey="date" stroke="#9ca3af" style={{ fontSize: '12px' }} />
-                    <YAxis stroke="#9ca3af" style={{ fontSize: '12px' }} domain={['dataMin - 2', 'dataMax + 2']} />
+                  <LineChart data={(analytics as any)?.weightHistory || []}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(value) => format(new Date(value), 'dd/MM')}
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      domain={['dataMin - 2', 'dataMax + 2']}
+                    />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px'
+                        backgroundColor: 'hsl(var(--background))',
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
                       }}
+                      labelFormatter={(value) => format(new Date(value), "dd 'de' MMMM", { locale: ptBR })}
                     />
-                    <Area
+                    <Line
                       type="monotone"
                       dataKey="weight"
-                      stroke="#8b5cf6"
-                      strokeWidth={3}
-                      fill="url(#weightGradient)"
-                      animationDuration={1500}
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+                      activeDot={{ r: 6 }}
                     />
-                    {dashboardStats.weightGoal > 0 && (
-                      <ReferenceLine
-                        y={dashboardStats.weightGoal}
-                        stroke="#10b981"
-                        strokeDasharray="5 5"
-                        label={{ value: 'Meta', fill: '#10b981', fontSize: 12 }}
-                      />
-                    )}
-                  </AreaChart>
+                  </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>

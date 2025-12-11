@@ -40,7 +40,47 @@ export interface WorkoutStats {
 }
 
 export class WorkoutService {
-  constructor(private prisma: PrismaClient | PrismaTenantWrapper) {}
+  constructor(private prisma: PrismaClient | PrismaTenantWrapper) { }
+
+  /**
+   * Helper para garantir que existe um registro de Client para um User
+   * Essencial para SuperAdmin testando funcionalidades de usuário
+   */
+  private async ensureClientForUser(userId: string, tenantId: string): Promise<string> {
+    // 1. Tentar encontrar cliente pelo userId
+    const existingClient = await this.prisma.client.findUnique({
+      where: { userId }
+    });
+
+    if (existingClient) {
+      return existingClient.id;
+    }
+
+    // 2. Se não existir, criar um novo Client para este User
+    // Precisamos buscar dados do usuário primeiro para preencher o Client
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new Error(`Usuário ${userId} não encontrado para criar perfil de cliente`);
+    }
+
+    const newClient = await this.prisma.client.create({
+      data: {
+        userId: user.id,
+        tenantId: tenantId, // Usa o tenant atual do contexto
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+        email: user.email,
+        phone: user.phone,
+        membershipType: 'basic', // Default
+        status: 'active'
+      }
+    });
+
+    logger.info(`Auto-created Client profile for User ${userId} (SuperAdmin/Test) - ClientID: ${newClient.id}`);
+    return newClient.id;
+  }
 
   /**
    * Listar workouts com filtros e paginação
@@ -72,9 +112,32 @@ export class WorkoutService {
       ];
     }
 
-    // Filtro por cliente
+    // Filtro por cliente (com resolução inteligente para userId)
     if (clientId) {
-      where.clientId = clientId;
+      // Se o clientId passado parecer ser o próprio userId (comum no frontend), 
+      // ou se o usuário for o próprio solicitante, tentamos resolver o ID real do cliente
+      if (clientId === userId) {
+        try {
+          const realClientId = await this.ensureClientForUser(userId!, tenantId);
+          where.clientId = realClientId;
+        } catch (e) {
+          // Se falhar (ex: usuario nao existe), mantem o filtro original que vai retornar vazio
+          where.clientId = clientId;
+        }
+      } else {
+        // Tenta achar direto, se não achar e for uuid válido, tenta achar pelo userId
+        const clientExists = await this.prisma.client.findUnique({ where: { id: clientId } });
+        if (clientExists) {
+          where.clientId = clientId;
+        } else {
+          const clientByUser = await this.prisma.client.findUnique({ where: { userId: clientId } });
+          if (clientByUser) {
+            where.clientId = clientByUser.id;
+          } else {
+            where.clientId = clientId;
+          }
+        }
+      }
     }
 
     // Filtro por usuário
@@ -205,11 +268,29 @@ export class WorkoutService {
    * Criar novo workout
    */
   async createWorkout(workoutData: WorkoutFormData, tenantId: string, createdBy: string): Promise<Workout> {
+    // Resolução inteligente de clientId
+    let realClientId = workoutData.clientId;
+
+    // Se estiver criando para si mesmo (admin testando), garante que existe perfil de cliente
+    if (workoutData.clientId === createdBy) {
+      realClientId = await this.ensureClientForUser(createdBy, tenantId);
+    }
+    // Se não for id de cliente válido, tenta ver se é user id
+    else {
+      const clientExists = await this.prisma.client.findUnique({ where: { id: workoutData.clientId } });
+      if (!clientExists) {
+        const clientByUser = await this.prisma.client.findUnique({ where: { userId: workoutData.clientId } });
+        if (clientByUser) {
+          realClientId = clientByUser.id;
+        }
+      }
+    }
+
     // Verificar se nome já existe para o cliente
     const existingWorkout = await this.prisma.workout.findFirst({
       where: {
         name: workoutData.name,
-        clientId: workoutData.clientId,
+        clientId: realClientId,
         tenantId
       }
     });
@@ -223,7 +304,7 @@ export class WorkoutService {
         name: workoutData.name,
         description: workoutData.description,
         exercises: workoutData.exercises,
-        clientId: workoutData.clientId,
+        clientId: realClientId,
         userId: createdBy,
         tenantId,
         aiGenerated: workoutData.aiGenerated || false
@@ -247,7 +328,7 @@ export class WorkoutService {
       }
     });
 
-    logger.info(`Workout created: ${workout.name} for client ${workoutData.clientId} in tenant ${tenantId} by ${createdBy}`);
+    logger.info(`Workout created: ${workout.name} for client ${realClientId} in tenant ${tenantId} by ${createdBy}`);
     return workout;
   }
 
@@ -288,6 +369,9 @@ export class WorkoutService {
       ...workoutData,
       updatedAt: new Date()
     };
+
+    // Se clientId foi atualizado, tome cuidado, mas aqui assumimos que se veio do front já é o ID correto
+    // ou não deve ser atualizado levianamente.
 
     const workout = await this.prisma.workout.update({
       where: { id },
@@ -387,11 +471,30 @@ export class WorkoutService {
       throw new Error('Workout não encontrado ou acesso negado');
     }
 
+    // Resolução de Client ID
+    let realClientId = newClientId;
+
+    // Se id = user id do chamador, resolver
+    if (newClientId === clonedBy) {
+      try {
+        realClientId = await this.ensureClientForUser(clonedBy, tenantId);
+      } catch (e) {
+        logger.warn(`Falha ao resolver client para user ${clonedBy} no clone: ${e}`);
+      }
+    } else {
+      // Tentar achar pelo user id se nao for client id
+      const clientExists = await this.prisma.client.findUnique({ where: { id: newClientId } });
+      if (!clientExists) {
+        const clientByUser = await this.prisma.client.findUnique({ where: { userId: newClientId } });
+        if (clientByUser) realClientId = clientByUser.id;
+      }
+    }
+
     // Verificar se novo nome já existe para o cliente
     const nameExists = await this.prisma.workout.findFirst({
       where: {
         name: newName,
-        clientId: newClientId,
+        clientId: realClientId,
         tenantId
       }
     });
@@ -405,7 +508,7 @@ export class WorkoutService {
         name: newName,
         description: originalWorkout.description,
         exercises: originalWorkout.exercises as any,
-        clientId: newClientId,
+        clientId: realClientId,
         userId: clonedBy,
         tenantId,
         aiGenerated: false // Clones não são considerados IA gerados
@@ -429,7 +532,7 @@ export class WorkoutService {
       }
     });
 
-    logger.info(`Workout cloned: ${originalWorkout.name} -> ${newName} for client ${newClientId} in tenant ${tenantId} by ${clonedBy}`);
+    logger.info(`Workout cloned: ${originalWorkout.name} -> ${newName} for client ${realClientId} in tenant ${tenantId} by ${clonedBy}`);
     return clonedWorkout;
   }
 
@@ -437,9 +540,21 @@ export class WorkoutService {
    * Obter histórico de workouts de um cliente
    */
   async getWorkoutHistory(clientId: string, tenantId: string, userRole: UserRole, userId?: string, limit: number = 50): Promise<Workout[]> {
+    let resolvedClientId = clientId;
+
+    // Resolver user id -> client id
+    if (clientId === userId) {
+      try {
+        resolvedClientId = await this.ensureClientForUser(userId!, tenantId);
+      } catch (e) { /* ignore */ }
+    } else {
+      const c = await this.prisma.client.findUnique({ where: { userId: clientId } });
+      if (c) resolvedClientId = c.id;
+    }
+
     const where: any = {
       tenantId,
-      clientId
+      clientId: resolvedClientId
     };
 
     // Validação de escopo por role
@@ -447,7 +562,7 @@ export class WorkoutService {
       where.userId = userId;
     } else if (userRole === 'TRAINER') {
       const assignedClients = await this.getAssignedClients(userId!, tenantId);
-      if (!assignedClients.includes(clientId)) {
+      if (!assignedClients.includes(resolvedClientId)) {
         throw new Error('Acesso negado: cliente não atribuído');
       }
     }
@@ -475,9 +590,20 @@ export class WorkoutService {
    * Obter estatísticas de workouts
    */
   async getWorkoutStats(clientId: string, tenantId: string, userRole: UserRole, userId?: string): Promise<WorkoutStats> {
+    let resolvedClientId = clientId;
+    // Resolver user id -> client id
+    if (clientId === userId) {
+      try {
+        resolvedClientId = await this.ensureClientForUser(userId!, tenantId);
+      } catch (e) { /* ignore */ }
+    } else {
+      const c = await this.prisma.client.findUnique({ where: { userId: clientId } });
+      if (c) resolvedClientId = c.id;
+    }
+
     const where: any = {
       tenantId,
-      clientId
+      clientId: resolvedClientId
     };
 
     // Validação de escopo por role
@@ -485,7 +611,7 @@ export class WorkoutService {
       where.userId = userId;
     } else if (userRole === 'TRAINER') {
       const assignedClients = await this.getAssignedClients(userId!, tenantId);
-      if (!assignedClients.includes(clientId)) {
+      if (!assignedClients.includes(resolvedClientId)) {
         throw new Error('Acesso negado: cliente não atribuído');
       }
     }
@@ -516,7 +642,7 @@ export class WorkoutService {
     // Calcular média de workouts por semana (últimos 30 dias)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     const workoutsLast30Days = await this.prisma.workout.count({
       where: {
         ...where,
@@ -533,7 +659,7 @@ export class WorkoutService {
     });
 
     const exerciseCounts: Record<string, { name: string; count: number }> = {};
-    
+
     allWorkouts.forEach(workout => {
       const exercises = workout.exercises as any[];
       exercises.forEach(exercise => {
@@ -585,7 +711,7 @@ export class WorkoutService {
       }
     });
 
-    return assignments.map(a => a.clientId);
+    return assignments.map((a: any) => a.clientId);
   }
 
   /**

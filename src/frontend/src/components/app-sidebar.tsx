@@ -536,8 +536,15 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   React.useEffect(() => {
     setHasMounted(true)
     const isSuperAdminRoute = pathname?.startsWith('/super-admin') || false
-    // Se for rota super-admin, sempre mostrar menu admin. Caso contrário, usar a visão salva
-    setIsAdminView(isSuperAdminRoute || String(view) === 'admin')
+    const isDashboard = pathname === '/dashboard'
+
+    // Se estiver no dashboard principal, forçar visão padrão (para permitir que Super Admin veja o dashboard padrão)
+    if (isDashboard) {
+      setIsAdminView(false)
+    } else {
+      // Se for rota super-admin, sempre mostrar menu admin. Caso contrário, usar a visão salva
+      setIsAdminView(isSuperAdminRoute || String(view) === 'admin')
+    }
   }, [view, pathname])
 
   const [hasNewDb, setHasNewDb] = React.useState(false)
@@ -680,7 +687,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
   const menuItemsWithIcons = effectiveMenus.map(item => {
     // Lógica para bloquear itens no plano gratuito
-    const isFreePlan = user?.plan === 'free';
+    const isFreePlan = (user as any)?.plan === 'free';
     const restrictedItems = ['Analytics', 'CRM', 'Financeiro', 'Marketing', 'Relatórios', 'White Label'];
     const isRestricted = isFreePlan && restrictedItems.some(restricted => item.title.includes(restricted));
 

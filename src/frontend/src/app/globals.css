@@ -4,114 +4,118 @@
 
 @layer base {
   :root {
-    /* Backgrounds: #F3F4F6 (Gray 100) */
+    /* 
+      PALETA DE CORES PERSONALIZADA - Fitos OS
+      Baseada em:
+      - Primary: #10B981 (Emerald 500)
+      - Background: #F3F4F6 (Gray 100)
+      - Text: #1F2937 (Gray 800)
+    */
+
+    /* Background: #F3F4F6 */
     --background: 220 14% 96%;
-    /* Foreground: #1F2937 (Gray 800) */
+    /* Foreground: #1F2937 */
     --foreground: 220 13% 18%;
-    
-    /* Card: White for contrast on the light gray bg */
+
+    /* Card: #FFFFFF (Mantendo branco para contraste Apple Style sobre o fundo cinza) */
     --card: 0 0% 100%;
     --card-foreground: 220 13% 18%;
-    
+
+    /* Popover: #FFFFFF */
     --popover: 0 0% 100%;
     --popover-foreground: 220 13% 18%;
-    
+
     /* Primary: #10B981 (Emerald 500) */
-    --primary: 160 84% 39%;
-    --primary-foreground: 0 0% 100%; /* White text on green button */
-    
-    /* Secondary: Light gray for support */
-    --secondary: 220 14% 90%;
+    --primary: 159 84% 39%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: #F3F4F6 (Gray 100) ou levemente mais escuro para destaque no hover */
+    --secondary: 220 14% 96%;
     --secondary-foreground: 220 13% 18%;
-    
+
     /* Muted: #F3F4F6 */
     --muted: 220 14% 96%;
-    /* Muted Foreground: #6B7280 (Gray 500) */
+    /* Muted Foreground: #6B7280 */
     --muted-foreground: 220 9% 46%;
-    
-    /* Accent: #6EE7B7 (Emerald 300) or similar for subtle highlights */
-    --accent: 158 64% 95%; /* Very light green for hover backgrounds */
-    --accent-foreground: 160 84% 39%;
-    
+
+    /* Accent: #D1FAE5 (Emerald 100/50 mix) para hovers suaves */
+    --accent: 159 84% 95%;
+    /* Ajustado para um verde bem claro */
+    --accent-foreground: 159 84% 39%;
+
     /* Destructive: #EF4444 */
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    
-    /* Border: #E5E7EB (Gray 200) */
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border: #E5E7EB */
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 160 84% 39%; /* Ring matches primary */
-    
-    --radius: 0.5rem;
-    
+    /* Ring: #10B981 */
+    --ring: 159 84% 39%;
+
+    /* Radius: APPLE IOS STYLE - 16px (1rem) */
+    --radius: 1rem;
+
     /* Links: #06B6D4 (Cyan 500) */
     --link: 189 94% 43%;
 
-    /* Chart colors */
-    --chart-1: 160 84% 39%; /* Primary Green */
-    --chart-2: 189 94% 43%; /* Cyan */
-    --chart-3: 220 13% 18%; /* Dark */
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    /* Chart colors - Mantendo consistência */
+    --chart-1: 159 84% 39%;
+    /* Primary */
+    --chart-2: 189 94% 43%;
+    /* Info/Link */
+    --chart-3: 220 13% 18%;
+    /* Dark */
+    --chart-4: 43 96% 64%;
+    /* Warning-ish */
+    --chart-5: 0 84% 60%;
+    /* Error-ish */
+
+    /* Sidebar Variables */
+    --sidebar-background: 0 0% 100%;
+    /* White */
+    --sidebar-foreground: 220 9% 46%;
+    /* Gray 500 */
+    --sidebar-primary: 159 84% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 159 84% 39%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 160 84% 39%;
+    --sidebar-ring: 159 84% 39%;
   }
 
   .dark {
-    /* Dark Mode Backgrounds - Dark Slate/Zinc */
-    --background: 222 47% 11%; /* Slate 900 */
-    --foreground: 210 40% 98%; /* Slate 50 */
-    
-    --card: 224 71% 4%; /* Slate 950 */
+    /* Mapeamento Dark Mode para manter identidade mas legível */
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+
+    --card: 224 71% 4%;
     --card-foreground: 210 40% 98%;
-    
+
     --popover: 224 71% 4%;
     --popover-foreground: 210 40% 98%;
-    
-    /* Primary: KEEPING GREEN #10B981 as requested for colorful buttons */
-    --primary: 160 84% 39%;
+
+    /* Primary: #10B981 mantido mesmo no dark */
+    --primary: 159 84% 39%;
     --primary-foreground: 0 0% 100%;
-    
+
     --secondary: 217 19% 27%;
     --secondary-foreground: 210 40% 98%;
-    
+
     --muted: 217 19% 27%;
     --muted-foreground: 215 20% 65%;
-    
+
     --accent: 217 19% 27%;
     --accent-foreground: 210 40% 98%;
-    
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    
+
     --border: 217 19% 27%;
     --input: 217 19% 27%;
-    --ring: 160 84% 39%;
-    
-    /* Link in dark mode - might need to be slightly lighter or same cyan */
-    --link: 189 94% 43%;
+    --ring: 159 84% 39%;
 
-    --chart-1: 160 84% 39%;
-    --chart-2: 189 94% 43%;
-    --chart-3: 210 40% 98%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    
-    --sidebar-background: 224 71% 4%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 160 84% 39%;
+    --link: 189 94% 43%;
   }
 }
 
@@ -119,160 +123,98 @@
   * {
     @apply border-border;
   }
+
+  /* Typography - Apple System Fonts */
   body {
     @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
 @layer components {
+  /* 
+    APPLE IOS 26 STYLE - COMPONENTS
+    Mantendo as cores solicitadas mas com geometria Apple
+  */
+
+  /* Botões tipo Pill (Cápsula) */
   .btn {
-    @apply inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-full text-sm font-semibold transition-all duration-200 active:scale-95 disabled:pointer-events-none disabled:opacity-50 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
   }
-  
+
+  /* Primary: #10B981 c/ texto branco */
   .btn-primary {
-    @apply bg-primary text-primary-foreground hover:bg-[#059669]; /* Using specific hover hex for precision */
-    /* Note: tailwind usually handles opacity, but hex allows exact color matching */
+    @apply bg-primary text-primary-foreground hover:bg-[#059669] shadow-md hover:shadow-lg shadow-primary/20 border-transparent;
   }
-  
+
   .btn-secondary {
     @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
   }
-  
+
   .btn-destructive {
     @apply bg-destructive text-destructive-foreground hover:bg-destructive/90;
   }
-  
+
   .btn-outline {
-    @apply border border-input bg-background hover:bg-accent hover:text-accent-foreground;
+    @apply border-2 border-primary text-primary bg-transparent hover:bg-primary/5;
   }
-  
+
   .btn-ghost {
-    @apply hover:bg-accent hover:text-accent-foreground;
+    @apply hover:bg-accent hover:text-accent-foreground rounded-xl;
   }
-  
+
+  /* Links: #06B6D4 */
   .btn-link {
-    @apply text-[hsl(var(--link))] underline-offset-4 hover:underline hover:text-[#0891B2]; /* Using specific Link color */
+    @apply text-[hsl(189, 94%, 43%)] underline-offset-4 hover:underline hover:text-[#0891B2];
   }
-  
-  .btn-sm {
-    @apply h-9 rounded-md px-3;
+
+  /* Glassmorphism Classes */
+  .glass {
+    @apply bg-white/80 dark:bg-black/80 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-sm;
   }
-  
-  .btn-lg {
-    @apply h-11 rounded-md px-8;
-  }
-  
-  .btn-icon {
-    @apply h-10 w-10;
+
+  .glass-card {
+    @apply glass rounded-[1.5rem] p-6 transition-all duration-300;
   }
 }
 
-/* Custom scrollbar */
+/* Scrollbar Clean */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-secondary;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground rounded-full;
+  @apply bg-muted-foreground/30 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-foreground;
+  @apply bg-muted-foreground/50;
 }
 
-/* Loading animations */
-@keyframes pulse {
-  0%, 100% {
+/* Animations */
+@keyframes spring-up {
+  0% {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+
+  60% {
+    transform: translateY(-3px);
     opacity: 1;
   }
-  50% {
-    opacity: 0.5;
-  }
-}
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Chat message animations */
-.message-enter {
-  animation: fade-in 0.3s ease-out;
-}
-
-.message-exit {
-  animation: fade-out 0.3s ease-out;
-}
-
-@keyframes fade-out {
-  from {
-    opacity: 1;
+  100% {
     transform: translateY(0);
   }
-  to {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
 }
 
-/* Fitness specific styles */
-.workout-card {
-  @apply bg-card border border-border rounded-lg p-4 hover:shadow-md transition-shadow;
-}
-
-.exercise-item {
-  @apply flex items-center justify-between p-3 bg-muted rounded-md;
-}
-
-.progress-bar {
-  @apply w-full bg-secondary rounded-full h-2;
-}
-
-.progress-fill {
-  @apply bg-primary h-2 rounded-full transition-all duration-300;
-}
-
-/* AI Chat specific styles */
-.chat-message {
-  @apply p-4 rounded-lg max-w-3xl;
-}
-
-.chat-message.user {
-  @apply bg-primary text-primary-foreground ml-auto;
-}
-
-.chat-message.assistant {
-  @apply bg-muted text-muted-foreground;
-}
-
-.chat-input {
-  @apply w-full p-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring;
-}
-
-/* Toast variant styles */
-.group[data-variant="success"] .group-hover\:opacity-100 {
-  @apply text-white;
-}
-
-.group[data-variant="success"] .group-hover\:opacity-100:hover {
-  @apply text-green-100;
-}
-
-.group[data-variant="warning"] .group-hover\:opacity-100 {
-  @apply text-yellow-600;
-}
-
-.group[data-variant="warning"] .group-hover\:opacity-100:hover {
-  @apply text-yellow-700;
-}
-
-.group[data-variant="error"] .group-hover\:opacity-100 {
-  @apply text-red-300;
-}
-
-.group[data-variant="error"] .group-hover\:opacity-100:hover {
-  @apply text-red-50;
+.animate-spring-up {
+  animation: spring-up 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }

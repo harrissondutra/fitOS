@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Check, Zap, Crown, Building } from 'lucide-react';
+import { Check, Zap, Crown, Building, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 const plans = [
@@ -92,7 +92,6 @@ export default function PricingPage() {
 
         try {
             if (planId === 'free') {
-                // Para plano FREE, ativar e verificar se houve criação de tenant
                 const response = await fetch('/api/subscription/free', {
                     method: 'POST',
                     credentials: 'include',
@@ -104,10 +103,8 @@ export default function PricingPage() {
 
                 if (response.ok) {
                     toast.success('Plano FREE ativado!');
-
                     if (data.redirectUrl) {
                         toast.loading('Redirecionando para seu novo espaço...');
-                        // Pequeno delay para usuário ler o toast
                         setTimeout(() => {
                             window.location.href = data.redirectUrl;
                         }, 1500);
@@ -118,29 +115,9 @@ export default function PricingPage() {
                     toast.error(data.error || 'Erro ao ativar plano FREE');
                 }
             } else if (planId === 'enterprise') {
-                // Para Enterprise, redirecionar para contato/vendas
                 router.push('/contact-sales');
             } else {
-                // Para Professional, ir para checkout
-                const response = await fetch('/api/subscription/create-checkout', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        planId,
-                        billingCycle,
-                        userId: user?.id
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success && data.checkoutUrl) {
-                    // Redirecionar para Stripe/MercadoPago checkout
-                    window.location.href = data.checkoutUrl;
-                } else {
-                    toast.error('Erro ao criar checkout. Tente novamente.');
-                }
+                router.push(`/checkout?plan=${planId}&interval=${billingCycle}`);
             }
         } catch (error) {
             console.error('Erro ao selecionar plano:', error);
@@ -151,125 +128,155 @@ export default function PricingPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-12 px-4">
+        <div className="min-h-screen bg-background text-foreground py-8 px-4 sm:px-6 lg:px-8">
             <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="text-center mb-12">
-                    <h1 className="text-4xl md:text-5xl font-bold mb-4">
-                        Escolha o <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">plano ideal</span> para você
-                    </h1>
-                    <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-                        Comece grátis e evolua conforme suas necessidades crescem
-                    </p>
+                {/* Header with Logo */}
+                <div className="flex flex-col items-center mb-16">
+                    <div className="flex items-center gap-3 mb-8 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => router.push('/')}>
+                        <div className="relative h-10 w-auto">
+                            <img
+                                src="/images/logomarca.png"
+                                alt="FitOS"
+                                className="h-full w-auto object-contain"
+                            />
+                        </div>
+                        <span className="text-2xl font-bold tracking-tight">FitOS</span>
+                    </div>
 
-                    {/* Billing Toggle */}
-                    <div className="flex items-center justify-center gap-4 mb-8">
-                        <span className={`text-sm font-medium ${billingCycle === 'monthly' ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <h1 className="text-4xl md:text-5xl font-bold mb-4 text-center tracking-tight">
+                        Escolha seu plano.
+                    </h1>
+                    <p className="text-xl text-muted-foreground max-w-2xl text-center">
+                        Poderoso para profissionais. Simples para iniciantes.
+                    </p>
+                </div>
+
+                {/* Switcher Style iOS */}
+                <div className="flex justify-center mb-16">
+                    <div className="bg-white p-1 rounded-full shadow-sm inline-flex items-center">
+                        <button
+                            onClick={() => setBillingCycle('monthly')}
+                            className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${billingCycle === 'monthly'
+                                    ? 'bg-foreground text-background shadow-md'
+                                    : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                        >
                             Mensal
-                        </span>
-                        <Switch
-                            checked={billingCycle === 'yearly'}
-                            onCheckedChange={(checked) => setBillingCycle(checked ? 'yearly' : 'monthly')}
-                        />
-                        <span className={`text-sm font-medium ${billingCycle === 'yearly' ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        </button>
+                        <button
+                            onClick={() => setBillingCycle('yearly')}
+                            className={`px-8 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 ${billingCycle === 'yearly'
+                                    ? 'bg-foreground text-background shadow-md'
+                                    : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                        >
                             Anual
-                            <Badge variant="secondary" className="ml-2">Economize 17%</Badge>
-                        </span>
+                            <span className="ml-2 text-[10px] font-bold text-primary uppercase">Economize 17%</span>
+                        </button>
                     </div>
                 </div>
 
                 {/* Plans Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
                     {plans.map((plan) => {
                         const Icon = plan.icon;
                         const price = plan.price[billingCycle];
-                        const savings = billingCycle === 'yearly' ? Math.round((plan.price.monthly * 12 - plan.price.yearly) / 10) * 10 : 0;
 
                         return (
-                            <Card
+                            <div
                                 key={plan.id}
-                                className={`relative flex flex-col ${plan.popular
-                                    ? 'border-2 border-primary shadow-xl scale-105'
-                                    : 'border hover:shadow-lg transition-shadow'
-                                    }`}
+                                className={`
+                                    relative flex flex-col p-8 rounded-[2rem] transition-all duration-500
+                                    ${plan.popular
+                                        ? 'bg-white shadow-2xl scale-105 z-10 ring-1 ring-black/5'
+                                        : 'bg-white/60 backdrop-blur-sm border border-white/40 hover:bg-white hover:shadow-xl'
+                                    }
+                                `}
                             >
                                 {plan.popular && (
-                                    <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-purple-600">
-                                        Mais Popular
-                                    </Badge>
+                                    <div className="absolute top-0 left-0 right-0 flex justify-center -translate-y-1/2">
+                                        <div className="bg-primary text-primary-foreground px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg shadow-primary/20">
+                                            Mais Popular
+                                        </div>
+                                    </div>
                                 )}
 
-                                <CardHeader>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Icon className={`h-6 w-6 ${plan.popular ? 'text-primary' : 'text-muted-foreground'}`} />
-                                        <CardTitle>{plan.name}</CardTitle>
+                                <div className="mb-8">
+                                    <div className={`
+                                        w-12 h-12 rounded-2xl flex items-center justify-center mb-6 
+                                        ${plan.popular ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-600'}
+                                    `}>
+                                        <Icon className="h-6 w-6" />
                                     </div>
-                                    <CardDescription>{plan.description}</CardDescription>
-                                </CardHeader>
+                                    <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        {plan.description}
+                                    </p>
+                                </div>
 
-                                <CardContent className="flex-1">
-                                    <div className="mb-6">
-                                        <div className="flex items-baseline gap-2">
-                                            <span className="text-4xl font-bold">
-                                                {price === 0 ? 'Grátis' : `R$ ${price}`}
+                                <div className="mb-8">
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-4xl font-bold tracking-tight">
+                                            {price === 0 ? 'Grátis' : `R$ ${price}`}
+                                        </span>
+                                        {price > 0 && (
+                                            <span className="text-muted-foreground font-medium">
+                                                /{billingCycle === 'monthly' ? 'mês' : 'ano'}
                                             </span>
-                                            {price > 0 && (
-                                                <span className="text-muted-foreground">
-                                                    / {billingCycle === 'monthly' ? 'mês' : 'ano'}
-                                                </span>
-                                            )}
-                                        </div>
-                                        {savings > 0 && price > 0 && (
-                                            <p className="text-sm text-green-600 mt-1">
-                                                Economize R$ {savings}/ano
-                                            </p>
                                         )}
                                     </div>
+                                </div>
 
-                                    <ul className="space-y-3">
-                                        {plan.features.map((feature, idx) => (
-                                            <li key={idx} className="flex items-start gap-2">
-                                                <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                                                <span className="text-sm">{feature}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </CardContent>
+                                <ul className="space-y-4 mb-8 flex-1">
+                                    {plan.features.map((feature, idx) => (
+                                        <li key={idx} className="flex items-start gap-3">
+                                            <div className="mt-0.5 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                                                <Check className="h-3 w-3 text-primary" strokeWidth={3} />
+                                            </div>
+                                            <span className="text-sm font-medium text-gray-700">{feature}</span>
+                                        </li>
+                                    ))}
+                                </ul>
 
-                                <CardFooter>
-                                    <Button
-                                        className="w-full"
-                                        variant={plan.popular ? 'default' : 'outline'}
-                                        size="lg"
-                                        onClick={() => handleSelectPlan(plan.id)}
-                                        disabled={loading === plan.id}
-                                    >
-                                        {loading === plan.id ? (
-                                            <>
-                                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                                                Processando...
-                                            </>
-                                        ) : (
-                                            plan.cta
-                                        )}
-                                    </Button>
-                                </CardFooter>
-                            </Card>
+                                <Button
+                                    className={`
+                                        w-full h-12 rounded-full font-bold text-base transition-all duration-300
+                                        ${plan.popular
+                                            ? 'bg-primary hover:bg-[#059669] text-white shadow-lg hover:shadow-primary/30'
+                                            : 'bg-gray-900 text-white hover:bg-black'
+                                        }
+                                    `}
+                                    onClick={() => handleSelectPlan(plan.id)}
+                                    disabled={loading === plan.id}
+                                >
+                                    {loading === plan.id ? (
+                                        <div className="flex items-center gap-2">
+                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                                            <span>Processando...</span>
+                                        </div>
+                                    ) : (
+                                        plan.cta
+                                    )}
+                                </Button>
+                            </div>
                         );
                     })}
                 </div>
 
-                {/* FAQ / Info */}
-                <div className="mt-16 text-center">
+                {/* Footer Info */}
+                <div className="mt-16 text-center space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        Todos os planos incluem 14 dias de teste grátis • Cancele a qualquer momento
+                        Todos os planos incluem 14 dias de teste grátis. Cancele quando quiser.
                     </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                        Dúvidas?{' '}
-                        <a href="/contact" className="text-primary hover:underline">
-                            Fale conosco
-                        </a>
-                    </p>
+                    <button onClick={() => router.push('/contact')} className="text-sm font-semibold text-primary hover:underline">
+                        Precisa de um plano customizado para sua rede? Fale com nosso time de vendas.
+                    </button>
+                    <div className="pt-8">
+                        <Button variant="ghost" onClick={() => router.push('/')} className="rounded-full text-muted-foreground hover:text-foreground">
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Voltar para Home
+                        </Button>
+                    </div>
                 </div>
             </div>
         </div>

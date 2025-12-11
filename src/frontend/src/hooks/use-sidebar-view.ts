@@ -8,7 +8,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { SidebarView, UserRole } from '../../../shared/types/auth.types';
 import { useAuth } from './use-auth';
 
@@ -25,6 +25,7 @@ const STORAGE_KEY = 'sidebar_view_preference';
 
 export function useSidebarView(): UseSidebarViewReturn {
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useAuth();
   const [view, setViewState] = useState<SidebarView>('standard');
   const [hasMounted, setHasMounted] = useState(false);
@@ -34,9 +35,40 @@ export function useSidebarView(): UseSidebarViewReturn {
     setHasMounted(true);
   }, []);
 
-  // Carregar preferência salva do localStorage apenas no cliente
+  // Sincronizar view com a URL atual
+  // Isso garante que se o usuário for redirecionado ou navegar manualmente, a sidebar acompanha
   useEffect(() => {
     if (!hasMounted) return;
+
+    const path = window.location.pathname;
+
+    // Rotas que forçam visão administrativa
+    const isAdminRoute = path.startsWith('/super-admin') ||
+      path.startsWith('/admin');
+
+    // Rotas que forçam visão padrão
+    const isStandardRoute = path === '/dashboard' ||
+      path.startsWith('/client') ||
+      path.startsWith('/dashboard/');
+
+    if (isAdminRoute && view !== 'admin') {
+      console.log('🔄 Sincronizando sidebar para ADMIN (baseado na rota)');
+      setViewState('admin');
+      try { localStorage.setItem(STORAGE_KEY, 'admin'); } catch { }
+    } else if (isStandardRoute && view !== 'standard') {
+      console.log('🔄 Sincronizando sidebar para STANDARD (baseado na rota)');
+      setViewState('standard');
+      try { localStorage.setItem(STORAGE_KEY, 'standard'); } catch { }
+    }
+  }, [hasMounted, pathname, view]);
+
+  // Carregar preferência salva do localStorage apenas no cliente (fallback)
+  useEffect(() => {
+    if (!hasMounted) return;
+
+    // Se a rota já definiu (no effect acima), não sobrescrever
+    const path = window.location.pathname;
+    if (path.startsWith('/super-admin') || path.startsWith('/admin') || path === '/dashboard') return;
 
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -58,7 +90,7 @@ export function useSidebarView(): UseSidebarViewReturn {
     }
   }, []);
 
-  // Função para obter URL do dashboard baseado na role e visão - MOVIDO PARA CIMA para ser usado no toggleView
+  // Função para obter URL do dashboard baseado na role e visão
   const getDashboardUrl = useCallback((role: UserRole, targetView?: SidebarView): string => {
     const currentView = targetView || view;
 

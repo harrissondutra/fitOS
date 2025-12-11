@@ -3,10 +3,10 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { motion } from 'framer-motion';
 
 // Componente interno para suspender
 function VerifyEmailContent() {
@@ -24,6 +24,9 @@ function VerifyEmailContent() {
 
         const verifyToken = async () => {
             try {
+                // Artificial delay for better UX (prevent flashing)
+                await new Promise(resolve => setTimeout(resolve, 800));
+
                 const response = await fetch('/api/auth/verify-email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -36,18 +39,15 @@ function VerifyEmailContent() {
                     setStatus('success');
                     toast.success('Email verificado com sucesso!');
 
-                    // Auto-Login: Se o backend retornou tokens, logar o usuário imediatamente
                     if (data.accessToken && data.refreshToken) {
                         setAuthData({
                             accessToken: data.accessToken,
                             refreshToken: data.refreshToken,
                             isAuthenticated: true
                         });
-                        console.log('✅ Auto-login realizado após verificação de email');
                     }
 
-                    // Redireciona automaticamente após 1.5 segundos
-                    setTimeout(() => router.push('/pricing'), 1500);
+                    setTimeout(() => router.push('/pricing'), 2000);
                 } else {
                     setStatus('error');
                     toast.error(data.message || 'Link inválido ou expirado');
@@ -62,58 +62,89 @@ function VerifyEmailContent() {
     }, [token, router, setAuthData]);
 
     return (
-        <Card className="w-full max-w-md mx-auto text-center border-0 shadow-xl bg-white/90 backdrop-blur dark:bg-gray-900/90">
-            <CardHeader>
-                <div className="mx-auto mb-4">
-                    {status === 'verifying' && <Loader2 className="h-16 w-16 text-blue-500 animate-spin" />}
-                    {status === 'success' && <CheckCircle2 className="h-16 w-16 text-green-500" />}
-                    {status === 'error' && <XCircle className="h-16 w-16 text-red-500" />}
-                </div>
-                <CardTitle className="text-2xl">
-                    {status === 'verifying' && 'Verificando seu email...'}
-                    {status === 'success' && 'Email Verificado!'}
-                    {status === 'error' && 'Link Expirado ou Inválido'}
-                </CardTitle>
-                <CardDescription>
-                    {status === 'verifying' && 'Aguarde um momento enquanto validamos seu token.'}
-                    {status === 'success' && 'Redirecionando para os planos...'}
-                    {status === 'error' && 'Este link já foi usado ou não é mais válido.'}
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+        <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl p-8 md:p-12 text-center"
+        >
+            <div className="mx-auto mb-8 flex justify-center">
+                {status === 'verifying' && (
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-blue-100 rounded-full animate-ping opacity-75"></div>
+                        <div className="relative bg-blue-50 p-4 rounded-full">
+                            <Loader2 className="h-12 w-12 text-primary animate-spin" />
+                        </div>
+                    </div>
+                )}
+                {status === 'success' && (
+                    <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="bg-green-50 p-4 rounded-full"
+                    >
+                        <CheckCircle2 className="h-12 w-12 text-primary" />
+                    </motion.div>
+                )}
+                {status === 'error' && (
+                    <div className="bg-red-50 p-4 rounded-full">
+                        <XCircle className="h-12 w-12 text-red-500" />
+                    </div>
+                )}
+            </div>
+
+            <h1 className="text-2xl md:text-3xl font-bold mb-4 tracking-tight">
+                {status === 'verifying' && 'Verificando...'}
+                {status === 'success' && 'Email Confirmado!'}
+                {status === 'error' && 'Link Inválido'}
+            </h1>
+
+            <p className="text-muted-foreground mb-8 text-lg font-medium leading-relaxed">
+                {status === 'verifying' && 'Estamos validando seu token de acesso seguro.'}
+                {status === 'success' && 'Sua conta foi ativada. Estamos te levando para a próxima etapa.'}
+                {status === 'error' && 'Parece que este link expirou ou já foi utilizado anteriormente.'}
+            </p>
+
+            <div className="flex flex-col gap-3">
                 {status === 'success' && (
                     <Button
                         onClick={() => router.push('/pricing')}
-                        className="w-full bg-green-600 hover:bg-green-700"
+                        className="w-full h-12 rounded-full bg-primary hover:bg-[#059669] text-white font-bold text-base shadow-lg shadow-primary/20"
                     >
-                        Escolher meu Plano Agora
+                        Continuar <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                 )}
+
                 {status === 'error' && (
                     <>
                         <Button
-                            onClick={() => router.push('/pricing')}
-                            className="w-full"
+                            onClick={() => router.push('/auth/signup')}
+                            className="w-full h-12 rounded-full font-bold"
                         >
-                            Ver Planos & Preços
+                            Tentar Novamente
                         </Button>
                         <Button
                             onClick={() => router.push('/auth/login')}
                             variant="outline"
-                            className="w-full"
+                            className="w-full h-12 rounded-full border-2"
                         >
-                            Fazer Login
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Fazer Login
                         </Button>
                     </>
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </motion.div>
     );
 }
 
 export default function VerifyEmailPage() {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
+            <div className="absolute top-8 left-0 right-0 flex justify-center">
+                <div className="flex items-center gap-2 mb-8 opacity-50 hover:opacity-100 transition-opacity">
+                    <img src="/images/logomarca.png" alt="FitOS" className="h-8 w-auto" />
+                    <span className="text-lg font-bold">FitOS</span>
+                </div>
+            </div>
             <Suspense fallback={<div>Carregando...</div>}>
                 <VerifyEmailContent />
             </Suspense>

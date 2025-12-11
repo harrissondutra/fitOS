@@ -11,10 +11,10 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { 
-  User, 
-  UserRole, 
-  AuthenticatedRequest, 
+import {
+  User,
+  UserRole,
+  AuthenticatedRequest,
   AuthMiddlewareOptions,
   AUTH_CONSTANTS
 } from '../../../shared/types/auth.types';
@@ -78,7 +78,7 @@ export class AuthMiddleware {
           acc[key] = value;
           return acc;
         }, {} as Record<string, string>);
-        
+
         token = cookies['accessToken'] || cookies['better-auth.session_token'];
       }
 
@@ -103,7 +103,7 @@ export class AuthMiddleware {
       } catch (verifyError: any) {
         const errorMessage = verifyError?.message || 'Unknown error';
         logger.warn(`Auth middleware - Token verification failed: ${errorMessage}`);
-        
+
         // Se for token expirado, retornar erro formatado imediatamente
         if (errorMessage === 'TOKEN_EXPIRED') {
           res.status(401).json({
@@ -113,19 +113,19 @@ export class AuthMiddleware {
           });
           return;
         }
-        
+
         // Para outros erros, lançar exceção para ser capturada pelo catch externo
         throw verifyError;
       }
-      
+
       // Para SUPER_ADMIN, verificar role do payload antes de tentar buscar no banco
       // Isso permite que SUPER_ADMIN continue funcionando mesmo com problemas de conexão
       const userRole = payload?.role;
       const isSuperAdmin = userRole === 'SUPER_ADMIN';
-      
+
       // Log para debug
       logger.debug(`Auth middleware - User role from token: ${userRole}, isSuperAdmin: ${isSuperAdmin}`);
-      
+
       // Buscar usuário no banco de dados (com tolerância a falhas de conexão)
       let user: any = null;
       try {
@@ -137,7 +137,7 @@ export class AuthMiddleware {
               tenant: true
             }
           }),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Database query timeout')), 5000)
           )
         ]) as any;
@@ -145,17 +145,17 @@ export class AuthMiddleware {
         // Se o banco caiu (ex.: P1001/P1017/P2037), para SUPER_ADMIN permitimos seguir com dados do token
         const prismaCode = dbErr?.code;
         const errorMessage = dbErr?.message || '';
-        const isConnIssue = prismaCode === 'P1001' || prismaCode === 'P1017' || prismaCode === 'P2037' || 
-                            /closed the connection/i.test(errorMessage) ||
-                            /too many clients/i.test(errorMessage) ||
-                            /Can't reach database server/i.test(errorMessage) ||
-                            /connection.*closed/i.test(errorMessage) ||
-                            /timeout/i.test(errorMessage) ||
-                            /Database query timeout/i.test(errorMessage);
-        
+        const isConnIssue = prismaCode === 'P1001' || prismaCode === 'P1017' || prismaCode === 'P2037' ||
+          /closed the connection/i.test(errorMessage) ||
+          /too many clients/i.test(errorMessage) ||
+          /Can't reach database server/i.test(errorMessage) ||
+          /connection.*closed/i.test(errorMessage) ||
+          /timeout/i.test(errorMessage) ||
+          /Database query timeout/i.test(errorMessage);
+
         if (isConnIssue) {
-          logger.warn('Auth DB error on user lookup', { 
-            code: prismaCode, 
+          logger.warn('Auth DB error on user lookup', {
+            code: prismaCode,
             message: errorMessage,
             payloadRole: userRole,
             payloadRoleType: typeof userRole,
@@ -163,7 +163,7 @@ export class AuthMiddleware {
             isSuperAdmin,
             payloadKeys: Object.keys(payload || {})
           });
-          
+
           // Se for SUPER_ADMIN, permitir seguir com dados do token
           if (isSuperAdmin) {
             logger.info('Allowing SUPER_ADMIN access with token-only fallback due to DB connection issue', {
@@ -180,7 +180,7 @@ export class AuthMiddleware {
               emailVerified: true
             };
           } else {
-            logger.error('Non-SUPER_ADMIN user cannot access during DB connection issue', { 
+            logger.error('Non-SUPER_ADMIN user cannot access during DB connection issue', {
               role: userRole,
               roleType: typeof userRole,
               userId: payload?.userId,
@@ -241,7 +241,7 @@ export class AuthMiddleware {
       next();
     } catch (error) {
       logger.error('Erro na autenticação:', error);
-      
+
       let errorCode = 'INVALID_TOKEN';
       let message = 'Token inválido';
 
@@ -298,9 +298,9 @@ export class AuthMiddleware {
       } catch (dbErr: any) {
         // Se o banco caiu ou tem muitos clientes (ex.: P1001/P1017/P2037), tratar adequadamente
         const prismaCode = dbErr?.code;
-        const isConnIssue = prismaCode === 'P1001' || prismaCode === 'P1017' || prismaCode === 'P2037' || 
-                            /closed the connection/i.test(dbErr?.message || '') ||
-                            /too many clients/i.test(dbErr?.message || '');
+        const isConnIssue = prismaCode === 'P1001' || prismaCode === 'P1017' || prismaCode === 'P2037' ||
+          /closed the connection/i.test(dbErr?.message || '') ||
+          /too many clients/i.test(dbErr?.message || '');
         if (isConnIssue) {
           // Para SUPER_ADMIN, seguir sem sessão (desde que token válido)
           if ((req.user as any)?.role === 'SUPER_ADMIN') {
@@ -326,7 +326,7 @@ export class AuthMiddleware {
           req.session = undefined;
           return next();
         }
-        
+
         res.status(401).json({
           success: false,
           error: 'SESSION_NOT_FOUND',
@@ -408,7 +408,7 @@ export class AuthMiddleware {
         // Tentar autenticar se token existe, mas não logar erros
         try {
           const payload = this.authService.verifyToken(token);
-          
+
           // Buscar usuário no banco de dados
           const user = await this.prisma.user.findUnique({
             where: { id: payload.userId },
@@ -422,12 +422,13 @@ export class AuthMiddleware {
             (req as any).user = user;
             (req as any).tenantId = user.tenantId || undefined;
           }
-        } catch (authError) {
+        } catch (authError: any) {
           // Token inválido ou expirado - continuar sem autenticação
-          // Não logar erro para evitar spam no console
+          // Logar erro como warning para debug
+          logger.warn(`Optional auth failed: ${authError.message}`, { error: authError });
         }
       }
-      
+
       // Continuar sem autenticação (com ou sem usuário)
       next();
     } catch (error) {
@@ -546,7 +547,7 @@ export class AuthMiddleware {
           const jwt = require('jsonwebtoken');
           const { config } = require('../config/config-simple');
           const decoded = jwt.verify(token, config.jwt.secret);
-          
+
           if (decoded.role === 'SUPER_ADMIN') {
             // SUPER_ADMIN não tem rate limiting em login
             return next();
@@ -555,7 +556,7 @@ export class AuthMiddleware {
           // Token inválido, continuar com rate limiting normal
         }
       }
-      
+
       // Verificar também role do usuário autenticado (se já estiver autenticado)
       const userRole = (req as any).user?.role;
       if (userRole === 'SUPER_ADMIN') {

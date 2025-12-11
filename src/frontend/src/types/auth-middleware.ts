@@ -16,11 +16,10 @@ export const UserRoles = {
 export type UserRole = keyof typeof UserRoles;
 
 export const DEFAULT_ROLE_REDIRECTS: Record<UserRole, string> = {
-  SUPER_ADMIN: '/super-admin/dashboard',
+  SUPER_ADMIN: '/dashboard',
   OWNER: '/admin/dashboard',
   ADMIN: '/admin/dashboard',
   TRAINER: '/trainer/dashboard',
   NUTRITIONIST: '/nutritionist/dashboard',
-  CLIENT: '/nutrition-client/dashboard'
+  CLIENT: '/dashboard'
 };
-
