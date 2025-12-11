@@ -4,13 +4,16 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Home, Dumbbell, Users, MessageSquare, Menu, Apple, Stethoscope, UtensilsCrossed } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useSidebar } from "@/components/ui/sidebar"
 
 interface MobileNavProps {
-    onMenuClick?: () => void
+    // onMenuClick removed as we use useSidebar hook
 }
 
-export function MobileNav({ onMenuClick }: MobileNavProps) {
+export function MobileNav({ }: MobileNavProps) {
     const pathname = usePathname()
+    // Use the sidebar hook to control the sidebar state directly
+    const { toggleSidebar, openMobile, setOpenMobile } = useSidebar()
 
     if (!pathname) return null
 
@@ -44,7 +47,10 @@ export function MobileNav({ onMenuClick }: MobileNavProps) {
             href: "#",
             icon: Menu,
             match: (path: string) => false,
-            onClick: onMenuClick
+            onClick: () => {
+                // Toggle sidebar manually
+                toggleSidebar()
+            }
         }
     ]
 
@@ -71,9 +77,10 @@ export function MobileNav({ onMenuClick }: MobileNavProps) {
                                 key={tab.name}
                                 onClick={(e) => {
                                     e.preventDefault()
+                                    e.stopPropagation() // Ensure click doesn't bubble incorrectly
                                     tab.onClick?.()
                                 }}
-                                className={baseClassName}
+                                className={cn(baseClassName, "cursor-pointer active:scale-95")} // Added touch feedback
                             >
                                 <tab.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                             </button>

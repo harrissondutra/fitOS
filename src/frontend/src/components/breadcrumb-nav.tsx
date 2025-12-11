@@ -28,7 +28,7 @@ const routeNames: Record<string, string> = {
   'admin': 'Administração',
   'trainer': 'Personal Trainer',
   'client': 'Cliente',
-  
+
   // Funcionalidades principais
   'dashboard': 'Dashboard',
   'users': 'Usuários',
@@ -48,7 +48,7 @@ const routeNames: Record<string, string> = {
   'plans': 'Planos',
   'costs': 'Custos',
   'integrations': 'Integrações',
-  
+
   // Subfuncionalidades
   'providers': 'Provedores',
   'logs': 'Logs',
@@ -87,30 +87,30 @@ const routeNames: Record<string, string> = {
 function generateBreadcrumbItems(pathname: string) {
   const segments = pathname.split('/').filter(Boolean)
   const items = []
-  
+
   // Sempre começar com Home
   items.push({
     href: '/',
     label: 'Home',
     isLast: segments.length === 0
   })
-  
+
   // Processar cada segmento
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i]
     const href = '/' + segments.slice(0, i + 1).join('/')
     const isLast = i === segments.length - 1
-    
+
     // Usar nome mapeado ou capitalizar o segmento
     const label = routeNames[segment] || segment.charAt(0).toUpperCase() + segment.slice(1)
-    
+
     items.push({
       href: isLast ? undefined : href,
       label,
       isLast
     })
   }
-  
+
   return items
 }
 
@@ -136,14 +136,14 @@ export function BreadcrumbNav() {
       </Breadcrumb>
     )
   }
-  
+
   const items = generateBreadcrumbItems(pathname || '')
   const ITEMS_TO_DISPLAY = 2
-  
+
   // Se temos poucos itens, mostrar todos
   if (items.length <= ITEMS_TO_DISPLAY) {
     return (
-      <Breadcrumb>
+      <Breadcrumb className="hidden md:flex">
         <BreadcrumbList>
           {items.map((item, index) => (
             <React.Fragment key={index}>
@@ -163,14 +163,14 @@ export function BreadcrumbNav() {
       </Breadcrumb>
     )
   }
-  
+
   // Se temos muitos itens, usar ellipsis conforme documentação shadcn/ui
   const firstItem = items[0]
   const lastItems = items.slice(-ITEMS_TO_DISPLAY + 1)
   const middleItems = items.slice(1, -ITEMS_TO_DISPLAY + 1)
-  
+
   return (
-    <Breadcrumb>
+    <Breadcrumb className="hidden md:flex">
       <BreadcrumbList>
         {/* Primeiro item */}
         <BreadcrumbItem>
@@ -179,7 +179,7 @@ export function BreadcrumbNav() {
           </BreadcrumbLink>
         </BreadcrumbItem>
         <BreadcrumbSeparator><ChevronRight /></BreadcrumbSeparator>
-        
+
         {/* Ellipsis com dropdown para itens do meio */}
         <BreadcrumbItem>
           <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -197,7 +197,7 @@ export function BreadcrumbNav() {
           </DropdownMenu>
         </BreadcrumbItem>
         <BreadcrumbSeparator><ChevronRight /></BreadcrumbSeparator>
-        
+
         {/* Últimos itens */}
         {lastItems.map((item, index) => (
           <React.Fragment key={index}>
