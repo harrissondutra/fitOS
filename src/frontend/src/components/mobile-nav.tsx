@@ -2,11 +2,17 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Dumbbell, Users, MessageSquare, Menu } from "lucide-react"
+import { Home, Dumbbell, Users, MessageSquare, Menu, Apple, Stethoscope, UtensilsCrossed } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export function MobileNav() {
+interface MobileNavProps {
+    onMenuClick?: () => void
+}
+
+export function MobileNav({ onMenuClick }: MobileNavProps) {
     const pathname = usePathname()
+
+    if (!pathname) return null
 
     const tabs = [
         {
@@ -17,27 +23,28 @@ export function MobileNav() {
         },
         {
             name: "Treinos",
-            href: "/workouts",
+            href: "/trainer/workouts",
             icon: Dumbbell,
-            match: (path: string) => path.startsWith("/workouts")
+            match: (path: string) => path.startsWith("/trainer/workouts")
         },
         {
-            name: "Clientes",
-            href: "/clients",
-            icon: Users,
-            match: (path: string) => path.startsWith("/clients")
+            name: "Dietas",
+            href: "/nutrition-client/dieta",
+            icon: UtensilsCrossed,
+            match: (path: string) => path.startsWith("/nutrition-client/dieta")
         },
         {
-            name: "Chat",
-            href: "/chat",
-            icon: MessageSquare,
-            match: (path: string) => path.startsWith("/chat")
+            name: "Avaliações Fisicas",
+            href: "/trainer/assessments",
+            icon: Stethoscope,
+            match: (path: string) => path.startsWith("/trainer/assessments")
         },
         {
             name: "Menu",
-            href: "/menu", // Or trigger sidebar
+            href: "#",
             icon: Menu,
-            match: (path: string) => path === "/menu"
+            match: (path: string) => false,
+            onClick: onMenuClick
         }
     ]
 
@@ -51,16 +58,33 @@ export function MobileNav() {
             <div className="bg-black/80 dark:bg-white/90 backdrop-blur-xl border border-white/10 dark:border-black/5 rounded-full p-2 shadow-2xl flex justify-between items-center px-6">
                 {tabs.map((tab) => {
                     const isActive = tab.match(pathname)
+                    const baseClassName = cn(
+                        "flex flex-col items-center justify-center w-12 h-12 rounded-full transition-all duration-300",
+                        isActive
+                            ? "bg-primary text-primary-foreground transform scale-110 shadow-lg shadow-primary/25"
+                            : "text-white/60 dark:text-black/60 hover:text-white dark:hover:text-black hover:bg-white/10 dark:hover:bg-black/5"
+                    )
+
+                    if (tab.onClick) {
+                        return (
+                            <button
+                                key={tab.name}
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    tab.onClick?.()
+                                }}
+                                className={baseClassName}
+                            >
+                                <tab.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                            </button>
+                        )
+                    }
+
                     return (
                         <Link
                             key={tab.name}
                             href={tab.href}
-                            className={cn(
-                                "flex flex-col items-center justify-center w-12 h-12 rounded-full transition-all duration-300",
-                                isActive
-                                    ? "bg-primary text-primary-foreground transform scale-110 shadow-lg shadow-primary/25"
-                                    : "text-white/60 dark:text-black/60 hover:text-white dark:hover:text-black hover:bg-white/10 dark:hover:bg-black/5"
-                            )}
+                            className={baseClassName}
                         >
                             <tab.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                         </Link>

@@ -3,6 +3,7 @@
   "short_name": "FitOS",
   "description": "Plataforma inteligente de gestão fitness com personal trainer alimentado por IA",
   "start_url": "/",
+  "id": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
@@ -10,7 +11,12 @@
   "scope": "/",
   "lang": "pt-BR",
   "dir": "ltr",
-  "categories": ["fitness", "health", "lifestyle", "sports"],
+  "categories": [
+    "fitness",
+    "health",
+    "lifestyle",
+    "sports"
+  ],
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -141,8 +147,12 @@
     {
       "action": "/file-handler",
       "accept": {
-        "text/csv": [".csv"],
-        "application/json": [".json"]
+        "text/csv": [
+          ".csv"
+        ],
+        "application/json": [
+          ".json"
+        ]
       }
     }
   ],
