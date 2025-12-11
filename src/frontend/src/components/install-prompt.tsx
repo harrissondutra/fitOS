@@ -101,8 +101,8 @@ export function InstallPrompt() {
                         <X size={14} />
                     </button>
 
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] shadow-inner flex items-center justify-center shrink-0 overflow-hidden">
-                        <img src="/icons/icon-192x192.png" alt="App" className="w-full h-full object-cover" />
+                    <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center shrink-0 border border-gray-100 p-0 overflow-hidden">
+                        <img src="/icons/fitos-icon.svg" alt="App Logo" className="w-full h-full object-cover" />
                     </div>
 
                     <div className="flex flex-col flex-1 min-w-0">
