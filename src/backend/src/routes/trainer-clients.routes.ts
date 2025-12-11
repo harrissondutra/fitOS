@@ -35,10 +35,11 @@ router.get('/clients', asyncHandler(async (req: RequestWithTenantAndAuth, res: R
     });
   }
 
-  if (req.user?.role !== 'TRAINER') {
+  const allowedRoles = ['TRAINER', 'ADMIN', 'SUPER_ADMIN', 'OWNER'];
+  if (!allowedRoles.includes(req.user?.role)) {
     return res.status(403).json({
       success: false,
-      error: 'Only trainers can access this endpoint'
+      error: 'Only trainers and admins can access this endpoint'
     });
   }
 

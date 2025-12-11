@@ -10,14 +10,40 @@ export class AnalyticsService {
     this.prisma = prisma;
   }
 
-  async getAnalytics(params: { tenantId: string; userId: string; role: AnalyticsRole; periodDays: number }) {
-    const { tenantId, userId, role, periodDays } = params;
+  async getAnalytics(params: { tenantId: string; userId: string; role: AnalyticsRole; periodDays: number; clientId?: string; trainerId?: string }) {
+    const { tenantId, userId, role, periodDays, clientId, trainerId } = params;
 
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - periodDays);
 
+    // Base filters
     const whereAppointments: any = { tenantId, scheduledAt: { gte: startDate } };
-    if (role === 'TRAINER') whereAppointments.professionalId = userId;
+    const whereBioimpedance: any = { tenantId, recordedAt: { gte: startDate } };
+    const whereCrm: any = { tenantId };
+    const whereGoals: any = { tenantId, createdAt: { gte: startDate } };
+
+    // Apply Client Filter
+    if (clientId) {
+      whereAppointments.clientId = clientId;
+      whereBioimpedance.clientId = clientId;
+      // CRM usually matches client profile
+      whereCrm.clientId = clientId;
+      whereGoals.clientId = clientId;
+    }
+
+    // Apply Trainer Filter (explicit or implied by role)
+    // If role is TRAINER, userId is the trainerId
+    // If explicit trainerId param provided (e.g. admin viewing trainer), use it
+    const effectiveTrainerId = trainerId || (role === 'TRAINER' ? userId : undefined);
+
+    if (effectiveTrainerId) {
+      whereAppointments.professionalId = effectiveTrainerId;
+      // Note: Other entities might not be directly linked to trainer implies fetching all, 
+      // or we should filter clients assigned to trainer?
+      // For simplicity, we filter appointments by trainer. 
+      // Bioimpedance/Goals might be relevant only if we filter by clients OF that trainer.
+      // But let's keep it simple and consistent with previous logic.
+    }
 
     // Appointments
     const prisma = this.prisma as any;
@@ -43,7 +69,7 @@ export class AnalyticsService {
 
     // Bioimpedance
     const bioimpedanceData = await prisma.biometricData.findMany({
-      where: { tenantId, recordedAt: { gte: startDate } },
+      where: whereBioimpedance,
       orderBy: { recordedAt: 'asc' },
     });
 
@@ -72,7 +98,7 @@ export class AnalyticsService {
 
     // CRM
     const crmData = await prisma.clientProfile.findMany({
-      where: { tenantId },
+      where: whereCrm,
       include: { _count: { select: { interactions: true } } },
     });
 
@@ -85,7 +111,7 @@ export class AnalyticsService {
 
     // Goals
     const goals = await prisma.clientGoal.findMany({
-      where: { tenantId, createdAt: { gte: startDate } },
+      where: whereGoals,
     });
 
     const goalsStats = {

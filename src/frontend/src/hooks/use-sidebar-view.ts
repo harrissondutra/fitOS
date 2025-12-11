@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { SidebarView, UserRole } from '../../../shared/types/auth.types';
+import { useAuth } from './use-auth';
 
 interface UseSidebarViewReturn {
   view: SidebarView;
@@ -24,6 +25,7 @@ const STORAGE_KEY = 'sidebar_view_preference';
 
 export function useSidebarView(): UseSidebarViewReturn {
   const router = useRouter();
+  const { user } = useAuth();
   const [view, setViewState] = useState<SidebarView>('standard');
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -35,7 +37,7 @@ export function useSidebarView(): UseSidebarViewReturn {
   // Carregar preferência salva do localStorage apenas no cliente
   useEffect(() => {
     if (!hasMounted) return;
-    
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved && (saved === 'standard' || saved === 'admin')) {
@@ -56,43 +58,42 @@ export function useSidebarView(): UseSidebarViewReturn {
     }
   }, []);
 
-  // Função para alternar entre visões
-  const toggleView = useCallback(() => {
-    const newView = view === 'standard' ? 'admin' : 'standard';
-    setView(newView);
-    
-    // Forçar refresh da página para atualizar todos os componentes
-    setTimeout(() => {
-      router.refresh();
-      // Forçar re-render adicional para garantir que todos os componentes se atualizem
-      window.location.reload();
-    }, 100);
-  }, [view, setView, router]);
-
-  // Função para obter URL do dashboard baseado na role e visão
+  // Função para obter URL do dashboard baseado na role e visão - MOVIDO PARA CIMA para ser usado no toggleView
   const getDashboardUrl = useCallback((role: UserRole, targetView?: SidebarView): string => {
     const currentView = targetView || view;
-    
+
     switch (role) {
       case 'SUPER_ADMIN':
-        return currentView === 'admin' 
-          ? '/super-admin/dashboard' 
-          : '/super-admin/dashboard';
+        return currentView === 'admin'
+          ? '/super-admin/dashboard'
+          : '/dashboard';
       case 'OWNER':
       case 'ADMIN':
-        return currentView === 'admin' 
-          ? '/admin/dashboard' 
-          : '/admin/dashboard';
+        return currentView === 'admin'
+          ? '/admin/dashboard'
+          : '/dashboard';
       case 'TRAINER':
-        return currentView === 'admin' 
-          ? '/trainer/analytics' 
-          : '/trainer/dashboard';
+        return currentView === 'admin'
+          ? '/trainer/analytics'
+          : '/dashboard';
       case 'CLIENT':
         return '/dashboard';
       default:
         return '/dashboard';
     }
   }, [view]);
+
+  // Função para alternar entre visões
+  const toggleView = useCallback(() => {
+    const newView = view === 'standard' ? 'admin' : 'standard';
+    setView(newView);
+
+    // Navegar para o dashboard correto
+    const role = (user?.role as UserRole) || 'CLIENT';
+    const destination = getDashboardUrl(role, newView);
+
+    router.push(destination);
+  }, [view, setView, router, user, getDashboardUrl]);
 
   return {
     view,

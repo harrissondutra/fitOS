@@ -68,6 +68,14 @@ export class PrismaTenantWrapper {
     return this.prisma.exercise;
   }
 
+  get clientTrainer() {
+    return this.prisma.clientTrainer;
+  }
+
+  get physicalAssessment() {
+    return this.prisma.physicalAssessment;
+  }
+
   // Delegate para outros modelos do Prisma
   // O PrismaClient expõe todos os modelos automaticamente
 
@@ -130,7 +138,7 @@ export class PrismaTenantWrapper {
       // Importar getPrismaClient dinamicamente para evitar dependência circular
       const { getPrismaClient } = await import('../config/database');
       const mainPrisma = getPrismaClient();
-      
+
       await mainPrisma.tenantAccessAudit.create({
         data: {
           organizationId: this.organizationId,
@@ -171,10 +179,10 @@ export class PrismaTenantWrapper {
    */
   async $queryRawUnsafe<T = any>(query: string, ...values: any[]): Promise<T> {
     await this.validateTenantContext();
-    
+
     // Validar que query não contém padrões perigosos
     this.validateQuerySafety(query);
-    
+
     return this.prisma.$queryRawUnsafe<T>(query, ...values);
   }
 
