@@ -11,45 +11,55 @@ export function InstallPrompt() {
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
 
     useEffect(() => {
-        // Check if running in standalone mode (already installed)
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-            (window.navigator as any).standalone === true;
+        // Prevent default browser install prompt
+        const handleBeforeInstallPrompt = (e: Event) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+            // Only show if on Android or Desktop (Chrome/Edge)
+            if (!platform || platform === 'android' || platform === 'desktop') {
+                setShowPrompt(true);
+            }
+        };
 
-        if (isStandalone) {
-            return;
-        }
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+        // Detect Platform
         const userAgent = window.navigator.userAgent.toLowerCase();
         const isIOS = /iphone|ipad|ipod/.test(userAgent);
         const isAndroid = /android/.test(userAgent);
 
+        // Check standalone
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+            (window.navigator as any).standalone === true;
+
+        if (isStandalone) {
+            setShowPrompt(false);
+            return;
+        }
+
         if (isIOS) {
             setPlatform("ios");
-            // Show prompt after a delay for iOS
-            const timer = setTimeout(() => setShowPrompt(true), 3000);
-            return () => clearTimeout(timer);
+            // iOS: Always show prompt after delay (since we can't detect installability easily reliably without user action)
+            const timer = setTimeout(() => setShowPrompt(true), 2000);
+            return () => {
+                clearTimeout(timer);
+                window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+            };
         } else if (isAndroid) {
             setPlatform("android");
         } else {
             setPlatform("desktop");
         }
 
-        // Capture the PWA install prompt event (Android/Desktop)
-        const handleBeforeInstallPrompt = (e: Event) => {
-            e.preventDefault();
-            setDeferredPrompt(e);
-            setShowPrompt(true);
-        };
-
-        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
         return () => {
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         };
-    }, []);
+    }, [platform]);
 
     const handleInstallClick = async () => {
-        if (!deferredPrompt) return;
+        if (!deferredPrompt) {
+            return;
+        }
 
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
@@ -69,56 +79,45 @@ export function InstallPrompt() {
     return (
         <AnimatePresence>
             <motion.div
-                initial={{ y: 100, opacity: 0 }}
+                initial={{ y: -100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 100, opacity: 0 }}
-                className="fixed bottom-0 left-0 right-0 z-[60] p-4 md:hidden"
+                exit={{ y: -100, opacity: 0 }}
+                className="fixed top-0 left-0 right-0 z-[100] p-4 md:hidden print:hidden pointer-events-none"
             >
-                <div className="bg-white dark:bg-zinc-900 rounded-[2rem] p-6 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.2)] border border-gray-100 dark:border-zinc-800 relative">
+                <div className="bg-white/80 dark:bg-black/80 backdrop-blur-xl border border-white/20 shadow-2xl rounded-[2rem] p-4 flex items-center gap-4 pointer-events-auto ring-1 ring-black/5">
                     <button
                         onClick={handleDismiss}
-                        className="absolute top-4 right-4 p-2 bg-gray-100 dark:bg-zinc-800 rounded-full text-muted-foreground"
+                        className="absolute -top-2 -right-2 p-1.5 bg-white dark:bg-zinc-800 rounded-full text-muted-foreground shadow-sm border border-border"
                     >
-                        <X size={16} />
+                        <X size={14} />
                     </button>
 
-                    <div className="flex flex-col items-center text-center space-y-4">
-                        <div className="w-16 h-16 rounded-[1rem] bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg flex items-center justify-center">
-                            <img src="/icons/icon-192x192.png" alt="App Icon" className="w-full h-full object-cover rounded-[1rem]" onError={(e) => {
-                                e.currentTarget.src = "https://placehold.co/192x192/10B981/white?text=FitOS"
-                            }} />
-                        </div>
-
-                        <div className="space-y-1">
-                            <h3 className="font-bold text-lg">Instalar FitOS App</h3>
-                            <p className="text-sm text-muted-foreground max-w-[250px] mx-auto leading-relaxed">
-                                Tenha a melhor experiência! Instale o app na sua tela inicial para acesso rápido.
-                            </p>
-                        </div>
-
-                        {platform === "ios" && (
-                            <div className="w-full bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-4 text-left space-y-3 text-sm">
-                                <div className="flex items-center gap-3">
-                                    <Share size={20} className="text-blue-500" />
-                                    <span>1. Toque no botão <strong>Compartilhar</strong></span>
-                                </div>
-                                <div className="w-full h-px bg-gray-200 dark:bg-zinc-700" />
-                                <div className="flex items-center gap-3">
-                                    <PlusSquare size={20} className="text-gray-600 dark:text-gray-300" />
-                                    <span>2. Selecione <strong>Adicionar à Tela de Início</strong></span>
-                                </div>
-                            </div>
-                        )}
-
-                        {(platform === "android" || platform === "desktop") && (
-                            <Button
-                                onClick={handleInstallClick}
-                                className="w-full h-12 rounded-full font-bold text-base shadow-lg shadow-primary/20 bg-primary hover:bg-[#059669]"
-                            >
-                                <Download className="mr-2 h-4 w-4" /> Instalar Agora
-                            </Button>
-                        )}
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] shadow-inner flex items-center justify-center shrink-0 overflow-hidden">
+                        <img src="/icons/icon-192x192.png" alt="App" className="w-full h-full object-cover" />
                     </div>
+
+                    <div className="flex flex-col flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm leading-tight text-foreground">Instalar FitOS App</h3>
+                        <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                            {platform === 'ios' ? 'Adicione à Tela de Início' : 'Instale para melhor performance'}
+                        </p>
+                    </div>
+
+                    {(platform === "ios") ? (
+                        <div className="flex flex-col items-end gap-1">
+                            <span className="text-[10px] font-medium text-blue-500 whitespace-nowrap animate-pulse">
+                                Toque em <Share className="inline w-3 h-3" /> ↓
+                            </span>
+                        </div>
+                    ) : (
+                        <Button
+                            onClick={handleInstallClick}
+                            size="sm"
+                            className="rounded-full h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-blue-500/20 shadow-lg text-xs"
+                        >
+                            Instalar
+                        </Button>
+                    )}
                 </div>
             </motion.div>
         </AnimatePresence>
