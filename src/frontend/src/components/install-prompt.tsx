@@ -31,25 +31,32 @@ export function InstallPrompt() {
             return;
         }
 
-        // Always show prompt after a small delay to allow animation "drop down"
-        // This fulfills "Always display" even if browser event is lazy
-        const timer = setTimeout(() => {
-            setShowPrompt(true);
-        }, 1500);
+        // Logic for showing the prompt:
+        // iOS: No native event, so we show after a delay.
+        // Android/Desktop: ONLY show if browser fires 'beforeinstallprompt'.
+        // This ensures clicking 'Install' always triggers the native dialog.
+
+        let timer: NodeJS.Timeout;
+
+        if (ios) {
+            timer = setTimeout(() => {
+                setShowPrompt(true);
+            }, 2000);
+        }
 
         // Capture the PWA install prompt event (Android/Desktop)
-        // Note: Chrome on Android might block this if user declined recently.
-        // But we still want to show our UI.
         const handleBeforeInstallPrompt = (e: Event) => {
             e.preventDefault();
             console.log("beforeinstallprompt fired");
             setDeferredPrompt(e);
+            // Event fired! Now we can safely show the UI knowing installation is allowed.
+            setShowPrompt(true);
         };
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
         return () => {
-            clearTimeout(timer);
+            if (timer) clearTimeout(timer);
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         };
     }, []);
@@ -128,7 +135,7 @@ export function InstallPrompt() {
                     <Button
                         onClick={handleInstallClick}
                         size="sm"
-                        className="rounded-full h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-blue-500/20 shadow-lg text-xs"
+                        className="rounded-full h-9 px-5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-emerald-500/20 shadow-lg text-xs"
                     >
                         Instalar
                     </Button>
