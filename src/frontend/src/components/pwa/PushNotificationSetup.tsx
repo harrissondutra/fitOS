@@ -15,10 +15,10 @@ interface PushNotificationSetupProps {
   onDismiss?: () => void;
 }
 
-export function PushNotificationSetup({ 
-  className, 
-  onSetupComplete, 
-  onDismiss 
+export function PushNotificationSetup({
+  className,
+  onSetupComplete,
+  onDismiss
 }: PushNotificationSetupProps) {
   const {
     isSupported,
@@ -30,7 +30,7 @@ export function PushNotificationSetup({
     unsubscribe,
     clearError,
   } = usePushNotifications({
-    vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '',
+    vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BCEyV7c3jhreAKZ0gjt0UjVqwEjQB4IG1SUd-KU9eRssyYQDpctAwfA1vfvOJIqBrUlTcGLOton4bUgwrhNrPI0',
     serverUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
   });
 
@@ -59,7 +59,7 @@ export function PushNotificationSetup({
       // Inscrever para notificações
       const success = await subscribe();
       onSetupComplete?.(success);
-      
+
       if (success) {
         setShowSetup(false);
       }
@@ -73,7 +73,7 @@ export function PushNotificationSetup({
 
   const handleUnsubscribe = async () => {
     setIsLoading(true);
-    
+
     try {
       const success = await unsubscribe();
       if (success) {
@@ -180,7 +180,7 @@ export function PushNotificationSetup({
           Receba lembretes de treino, mensagens do trainer e atualizações importantes
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
         {error && (
           <div className="p-3 bg-red-100 dark:bg-red-900 rounded-lg">
@@ -236,7 +236,7 @@ export function PushNotificationSetup({
               </>
             )}
           </Button>
-          
+
           {permission === 'denied' && (
             <Button
               variant="outline"

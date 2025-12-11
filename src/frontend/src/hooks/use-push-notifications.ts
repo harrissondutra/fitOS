@@ -34,7 +34,7 @@ export function usePushNotifications(config?: PushNotificationConfig) {
     try {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
-      
+
       setState(prev => ({
         ...prev,
         isSubscribed: !!subscription,
@@ -52,9 +52,9 @@ export function usePushNotifications(config?: PushNotificationConfig) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const isSupported = 'serviceWorker' in navigator && 
-                       'PushManager' in window && 
-                       'Notification' in window;
+    const isSupported = 'serviceWorker' in navigator &&
+      'PushManager' in window &&
+      'Notification' in window;
 
     setState(prev => ({
       ...prev,
@@ -80,7 +80,7 @@ export function usePushNotifications(config?: PushNotificationConfig) {
 
     try {
       const permission = await requestNotificationPermission();
-      
+
       setState(prev => ({
         ...prev,
         permission,
@@ -108,19 +108,20 @@ export function usePushNotifications(config?: PushNotificationConfig) {
     }
 
     if (!config?.vapidPublicKey) {
+      console.error('[Push Notifications] VAPID Public Key is missing from config:', config);
       setState(prev => ({
         ...prev,
-        error: 'Chave VAPID não configurada',
+        error: 'Chave VAPID não configurada (Variável de ambiente ausente)',
       }));
       return false;
     }
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      
+
       // Converter chave VAPID para Uint8Array
       const vapidPublicKey = urlBase64ToUint8Array(config.vapidPublicKey);
-      
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: vapidPublicKey.buffer as ArrayBuffer,
