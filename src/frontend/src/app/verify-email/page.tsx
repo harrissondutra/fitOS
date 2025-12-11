@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
@@ -11,8 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 function VerifyEmailContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const token = searchParams.get('token');
+    const token = searchParams ? searchParams.get('token') : null;
     const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
+    const { setAuthData } = useAuth();
 
     useEffect(() => {
         if (!token) {
@@ -28,14 +30,27 @@ function VerifyEmailContent() {
                     body: JSON.stringify({ token })
                 });
 
-                if (response.ok) {
+                const data = await response.json();
+
+                if (response.ok && data.success) {
                     setStatus('success');
                     toast.success('Email verificado com sucesso!');
-                    // Redireciona automaticamente após 3 segundos
-                    setTimeout(() => router.push('/pricing'), 3000);
+
+                    // Auto-Login: Se o backend retornou tokens, logar o usuário imediatamente
+                    if (data.accessToken && data.refreshToken) {
+                        setAuthData({
+                            accessToken: data.accessToken,
+                            refreshToken: data.refreshToken,
+                            isAuthenticated: true
+                        });
+                        console.log('✅ Auto-login realizado após verificação de email');
+                    }
+
+                    // Redireciona automaticamente após 1.5 segundos
+                    setTimeout(() => router.push('/pricing'), 1500);
                 } else {
                     setStatus('error');
-                    toast.error('Token inválido ou expirado');
+                    toast.error(data.message || 'Link inválido ou expirado');
                 }
             } catch (error) {
                 console.error('Erro ao verificar email:', error);
@@ -44,7 +59,7 @@ function VerifyEmailContent() {
         };
 
         verifyToken();
-    }, [token, router]);
+    }, [token, router, setAuthData]);
 
     return (
         <Card className="w-full max-w-md mx-auto text-center border-0 shadow-xl bg-white/90 backdrop-blur dark:bg-gray-900/90">
@@ -57,31 +72,39 @@ function VerifyEmailContent() {
                 <CardTitle className="text-2xl">
                     {status === 'verifying' && 'Verificando seu email...'}
                     {status === 'success' && 'Email Verificado!'}
-                    {status === 'error' && 'Erro na Verificação'}
+                    {status === 'error' && 'Link Expirado ou Inválido'}
                 </CardTitle>
                 <CardDescription>
                     {status === 'verifying' && 'Aguarde um momento enquanto validamos seu token.'}
-                    {status === 'success' && 'Tudo pronto! Redirecionando para a escolha do seu plano...'}
-                    {status === 'error' && 'O link de verificação é inválido ou expirou.'}
+                    {status === 'success' && 'Redirecionando para os planos...'}
+                    {status === 'error' && 'Este link já foi usado ou não é mais válido.'}
                 </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col gap-3">
                 {status === 'success' && (
                     <Button
                         onClick={() => router.push('/pricing')}
-                        className="w-full bg-green-600 hover:bg-green-700 mt-4"
+                        className="w-full bg-green-600 hover:bg-green-700"
                     >
                         Escolher meu Plano Agora
                     </Button>
                 )}
                 {status === 'error' && (
-                    <Button
-                        onClick={() => router.push('/auth/login')}
-                        variant="outline"
-                        className="w-full mt-4"
-                    >
-                        Voltar para Login
-                    </Button>
+                    <>
+                        <Button
+                            onClick={() => router.push('/pricing')}
+                            className="w-full"
+                        >
+                            Ver Planos & Preços
+                        </Button>
+                        <Button
+                            onClick={() => router.push('/auth/login')}
+                            variant="outline"
+                            className="w-full"
+                        >
+                            Fazer Login
+                        </Button>
+                    </>
                 )}
             </CardContent>
         </Card>

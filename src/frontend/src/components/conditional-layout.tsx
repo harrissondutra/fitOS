@@ -31,7 +31,12 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
     '/auth/login',
     '/auth/signup',
     '/auth/forgot-password',
-    '/auth/reset-password'
+    '/auth/reset-password',
+    '/verify-email',
+    '/pricing',
+    '/marketplace',
+    '/store',
+    '/checkout'
   ]
 
   // Rotas que têm layouts específicos com sidebar próprio

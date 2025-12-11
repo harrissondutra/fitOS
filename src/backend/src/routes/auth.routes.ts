@@ -589,9 +589,27 @@ export class AuthRoutes {
         where: { id: verification.id }
       });
 
-      const response: VerifyEmailResponse = {
+      // --- AUTO LOGIN LOGIC ---
+      // Criar sessão automaticamente
+      const session = await this.authService.createSession(
+        user.id,
+        user.tenantId || 'default-tenant',
+        req.ip,
+        req.get('User-Agent')
+      );
+
+      // Gerar tokens de autenticação
+      const accessToken = this.authService.generateAccessToken(user as User);
+      const refreshTokenData = await this.authService.createRefreshToken(user.id);
+
+      const response: any = {
         success: true,
-        message: 'Email verificado com sucesso'
+        message: 'Email verificado com sucesso',
+        // Retornar dados de auth para o frontend logar
+        accessToken,
+        refreshToken: refreshTokenData.token,
+        user: user,
+        expiresIn: this.authService.parseExpiration(this.authService.getConfig().jwtAccessExpiresIn)
       };
 
       res.json(response);
