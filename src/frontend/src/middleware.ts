@@ -33,9 +33,11 @@ const PUBLIC_ROUTES = [
   '/offline.html',
   '/robots.txt',
   '/sitemap.xml',
+  '/sitemap.xml',
   // PWA assets
   '/icons/',
-  '/screenshots/'
+  '/screenshots/',
+  '/images/'
 ];
 
 // Rotas de autenticação (redirecionam se já autenticado)
