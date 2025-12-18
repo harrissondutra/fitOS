@@ -11,12 +11,13 @@
 
 import { PrismaClient, Advertisement } from '@prisma/client';
 import { PrismaClient as PrismaClientType } from '@prisma/client';
+import { getPrismaClient } from '../config/database';
 import { RedisService } from './redis.service';
 import { logger } from '../utils/logger';
 import { AdRelevanceAgent, AdRelevanceContext } from '../agents/ad-relevance-agent';
 
 export interface UserContext {
-  currentGoal?: 'gain_muscle' | 'lose_weight' | 'maintain' | 'performance';     
+  currentGoal?: 'gain_muscle' | 'lose_weight' | 'maintain' | 'performance';
   recentActivities?: string[];
   nutritionPreferences?: string[];
   equipmentAvailable?: string[];
@@ -66,7 +67,7 @@ export class AdvertisementService {
   private adRelevanceAgent: AdRelevanceAgent;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    this.prisma = getPrismaClient();
     this.redis = new RedisService();
     this.adRelevanceAgent = new AdRelevanceAgent();
   }
@@ -97,8 +98,8 @@ export class AdvertisementService {
       // Invalidar cache
       await this.invalidateCache(data.tenantId);
 
-      logger.info('Advertisement created', { 
-        id: advertisement.id, 
+      logger.info('Advertisement created', {
+        id: advertisement.id,
         tenantId: data.tenantId,
         type: data.type,
         position: data.position
@@ -152,10 +153,10 @@ export class AdvertisementService {
       // 5. Filtrar por relevância mínima (80%)
       const MIN_RELEVANCE = 0.8;
       const relevant = scoredAds.filter(item => item.score >= MIN_RELEVANCE);
-      
+
       if (relevant.length === 0) {
-        logger.debug('No ads meet minimum relevance threshold', { 
-          position, 
+        logger.debug('No ads meet minimum relevance threshold', {
+          position,
           tenantId,
           minRelevance: MIN_RELEVANCE
         });
@@ -241,21 +242,21 @@ export class AdvertisementService {
    */
   private async shouldShowAds(tenantId: string): Promise<boolean> {
     const cacheKey = `ads:should_show:${tenantId}`;
-    
+
     try {
       const cached = await this.redis.get(cacheKey, {
         namespace: 'ads',
         ttl: 300 // 5 minutos
       });
-      
+
       if (cached !== null) {
         return cached === true;
       }
 
       const tenant = await this.prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: { 
-          adsEnabled: true, 
+        select: {
+          adsEnabled: true,
           plan: true,
           adsSettings: true
         }
@@ -286,13 +287,13 @@ export class AdvertisementService {
    */
   private async getAdCandidates(position: string, tenantId: string): Promise<Advertisement[]> {
     const cacheKey = `ads:candidates:${tenantId}:${position}`;
-    
+
     try {
       const cached = await this.redis.get(cacheKey, {
         namespace: 'ads',
         ttl: 60 // 1 minuto
       });
-      
+
       if (cached) {
         return cached as Advertisement[];
       }
@@ -352,7 +353,7 @@ export class AdvertisementService {
 
     for (const ad of ads) {
       const frequencyKey = `ads:frequency:${userId}:${ad.id}:${today}`;
-      
+
       try {
         const count = await this.redis.get(frequencyKey, {
           namespace: 'ads',
@@ -360,7 +361,7 @@ export class AdvertisementService {
         });
 
         const countNum = count ? parseInt(count as string) : 0;
-        
+
         // Máximo 2x por dia
         if (countNum < 2) {
           filtered.push(ad);
@@ -378,7 +379,7 @@ export class AdvertisementService {
   /**
    * Calcular relevância do anúncio para o contexto do usuário
    */
-    private async calculateRelevance(
+  private async calculateRelevance(
     ad: Advertisement,
     context: UserContext,
     tenantId?: string
@@ -442,7 +443,7 @@ export class AdvertisementService {
     }
 
     // Verificar se há preferências nutricionais correspondentes
-    if (targeting.nutritionPreferences && context.nutritionPreferences) {       
+    if (targeting.nutritionPreferences && context.nutritionPreferences) {
       const match = context.nutritionPreferences.some(pref =>
         targeting.nutritionPreferences.includes(pref)
       );
@@ -495,15 +496,15 @@ export class AdvertisementService {
       if (userId) {
         const today = new Date().toISOString().split('T')[0];
         const frequencyKey = `ads:frequency:${userId}:${adId}:${today}`;
-        
+
         await this.redis.incrWithTTL(frequencyKey, 86400, {
           namespace: 'ads'
         }); // TTL de 24 horas
       }
 
-      logger.debug('Advertisement impression registered', { 
-        adId, 
-        tenantId, 
+      logger.debug('Advertisement impression registered', {
+        adId,
+        tenantId,
         relevanceScore,
         userId
       });
@@ -567,10 +568,10 @@ export class AdvertisementService {
       throw new Error('Advertisement not found');
     }
 
-    const ctr = ad.impressionCount > 0 
-      ? (ad.clickCount / ad.impressionCount) * 100 
+    const ctr = ad.impressionCount > 0
+      ? (ad.clickCount / ad.impressionCount) * 100
       : 0;
-    
+
     const conversionRate = ad.clickCount > 0
       ? (ad.conversionCount / ad.clickCount) * 100
       : 0;

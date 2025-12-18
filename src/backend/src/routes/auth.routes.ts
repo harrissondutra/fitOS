@@ -170,13 +170,32 @@ export class AuthRoutes {
       const { email, password, rememberMe } = req.body as any;
       const deviceFingerprint = (req.body as any).deviceFingerprint;
 
-      // Buscar usuário por email
-      const user = await this.withPrismaRetry(() =>
-        this.prisma.user.findUnique({
-          where: { email: email.toLowerCase() },
-          include: { tenant: true }
-        })
-      );
+      // Retry logic for login
+      let user: any = null;
+      let retryCount = 0;
+      const maxRetries = 2;
+
+      while (retryCount <= maxRetries) {
+        try {
+          const { getPrismaClient } = require('../config/database');
+          const currentPrisma = getPrismaClient();
+
+          user = await currentPrisma.user.findUnique({
+            where: { email: email.toLowerCase() },
+            include: { tenant: true }
+          });
+          break;
+        } catch (dbErr: any) {
+          const code = dbErr?.code;
+          const isConn = code === 'P1001' || code === 'P1017' || code === 'P2024' || /closed/i.test(dbErr.message || '');
+          if (isConn && retryCount < maxRetries) {
+            retryCount++;
+            await new Promise(r => setTimeout(r, 200 * retryCount));
+            continue;
+          }
+          throw dbErr;
+        }
+      }
 
       if (!user) {
         res.status(401).json({
@@ -209,6 +228,7 @@ export class AuthRoutes {
       }
 
       // Criar sessão com device fingerprint (se fornecido)
+      // Nota: authService já usa retry interno se necessário, mas podemos ser explícitos
       const session = await this.authService.createSession(
         user.id,
         user.tenantId || 'default-tenant',
@@ -221,13 +241,27 @@ export class AuthRoutes {
       const accessToken = this.authService.generateAccessToken(user as User);
       const refreshTokenData = await this.authService.createRefreshToken(user.id);
 
-      // Atualizar último login
-      await this.withPrismaRetry(() =>
-        this.prisma.user.update({
-          where: { id: user.id },
-          data: { lastLogin: new Date() }
-        })
-      );
+      // Atualizar último login com retry
+      retryCount = 0;
+      while (retryCount <= maxRetries) {
+        try {
+          const { getPrismaClient } = require('../config/database');
+          const currentPrisma = getPrismaClient();
+          await currentPrisma.user.update({
+            where: { id: user.id },
+            data: { lastLogin: new Date() }
+          });
+          break;
+        } catch (e: any) {
+          if (retryCount < maxRetries) {
+            retryCount++;
+            await new Promise(r => setTimeout(r, 100));
+            continue;
+          }
+          console.warn('Failed to update lastLogin time (non-critical)', e.message);
+          break; // Não falhar login por isso
+        }
+      }
 
       // Determinar redirecionamento baseado na role
       const redirectTo = DEFAULT_ROLE_REDIRECTS[user.role as keyof typeof DEFAULT_ROLE_REDIRECTS];

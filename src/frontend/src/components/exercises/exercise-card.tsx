@@ -3,10 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Exercise } from '@/shared/types';
-import { 
-  Dumbbell, 
-  Clock, 
-  Users, 
+import {
+  Dumbbell,
+  Clock,
+  Users,
   Target,
   MoreHorizontal,
   Edit,
@@ -28,12 +28,12 @@ interface ExerciseCardProps {
   showActions?: boolean;
 }
 
-export function ExerciseCard({ 
-  exercise, 
-  onEdit, 
-  onDelete, 
-  onClone, 
-  showActions = true 
+export function ExerciseCard({
+  exercise,
+  onEdit,
+  onDelete,
+  onClone,
+  showActions = true
 }: ExerciseCardProps) {
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty.toLowerCase()) {
@@ -60,6 +60,8 @@ export function ExerciseCard({
         return <Dumbbell className="h-4 w-4" />;
     }
   };
+
+  const exerciseImage = exercise.videoUrl || exercise.thumbnailUrl;
 
   return (
     <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg dark:hover:shadow-none dark:hover:border-primary/50">
@@ -97,7 +99,7 @@ export function ExerciseCard({
                   </DropdownMenuItem>
                 )}
                 {onDelete && (
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={() => onDelete(exercise)}
                     className="text-destructive focus:text-destructive"
                   >
@@ -110,14 +112,25 @@ export function ExerciseCard({
           )}
         </div>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
+        {exerciseImage && (
+          <div className="relative w-full h-48 mb-4 overflow-hidden rounded-md bg-muted">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={exerciseImage}
+              alt={exercise.name}
+              className="object-cover w-full h-full transition-transform hover:scale-105"
+            />
+          </div>
+        )}
+
         {exercise.description && (
           <p className="text-sm text-muted-foreground line-clamp-2">
             {exercise.description}
           </p>
         )}
-        
+
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary" className={getDifficultyColor(exercise.difficulty)}>
             {exercise.difficulty}
@@ -129,7 +142,7 @@ export function ExerciseCard({
             </Badge>
           )}
         </div>
-        
+
         {exercise.instructions && Array.isArray(exercise.instructions) && exercise.instructions.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Instructions:</h4>
@@ -150,7 +163,7 @@ export function ExerciseCard({
             </ol>
           </div>
         )}
-        
+
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">

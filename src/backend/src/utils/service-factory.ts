@@ -35,8 +35,8 @@ export async function createExerciseService(req?: Request): Promise<ExerciseServ
     const prisma = await getTenantPrismaWrapper(tenantId);
     return new ExerciseService(prisma);
   }
-  // Fallback para compatibilidade retroativa
-  const prisma = getTenantPrisma(req);
+  // Fallback para compatibilidade retroativa e acesso público
+  const prisma = getPrismaClient();
   return new ExerciseService(prisma);
 }
 

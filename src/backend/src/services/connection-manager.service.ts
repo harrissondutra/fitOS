@@ -51,15 +51,15 @@ export class ConnectionManagerService {
       } catch (error: any) {
         const code = error?.code || error?.meta?.code;
         const message = error?.message || '';
-        
+
         // P1017: Server closed connection - reconectar e retry
         if (code === 'P1017' && i < maxRetries - 1) {
           logger.warn(`Prisma connection closed (P1017), attempting reconnect... Attempt ${i + 1}/${maxRetries}`);
-          
+
           try {
             // Aguardar antes de tentar reconectar
             await new Promise(resolve => setTimeout(resolve, 300 * (i + 1)));
-            
+
             // Tentar reconectar o cliente Prisma
             const prisma = getPrismaClient();
             try {
@@ -67,7 +67,7 @@ export class ConnectionManagerService {
             } catch (disconnectError) {
               // Ignorar erros de disconnect (pode já estar desconectado)
             }
-            
+
             // Reconectar
             await prisma.$connect();
             logger.info(`✅ Prisma reconnected after P1017`);
@@ -75,30 +75,30 @@ export class ConnectionManagerService {
             logger.warn(`⚠️ Failed to reconnect Prisma, will retry operation:`, reconnectError?.message || reconnectError);
             // Continuar com retry mesmo se reconexão falhar
           }
-          
+
           continue;
         }
-        
+
         // P2024: Connection pool timeout - retry com backoff exponencial
         if (code === 'P2024' && i < maxRetries - 1) {
           logger.warn(`Prisma pool timeout (P2024), retrying in ${200 * (i + 1)}ms... Attempt ${i + 1}/${maxRetries}`);
           await new Promise(resolve => setTimeout(resolve, 200 * (i + 1)));
           continue;
         }
-        
+
         // P1001: Database unreachable - não retry, mas logar
         if (code === 'P1001') {
           logger.error(`Database unreachable (P1001):`, message);
           throw error;
         }
-        
+
         // Se a mensagem indica conexão fechada (mesmo sem código P1017)
         if ((message.includes('closed the connection') || message.includes('connection closed')) && i < maxRetries - 1) {
           logger.warn(`Connection closed detected, retrying in ${300 * (i + 1)}ms... Attempt ${i + 1}/${maxRetries}`);
           await new Promise(resolve => setTimeout(resolve, 300 * (i + 1)));
           continue;
         }
-        
+
         // Outros erros ou última tentativa falhou
         throw error;
       }
@@ -118,7 +118,7 @@ export class ConnectionManagerService {
 
     // Verificar cache Redis (estratégia)
     const cachedStrategy = await this.getCachedStrategy(organizationId);
-    
+
     // Se não tem estratégia em cache, buscar do banco
     const prisma = getPrismaClient();
     const tenant = await this.withPrismaRetry(() => prisma.tenant.findUnique({
@@ -139,7 +139,7 @@ export class ConnectionManagerService {
 
     // Criar conexão apropriada
     let connection: PrismaClient;
-    
+
     if (tenant.dbStrategy === 'database_level') {
       const connectionInfo = await this.getConnectionInfo(organizationId);
       if (!connectionInfo) {
@@ -190,7 +190,7 @@ export class ConnectionManagerService {
    */
   async getConnectionInfo(organizationId: string): Promise<ConnectionInfo | null> {
     const prisma = getPrismaClient();
-    
+
     const connection = await this.withPrismaRetry(() => prisma.databaseConnection.findFirst({
       where: {
         organizationId,
@@ -346,10 +346,13 @@ export class ConnectionManagerService {
 
     await Promise.all(closePromises);
     this.connectionCache.clear();
-    
+
     // Fechar túneis SSH
     await this.sshTunnelService.shutdown();
-    
+
     logger.info('ConnectionManagerService shutdown complete');
   }
 }
+
+export const connectionManager = new ConnectionManagerService();
+

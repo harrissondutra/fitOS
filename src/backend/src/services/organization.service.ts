@@ -1,7 +1,7 @@
 import { PrismaClient, PlanType, DbStrategy, DatabaseProvider } from '@prisma/client';
 import { getPrismaClient } from '../config/database';
 import { logger } from '../utils/logger';
-import { ConnectionManagerService } from './connection-manager.service';
+import { ConnectionManagerService, connectionManager } from './connection-manager.service';
 import { BackupService } from './backup.service';
 import { MigrationOrchestratorService } from './migration-orchestrator.service';
 import { ProviderIntegrationService, ProvisionedDatabase } from './provider-integration.service';
@@ -34,7 +34,7 @@ export class OrganizationService {
 
   constructor() {
     this.prisma = getPrismaClient();
-    this.connectionManager = new ConnectionManagerService();
+    this.connectionManager = connectionManager;
     this.backupService = new BackupService();
     this.migrationOrchestrator = new MigrationOrchestratorService();
     this.providerIntegration = new ProviderIntegrationService();

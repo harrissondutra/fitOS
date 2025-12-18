@@ -53,14 +53,19 @@ interface MercadoPagoPaymentDetails {
 }
 
 export class PaymentService {
-  private useMockData: boolean;
+  private useStripeMock: boolean;
+  private useMercadoPagoMock: boolean;
 
   constructor() {
-    // Usar mock enquanto não houver credenciais configuradas
-    this.useMockData = !process.env.STRIPE_SECRET_KEY || !process.env.MERCADOPAGO_ACCESS_TOKEN;
-    
-    if (this.useMockData) {
-      console.log('⚠️  PaymentService: Usando dados mockados (configure STRIPE_SECRET_KEY e MERCADOPAGO_ACCESS_TOKEN para usar dados reais)');
+    // Configurar mocks independentemente
+    this.useStripeMock = !process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY.includes('test_mock');
+    this.useMercadoPagoMock = !process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MERCADOPAGO_ACCESS_TOKEN.includes('USR_mock');
+
+    if (this.useStripeMock) {
+      console.log('⚠️  PaymentService: Stripe usando dados mockados');
+    }
+    if (this.useMercadoPagoMock) {
+      console.log('⚠️  PaymentService: Mercado Pago usando dados mockados');
     }
   }
 
@@ -70,7 +75,7 @@ export class PaymentService {
    * Buscar detalhes completos de uma assinatura Stripe (mockado)
    */
   async getStripeSubscriptionDetails(subscriptionId: string): Promise<StripeSubscriptionDetails> {
-    if (this.useMockData) {
+    if (this.useStripeMock) {
       // Retornar dados mockados
       return {
         subscription: {
@@ -131,7 +136,7 @@ export class PaymentService {
    * Buscar próxima fatura da assinatura
    */
   async getUpcomingInvoice(subscriptionId: string) {
-    if (this.useMockData) {
+    if (this.useStripeMock) {
       return {
         amount_due: 9900,
         due_date: new Date('2024-02-01')
@@ -146,7 +151,7 @@ export class PaymentService {
    * Cancelar assinatura Stripe (mockado)
    */
   async cancelStripeSubscription(subscriptionId: string, cancelAtPeriodEnd = true) {
-    if (this.useMockData) {
+    if (this.useStripeMock) {
       console.log(`[MOCK] Cancelando assinatura ${subscriptionId} (cancel_at_period_end: ${cancelAtPeriodEnd})`);
       return {
         id: subscriptionId,
@@ -165,7 +170,7 @@ export class PaymentService {
    * Buscar detalhes de um pagamento Mercado Pago (mockado)
    */
   async getMercadoPagoPaymentDetails(paymentId: string): Promise<MercadoPagoPaymentDetails> {
-    if (this.useMockData) {
+    if (this.useMercadoPagoMock) {
       return {
         id: paymentId,
         status: 'approved',
@@ -190,7 +195,7 @@ export class PaymentService {
    * Listar pagamentos de um tenant (mockado)
    */
   async getMercadoPagoPaymentsByTenant(tenantId: string): Promise<MercadoPagoPaymentDetails[]> {
-    if (this.useMockData) {
+    if (this.useMercadoPagoMock) {
       return [
         {
           id: 'mp_mock_1',
@@ -232,7 +237,7 @@ export class PaymentService {
    * Criar pagamento PIX (mockado)
    */
   async createPIXPayment(tenantId: string, amount: number, description: string) {
-    if (this.useMockData) {
+    if (this.useMercadoPagoMock) {
       const mockPaymentId = `mp_pix_${Date.now()}`;
       return {
         id: mockPaymentId,
@@ -250,7 +255,7 @@ export class PaymentService {
    * Verificar status de pagamento (mockado)
    */
   async checkPaymentStatus(paymentId: string) {
-    if (this.useMockData) {
+    if (this.useMercadoPagoMock) {
       return {
         status: 'approved',
         statusDetail: 'accredited',

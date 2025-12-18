@@ -7,32 +7,156 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+// import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'; // Comentado pois o PaymentElement gerencia métodos
 import { motion } from 'framer-motion';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+
+// Inicializar Stripe com a chave pública
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_51SQvu10aTWFI2uJkTfwhnr3XefqHAyxsnHTHgT5E2RO3vIiG5yl8vmHjUrHC68G6bM6ThieW9G0fCRCe5gfXxASW00sH1sQrVg');
+
+// Sub-componente para o formulário de pagamento real usando Stripe Elements
+function PaymentForm({ clientSecret, planId, interval, email, name }: { clientSecret: string, planId: string, interval: string, email: string, name: string }) {
+    const stripe = useStripe();
+    const elements = useElements();
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!stripe || !elements) return;
+
+        setIsProcessing(true);
+        setErrorMessage(null);
+
+        const isSetupIntent = clientSecret.startsWith('seti_');
+
+        const confirmOptions = {
+            elements,
+            confirmParams: {
+                return_url: `${window.location.origin}/checkout?plan=${planId}&interval=${interval}&email=${encodeURIComponent(email)}`,
+                payment_method_data: {
+                    billing_details: {
+                        name: name,
+                        email: email
+                    }
+                }
+            },
+        };
+
+        const { error } = isSetupIntent
+            ? await stripe.confirmSetup(confirmOptions)
+            : await stripe.confirmPayment(confirmOptions);
+
+        if (error) {
+            setErrorMessage(error.message || 'Ocorreu um erro inesperado.');
+            setIsProcessing(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="mb-4 text-center sm:text-left">
+                <h2 className="text-2xl font-bold mb-2">Detalhes do Pagamento</h2>
+                <p className="text-sm text-muted-foreground mb-6">Insira os dados do seu cartão ou escolha outro método seguro abaixo.</p>
+            </div>
+
+            <div className="bg-gray-50/50 p-4 sm:p-6 rounded-2xl border border-gray-100">
+                <PaymentElement options={{ layout: 'tabs' }} />
+            </div>
+
+            {errorMessage && (
+                <div className="p-4 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm font-medium animate-pulse">
+                    ⚠️ {errorMessage}
+                </div>
+            )}
+
+            <Button
+                type="submit"
+                disabled={isProcessing || !stripe}
+                className="w-full bg-primary hover:bg-[#059669] text-white font-bold h-14 rounded-full text-lg shadow-lg shadow-primary/25 mt-4 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+                {isProcessing ? (
+                    <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
+                        Processando...
+                    </div>
+                ) : (
+                    'Confirmar e Iniciar Teste Grátis'
+                )}
+            </Button>
+
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4">
+                <ShieldCheck className="h-3 w-3" />
+                <span>Ambiente 100% Seguro & Criptografado</span>
+            </div>
+        </form>
+    );
+}
 
 export default function CheckoutPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const planId = searchParams.get('plan') || 'professional';
-    const interval = searchParams.get('interval') || 'monthly';
+    const planId = searchParams?.get('plan') || 'professional';
+    const interval = searchParams?.get('interval') || 'monthly';
+    const sessionId = searchParams?.get('session_id');
+    const paymentIntentSecret = searchParams?.get('payment_intent_client_secret');
+    const setupIntentSecret = searchParams?.get('setup_intent_client_secret');
+
+    // Sucesso detectado via query params após o redirect do Stripe Elements
+    const isSuccess = !!(sessionId || paymentIntentSecret || setupIntentSecret);
+
     const [loading, setLoading] = useState(false);
+    const [clientSecret, setClientSecret] = useState<string | null>(null);
+    const [userData, setUserData] = useState({
+        email: searchParams?.get('email') || '',
+        name: ''
+    });
 
     const plans = {
-        free: { name: 'Starter', price: 0 },
-        professional: { name: 'Professional', price: interval === 'yearly' ? 970 : 97 },
-        enterprise: { name: 'Enterprise', price: interval === 'yearly' ? 2970 : 297 }
+        free: { name: 'Individual', price: 0 },
+        individual: { name: 'Individual', price: 0 },
+        starter: { name: 'Starter', price: interval === 'yearly' ? 799.20 : 99.90 },
+        professional: { name: 'Professional', price: interval === 'yearly' ? 1599.20 : 199.90 },
+        enterprise: { name: 'Enterprise', price: interval === 'yearly' ? 3199.20 : 399.90 }
     };
 
-    const selectedPlan = plans[planId as keyof typeof plans] || plans.professional;
+    const selectedPlan = plans[planId as keyof typeof plans] || plans.starter;
 
-    const handleCheckout = async (e: React.FormEvent) => {
+    const handleInitialSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        // Simulação de checkout
-        setTimeout(() => {
+
+        const email = (document.getElementById('email') as HTMLInputElement)?.value;
+        const name = (document.getElementById('cardName') as HTMLInputElement)?.value;
+        setUserData({ email, name });
+
+        try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/subscription/checkout-session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    planId,
+                    interval,
+                    email,
+                    name
+                })
+            });
+            const data = await response.json();
+
+            if (data.clientSecret) {
+                setClientSecret(data.clientSecret);
+            } else {
+                console.error('Checkout error:', data);
+                alert('Erro ao iniciar checkout: ' + (data.error || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            console.error('Checkout error:', error);
+            alert('Erro de conexão com o servidor.');
+        } finally {
             setLoading(false);
-            router.push('/checkout/success');
-        }, 2000);
+        }
     };
 
     return (
@@ -52,7 +176,7 @@ export default function CheckoutPage() {
                     </div>
 
                     <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground bg-white px-3 py-1.5 rounded-full shadow-sm border">
-                        <Lock className="h-3 w-3" />
+                        <Lock className="h-3 w-3 text-green-500" />
                         Ambiente Seguro SSL 256-bit
                     </div>
                 </div>
@@ -66,110 +190,108 @@ export default function CheckoutPage() {
                             animate={{ opacity: 1, y: 0 }}
                             className="bg-white rounded-[2rem] p-8 shadow-sm border border-gray-100"
                         >
-                            <h2 className="text-2xl font-bold mb-2">Dados de Pagamento</h2>
-                            <p className="text-muted-foreground text-sm mb-8">Complete suas informações para iniciar</p>
-
-                            <form onSubmit={handleCheckout} className="space-y-6">
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email" className="text-xs font-bold uppercase text-gray-500 tracking-wider ml-1">Email</Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            placeholder="seu@email.com"
-                                            required
-                                            className="h-12 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary transition-all"
-                                        />
+                            {isSuccess ? (
+                                <div className="text-center py-8">
+                                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <Check className="h-10 w-10 text-green-600" />
                                     </div>
-
-                                    <div className="pt-4 pb-2">
-                                        <Label className="text-xs font-bold uppercase text-gray-500 tracking-wider ml-1 mb-2 block">Método de Pagamento</Label>
-                                        <RadioGroup defaultValue="card" className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <RadioGroupItem value="card" id="card" className="peer sr-only" />
-                                                <Label
-                                                    htmlFor="card"
-                                                    className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-transparent bg-gray-50 p-4 hover:bg-gray-100 cursor-pointer transition-all peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 peer-data-[state=checked]:text-primary"
-                                                >
-                                                    <CreditCard className="h-6 w-6" />
-                                                    <span className="font-semibold text-sm">Cartão de Crédito</span>
-                                                </Label>
-                                            </div>
-                                            <div>
-                                                <RadioGroupItem value="pix" id="pix" className="peer sr-only" />
-                                                <Label
-                                                    htmlFor="pix"
-                                                    className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-transparent bg-gray-50 p-4 hover:bg-gray-100 cursor-pointer transition-all peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 peer-data-[state=checked]:text-primary"
-                                                >
-                                                    <Zap className="h-6 w-6" />
-                                                    <span className="font-semibold text-sm">PIX Instantâneo</span>
-                                                </Label>
-                                            </div>
-                                        </RadioGroup>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="cardName" className="text-xs font-bold uppercase text-gray-500 tracking-wider ml-1">Nome no Cartão</Label>
-                                        <Input
-                                            id="cardName"
-                                            placeholder="Como impresso no cartão"
-                                            required
-                                            className="h-12 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary transition-all"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="cardNumber" className="text-xs font-bold uppercase text-gray-500 tracking-wider ml-1">Número do Cartão</Label>
-                                        <Input
-                                            id="cardNumber"
-                                            placeholder="0000 0000 0000 0000"
-                                            required
-                                            className="h-12 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary transition-all"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="expiry" className="text-xs font-bold uppercase text-gray-500 tracking-wider ml-1">Validade</Label>
-                                            <Input
-                                                id="expiry"
-                                                placeholder="MM/AA"
-                                                required
-                                                className="h-12 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary transition-all"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="cvv" className="text-xs font-bold uppercase text-gray-500 tracking-wider ml-1">CVV</Label>
-                                            <Input
-                                                id="cvv"
-                                                placeholder="123"
-                                                required
-                                                className="h-12 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary transition-all"
-                                            />
-                                        </div>
-                                    </div>
+                                    <h2 className="text-3xl font-bold mb-4 text-gray-900">Pagamento Confirmado!</h2>
+                                    <p className="text-lg text-muted-foreground mb-8">
+                                        Sua assinatura foi iniciada com sucesso. <br />
+                                        Crie sua senha para acessar o sistema.
+                                    </p>
+                                    <Button
+                                        onClick={() => router.push(`/auth/signup?plan=${planId}&interval=${interval}&email=${userData.email}`)}
+                                        className="bg-primary hover:bg-primary/90 text-white font-bold h-12 px-8 rounded-full text-lg shadow-lg shadow-primary/20"
+                                    >
+                                        Finalizar Cadastro
+                                    </Button>
                                 </div>
-
-                                <Button
-                                    type="submit"
-                                    className="w-full bg-primary hover:bg-[#059669] text-white font-bold h-14 rounded-full text-lg shadow-lg shadow-primary/25 mt-8 transition-all hover:scale-[1.01]"
-                                    disabled={loading}
+                            ) : clientSecret ? (
+                                <Elements
+                                    stripe={stripePromise}
+                                    options={{
+                                        clientSecret,
+                                        appearance: {
+                                            theme: 'stripe',
+                                            variables: {
+                                                colorPrimary: '#10b981',
+                                                borderRadius: '12px',
+                                                colorBackground: '#f9fafb',
+                                            }
+                                        }
+                                    }}
                                 >
-                                    {loading ? (
-                                        <div className="flex items-center gap-2">
-                                            <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
-                                            Processando...
-                                        </div>
-                                    ) : (
-                                        'Iniciar Teste Grátis'
-                                    )}
-                                </Button>
+                                    <PaymentForm
+                                        clientSecret={clientSecret}
+                                        planId={planId}
+                                        interval={interval}
+                                        email={userData.email}
+                                        name={userData.name}
+                                    />
+                                </Elements>
+                            ) : (
+                                <>
+                                    <h2 className="text-2xl font-bold mb-2">Dados de Identificação</h2>
+                                    <p className="text-muted-foreground text-sm mb-8">Informe quem você é para continuar</p>
 
-                                <p className="text-xs text-center text-muted-foreground mt-4">
-                                    Ao clicar em Iniciar, você concorda com nossos Termos de Uso. Cancelamento fácil a qualquer momento.
+                                    <form onSubmit={handleInitialSubmit} className="space-y-6">
+                                        <div className="space-y-4">
+                                            <div className="space-y-2">
+                                                <Label htmlFor="email" className="text-xs font-bold uppercase text-gray-500 tracking-wider ml-1">Email Profissional</Label>
+                                                <Input
+                                                    id="email"
+                                                    type="email"
+                                                    placeholder="seu@email.com"
+                                                    required
+                                                    className="h-12 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary transition-all"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="cardName" className="text-xs font-bold uppercase text-gray-500 tracking-wider ml-1">Nome Completo</Label>
+                                                <Input
+                                                    id="cardName"
+                                                    placeholder="Seu nome completo"
+                                                    required
+                                                    className="h-12 rounded-xl bg-gray-50 border-transparent focus:bg-white focus:border-primary transition-all"
+                                                />
+                                            </div>
+
+                                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
+                                                <ShieldCheck className="h-5 w-5 text-blue-600 mt-0.5" />
+                                                <div className="text-sm text-blue-800">
+                                                    <p className="font-semibold mb-1">Passo Inicial</p>
+                                                    <p>Após informar seus dados, você verá as opções de pagamento integradas.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <Button
+                                            type="submit"
+                                            className="w-full bg-primary hover:bg-[#059669] text-white font-bold h-14 rounded-full text-lg shadow-lg shadow-primary/25 mt-8 transition-all hover:scale-[1.01]"
+                                            disabled={loading}
+                                        >
+                                            {loading ? (
+                                                <div className="flex items-center gap-2">
+                                                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
+                                                    Iniciando...
+                                                </div>
+                                            ) : (
+                                                'Continuar para Pagamento'
+                                            )}
+                                        </Button>
+                                    </form>
+                                </>
+                            )}
+
+                            {!isSuccess && !clientSecret && (
+                                <p className="text-xs text-center text-muted-foreground mt-6">
+                                    Ambiente criptografado e seguro. Seus dados estão protegidos sob a LGPD.
                                 </p>
-                            </form>
+                            )}
                         </motion.div>
+
                         <div className="mt-8 text-center lg:text-left">
                             <Button
                                 variant="ghost"
@@ -177,7 +299,7 @@ export default function CheckoutPage() {
                                 className="text-muted-foreground hover:text-foreground rounded-full pl-0 hover:bg-transparent"
                             >
                                 <ArrowLeft className="mr-2 h-4 w-4" />
-                                Voltar
+                                Voltar para planos
                             </Button>
                         </div>
                     </div>
@@ -198,7 +320,7 @@ export default function CheckoutPage() {
                                     <div className="text-sm text-muted-foreground capitalize">{interval === 'yearly' ? 'Plano Anual' : 'Plano Mensal'}</div>
                                 </div>
                                 <div className="text-right">
-                                    <div className="text-xl font-bold">R$ {selectedPlan.price}</div>
+                                    <div className="text-xl font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedPlan.price)}</div>
                                     <div className="text-xs text-muted-foreground">/{interval === 'yearly' ? 'ano' : 'mês'}</div>
                                 </div>
                             </div>
@@ -228,11 +350,11 @@ export default function CheckoutPage() {
 
                             <div className="flex justify-between items-center mb-2">
                                 <span className="text-muted-foreground">Subtotal</span>
-                                <span className="font-medium">R$ {selectedPlan.price},00</span>
+                                <span className="font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedPlan.price)}</span>
                             </div>
                             <div className="flex justify-between items-center mb-6 text-primary">
                                 <span className="font-medium">Desconto de Teste (14 dias)</span>
-                                <span className="font-bold">- R$ {selectedPlan.price},00</span>
+                                <span className="font-bold">- {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedPlan.price)}</span>
                             </div>
 
                             <div className="flex justify-between items-end pt-4 border-t border-gray-200">

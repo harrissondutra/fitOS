@@ -27,8 +27,10 @@ import {
   User,
   LogIn,
   ChevronDown,
-  ArrowUp
+  ArrowUp,
+  Star
 } from 'lucide-react';
+import { usePlans } from '@/hooks/use-plans';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 
 import { Button } from '@/components/ui/button';
@@ -51,6 +53,7 @@ const HERO_IMAGES = [
 
 export default function HomePage() {
   const router = useRouter();
+  const { plans: backendPlans, isLoading } = usePlans();
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
@@ -84,9 +87,6 @@ export default function HomePage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  if (!mounted) return null;
-
-  // Variantes de Animação
   const fadeInView = {
     hidden: { opacity: 0, y: 30 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
@@ -102,61 +102,64 @@ export default function HomePage() {
     }
   };
 
-  // Dados de Preços (Sincronizado)
-  const plans = [
-    {
-      id: 'free',
-      name: 'FREE',
+  // Metadata para enriquecer os dados do backend
+  const PLAN_METADATA: Record<string, any> = {
+    individual: {
       icon: Zap,
-      price: { monthly: 0, yearly: 0 },
       description: 'Para começar sua jornada fitness',
-      features: [
-        'Acesso completo aos seus dados pessoais',
-        'Histórico de 1 ano de treinos e progresso',
-        'Gráficos avançados de analytics',
-        'Aplicativo móvel',
-        'Suporte por email'
-      ],
+      limitations: ['Sem gestão de clientes', 'Sem CRM', 'Sem white-label'],
+      cta: 'Começar Grátis',
       popular: false,
-      cta: 'Começar Grátis'
+      order: 1
     },
-    {
-      id: 'professional',
-      name: 'PROFESSIONAL',
+    starter: {
+      icon: Star,
+      description: 'Perfeito para personal trainers',
+      limitations: ['Sem domínio personalizado', 'Sem API'],
+      cta: 'Escolher Starter',
+      popular: false,
+      order: 2
+    },
+    professional: {
       icon: Crown,
-      price: { monthly: 97, yearly: 970 },
-      description: 'Para profissionais que querem crescer',
-      features: [
-        'Tudo do FREE +',
-        'Exportação de dados',
-        'Gestão de até 50 clientes',
-        'CRM básico',
-        'Marketplace de produtos',
-        'Suporte prioritário',
-        'Relatórios avançados'
-      ],
+      description: 'Para academias em crescimento',
+      limitations: [],
+      cta: 'Escolher Professional',
       popular: true,
-      cta: 'Escolher Professional'
+      order: 3
     },
-    {
-      id: 'enterprise',
-      name: 'ENTERPRISE',
+    enterprise: {
       icon: Building,
-      price: { monthly: 297, yearly: 2970 },
-      description: 'Para academias e grandes empresas',
-      features: [
-        'Tudo do PROFESSIONAL +',
-        'Clientes ilimitados',
-        'CRM completo',
-        'Multi-tenancy',
-        'White-label',
-        'API dedicada',
-        'Suporte 24/7'
-      ],
+      description: 'Para grandes redes',
+      limitations: [],
+      cta: 'Fale com Vendas',
       popular: false,
-      cta: 'Fale com Vendas'
+      order: 4
     }
-  ];
+  };
+
+  const plans = backendPlans?.map(plan => {
+    const metadata = PLAN_METADATA[plan.id] || {
+      icon: Star,
+      description: plan.name,
+      limitations: [],
+      cta: 'Escolher Plano',
+      popular: false,
+      order: 99
+    };
+
+    const price = typeof plan.price === 'object' && plan.price !== null
+      ? plan.price
+      : { monthly: Number(plan.price || 0), yearly: Number(plan.price || 0) * 12 * 0.8 };
+
+    return {
+      ...plan,
+      ...metadata,
+      price
+    };
+  }).sort((a: any, b: any) => (a.order || 99) - (b.order || 99)) || [];
+
+  if (!mounted) return null;
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] text-[#1D1D1F] font-sans overflow-x-hidden selection:bg-[#10B981] selection:text-white">
@@ -447,7 +450,7 @@ export default function HomePage() {
             </div>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-stretch">
             {plans.map((plan) => {
               const Icon = plan.icon;
               const price = plan.price[billingCycle];
@@ -456,45 +459,66 @@ export default function HomePage() {
                 <motion.div
                   variants={fadeInView}
                   key={plan.id}
-                  className={`relative flex flex-col p-8 rounded-[2rem] transition-all duration-300 ${plan.popular
-                    ? 'bg-white shadow-2xl ring-1 ring-black/5 scale-105 z-10'
-                    : 'bg-white/50 backdrop-blur shadow-sm hover:bg-white hover:shadow-xl'
-                    }`}
+                  className={`
+                    relative flex flex-col p-6 rounded-[2rem] transition-all duration-300
+                    ${plan.popular
+                      ? 'bg-white shadow-2xl scale-105 z-10 ring-2 ring-[#10B981] border-transparent'
+                      : 'bg-white/60 backdrop-blur-sm border border-white/40 hover:bg-white hover:shadow-xl hover:-translate-y-1'
+                    }
+                  `}
                 >
                   {plan.popular && (
-                    <div className="absolute top-6 right-6 text-[#10B981] text-xs font-bold uppercase tracking-wider">
-                      Popular
+                    <div className="absolute -top-4 left-0 right-0 flex justify-center">
+                      <div className="bg-[#10B981] text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg shadow-[#10B981]/20 flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-current" />
+                        Recomendado
+                      </div>
                     </div>
                   )}
 
-                  <div className="mb-8">
-                    <h3 className="text-2xl font-semibold text-[#1D1D1F]">{plan.name}</h3>
-                    <p className="text-sm mt-2 text-[#86868B]">{plan.description}</p>
+                  <div className="mb-6">
+                    <div className={`
+                      w-12 h-12 rounded-2xl flex items-center justify-center mb-4
+                      ${plan.popular ? 'bg-[#10B981]/10 text-[#10B981]' : 'bg-gray-100 text-gray-600'}
+                    `}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-xl font-bold mb-2 text-[#1D1D1F]">{plan.name}</h3>
+                    <p className="text-sm text-[#86868B] font-medium leading-relaxed h-[40px]">{plan.description}</p>
                   </div>
 
-                  <div className="mb-8">
+                  <div className="mb-6 pb-6 border-b border-gray-100">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-semibold text-[#1D1D1F]">
-                        {price === 0 ? 'Grátis' : `R$${price}`}
+                      <span className="text-3xl font-bold tracking-tight text-[#1D1D1F]">
+                        {price === 0 ? 'Grátis' : `R$ ${price}`}
                       </span>
-                      {price > 0 && <span className="text-[#86868B]">/mês</span>}
+                      {price > 0 && (
+                        <span className="text-[#86868B] font-medium text-sm">
+                          /{billingCycle === 'monthly' ? 'mês' : 'ano'}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   <ul className="space-y-4 mb-8 flex-1">
-                    {plan.features.map((feature, i) => (
-                      <li key={i} className="flex items-start gap-3 text-[15px] text-[#1D1D1F]">
-                        <Check className="h-4 w-4 text-[#10B981] mt-1 shrink-0" strokeWidth={3} />
-                        <span>{feature}</span>
+                    {plan.features.map((feature: string, i: number) => (
+                      <li key={i} className="flex items-start gap-3">
+                        <div className="mt-0.5 w-5 h-5 rounded-full bg-[#10B981]/10 flex items-center justify-center flex-shrink-0">
+                          <Check className="h-3 w-3 text-[#10B981]" strokeWidth={3} />
+                        </div>
+                        <span className="text-xs font-medium text-gray-700">{feature}</span>
                       </li>
                     ))}
                   </ul>
 
                   <Button
-                    className={`w-full h-12 rounded-full font-medium transition-all ${plan.popular
-                      ? 'bg-[#10B981] hover:bg-[#059669] text-white hover:shadow-lg hover:shadow-[#10B981]/25'
-                      : 'bg-[#F5F5F7] text-[#1D1D1F] hover:bg-[#E5E5EA]'
-                      }`}
+                    className={`
+                      w-full h-11 rounded-xl font-bold text-sm transition-all duration-300
+                      ${plan.popular
+                        ? 'bg-[#10B981] hover:bg-[#059669] text-white shadow-lg hover:shadow-[#10B981]/30'
+                        : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-900 hover:bg-gray-50'
+                      }
+                    `}
                     onClick={() => router.push(plan.id === 'enterprise' ? '/contact' : '/auth/signup')}
                   >
                     {plan.cta}

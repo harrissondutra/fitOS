@@ -92,15 +92,16 @@ export class CloudinaryService {
     uploadType: UploadType,
     entityId: string,
     publicId?: string,
-    customTransformations?: TransformationConfig
+    customTransformations?: TransformationConfig,
+    customFolder?: string
   ): Promise<{ url: string; publicId: string; width: number; height: number }> {
     try {
-      const folder = `fitos/${uploadType}s/${entityId}`;
+      const folder = customFolder || `fitos/${uploadType}s/${entityId}`;
       const finalPublicId = publicId || `${uploadType}_${entityId}_${Date.now()}`;
-      
+
       // Usar transformações customizadas ou padrão
       const transformations = customTransformations || transformationConfigs[uploadType];
-      
+
       // Converter Buffer para data URL se necessário
       let uploadData: string;
       if (Buffer.isBuffer(file)) {
@@ -113,12 +114,12 @@ export class CloudinaryService {
         } else if (file[0] === 0x52 && file[1] === 0x49 && file[2] === 0x46 && file[3] === 0x46) {
           mimeType = 'image/webp';
         }
-        
+
         uploadData = `data:${mimeType};base64,${file.toString('base64')}`;
       } else {
         uploadData = file; // Já é string
       }
-      
+
       const result = await cloudinary.uploader.upload(uploadData, {
         folder,
         public_id: finalPublicId,
@@ -128,7 +129,7 @@ export class CloudinaryService {
       });
 
       logger.info(`${uploadType} uploaded successfully for entity ${entityId}: ${result.public_id}`);
-      
+
       // Rastrear custo do upload
       try {
         await costTrackerService.trackCloudinaryUsage({
@@ -148,7 +149,7 @@ export class CloudinaryService {
       } catch (error) {
         logger.warn('Failed to track Cloudinary usage:', error);
       }
-      
+
       return {
         url: result.secure_url,
         publicId: result.public_id,
@@ -197,9 +198,10 @@ export class CloudinaryService {
   static async uploadExerciseImage(
     file: Buffer | string,
     exerciseId: string,
-    publicId?: string
+    publicId?: string,
+    folder?: string
   ): Promise<{ url: string; publicId: string; width: number; height: number }> {
-    return await this.uploadImage(file, 'exercise', exerciseId, publicId);
+    return await this.uploadImage(file, 'exercise', exerciseId, publicId, undefined, folder);
   }
 
   /**
@@ -250,7 +252,7 @@ export class CloudinaryService {
 
       const results = await Promise.all(uploadPromises);
       logger.info(`Multiple ${uploadType}s uploaded successfully for entity ${entityId}: ${results.length} images`);
-      
+
       return results;
     } catch (error) {
       logger.error(`Error uploading multiple ${uploadType}s to Cloudinary:`, error);
@@ -306,7 +308,7 @@ export class CloudinaryService {
       });
 
       logger.info(`Social avatar uploaded successfully for user ${userId} from ${provider}: ${result.public_id}`);
-      
+
       return {
         url: result.secure_url,
         publicId: result.public_id,
@@ -400,7 +402,7 @@ export class CloudinaryService {
     try {
       const folder = `fitos/exercises/${exerciseId}`;
       const finalPublicId = publicId || `exercise_video_${exerciseId}_${Date.now()}`;
-      
+
       // Converter Buffer para data URL se necessário
       let uploadData: string;
       if (Buffer.isBuffer(file)) {
@@ -408,7 +410,7 @@ export class CloudinaryService {
       } else {
         uploadData = file;
       }
-      
+
       const result = await cloudinary.uploader.upload(uploadData, {
         folder,
         public_id: finalPublicId,
@@ -421,7 +423,7 @@ export class CloudinaryService {
       });
 
       logger.info(`Exercise video uploaded successfully for exercise ${exerciseId}: ${result.public_id}`);
-      
+
       // Rastrear custo do upload
       try {
         const fileSizeMB = (file.length || 0) / (1024 * 1024);
@@ -433,7 +435,7 @@ export class CloudinaryService {
       } catch (costError) {
         logger.warn('Error tracking Cloudinary video cost:', costError);
       }
-      
+
       return {
         url: result.secure_url,
         publicId: result.public_id,

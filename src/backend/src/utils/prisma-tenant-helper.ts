@@ -1,8 +1,17 @@
-import { ConnectionManagerService } from '../services/connection-manager.service';
+import { ConnectionManagerService, connectionManager } from '../services/connection-manager.service';
 import { PrismaTenantWrapper } from '../services/prisma-tenant-wrapper.service';
 import { DbStrategy } from '@prisma/client';
 import { getPrismaClient } from '../config/database';
 import { logger } from './logger';
+
+// Cache to prevent object churn and reduce GC pressure
+const tenantWrapperCache = new Map<string, PrismaTenantWrapper>();
+
+// Simple interval to clear cache every hour to prevent stale growth
+setInterval(() => {
+  tenantWrapperCache.clear();
+  logger.info('Cleared tenantWrapperCache to release memory');
+}, 60 * 60 * 1000);
 
 /**
  * Helper para obter PrismaTenantWrapper para uma organização
@@ -12,16 +21,24 @@ export async function getTenantPrismaWrapper(
   organizationId: string,
   allowCrossTenant: boolean = false
 ): Promise<PrismaTenantWrapper> {
-  const connectionManager = new ConnectionManagerService();
+  const cacheKey = `${organizationId}:${allowCrossTenant}`;
+
+  if (tenantWrapperCache.has(cacheKey)) {
+    return tenantWrapperCache.get(cacheKey)!;
+  }
+
   const strategy = await connectionManager.getOrganizationStrategy(organizationId);
   const prisma = await connectionManager.getConnection(organizationId);
 
-  return new PrismaTenantWrapper(
+  const wrapper = new PrismaTenantWrapper(
     prisma,
     organizationId,
     strategy,
     allowCrossTenant
   );
+
+  tenantWrapperCache.set(cacheKey, wrapper);
+  return wrapper;
 }
 
 /**

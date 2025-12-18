@@ -154,9 +154,10 @@ export function usePushNotifications(config?: PushNotificationConfig) {
       return true;
     } catch (error) {
       console.error('[Push Notifications] Error subscribing:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       setState(prev => ({
         ...prev,
-        error: 'Erro ao inscrever para notificações',
+        error: `Erro: ${errorMessage}`,
       }));
       return false;
     }

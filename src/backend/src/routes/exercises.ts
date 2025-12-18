@@ -26,6 +26,10 @@ interface RequestWithTenantAndAuth extends RequestWithTenant {
   };
 }
 
+import { scraperService } from '../services/scraper.service';
+
+
+
 // Get all exercises - Auth removed
 router.get('/',
   [
@@ -52,28 +56,12 @@ router.get('/',
       });
     }
 
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Authentication required' }
-      });
-    }
+    // Allow public access - no mandatory auth check here for GET
+    // exercises are public by default now per user request
+    const tenantId = req.tenantId || req.user?.tenantId || 'global';
 
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Authentication required' }
-      });
-    }
-
-    const tenantId = req.tenantId || req.user?.tenantId;
-    // SUPER_ADMIN pode acessar sem tenantId específico
-    if (!tenantId && req.user?.role !== 'SUPER_ADMIN') {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Tenant not found' }
-      });
-    }
+    // Auth is optional, but if present we can use it for specific logic if needed
+    // For now, we just proceed to fetch exercises
 
     const filters: ExerciseFilters = {
       search: req.query.search as string,
@@ -90,7 +78,7 @@ router.get('/',
 
     // Usar service com wrapper para garantir isolamento multi-tenant
     const exerciseService = await createExerciseService(req);
-    const result = await exerciseService.getExercises(filters, tenantId || 'default', req.user.role);
+    const result = await exerciseService.getExercises(filters, tenantId || 'default', req.user?.role);
 
     return res.json({
       success: true,
@@ -111,15 +99,9 @@ router.get('/:id',
       });
     }
 
-    const tenantId = req.tenantId || req.user?.tenantId;
+    const tenantId = req.tenantId || req.user?.tenantId || 'global';
 
-    // SUPER_ADMIN pode acessar sem tenantId específico
-    if (!tenantId && req.user?.role !== 'SUPER_ADMIN') {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Tenant not found' }
-      });
-    }
+    // Auth is optional for details view too
 
     // Usar service com wrapper para garantir isolamento multi-tenant
     const exerciseService = await createExerciseService(req);
@@ -464,35 +446,40 @@ router.get('/category/:category',
   })
 );
 
-// Get exercises by muscle group
-router.get('/muscle-group/:muscleGroup',
+// Scrape URL (Super Admin only)
+router.post('/scrape',
+  [
+    body('url').isURL().withMessage('Valid URL required')
+  ],
   asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
-    const { muscleGroup } = req.params;
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Authentication required' }
-      });
+    // Auth check (relying on optionalAuth from app.js)
+    if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: { message: 'Access denied. Super Admin role required.' } });
     }
 
-    const tenantId = req.tenantId || req.user?.tenantId;
+    const { url } = req.body;
+    const tenantId = req.tenantId || req.user.tenantId || 'default';
 
-    // SUPER_ADMIN pode acessar sem tenantId específico
-    if (!tenantId && req.user?.role !== 'SUPER_ADMIN') {
-      return res.status(401).json({
-        success: false,
-        error: { message: 'Tenant not found' }
-      });
+    try {
+      const exercise = await scraperService.scrapeExercise(url, tenantId, req.user.id);
+      return res.json({ success: true, data: exercise });
+    } catch (e: any) {
+      return res.status(500).json({ success: false, error: { message: e.message } });
+    }
+  })
+);
+
+// Trigger full catalog scrape
+router.post('/scrape-all',
+  asyncHandler(async (req: RequestWithTenantAndAuth, res: Response) => {
+    // Auth check
+    if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ success: false, error: { message: 'Access denied' } });
     }
 
-    // Usar service com wrapper para garantir isolamento multi-tenant
-    const exerciseService = await createExerciseService(req);
-    const exercises = await exerciseService.getExercisesByMuscleGroup(muscleGroup, tenantId || 'default');
-
-    return res.json({
-      success: true,
-      data: exercises
-    });
+    const tenantId = req.tenantId || req.user.tenantId || 'default';
+    const result = await scraperService.scrapeCatalog(tenantId, req.user.id);
+    return res.json({ success: true, data: result });
   })
 );
 
@@ -517,7 +504,7 @@ router.get('/export/csv',
 
     // Usar service com wrapper para garantir isolamento multi-tenant
     const exerciseService = await createExerciseService(req);
-    const exerciseIds = req.query.exerciseIds ? (req.query.exerciseIds as string).split(',') : [];
+    // @ts-ignore
     const exercises = await exerciseService.exportExercisesToCSV(tenantId || 'default');
 
     return res.json({
@@ -527,5 +514,14 @@ router.get('/export/csv',
   })
 );
 
-export { router as exerciseRoutes };
+// Status endpoint
+router.get('/scrape-status', (req: RequestWithTenantAndAuth, res: Response) => {
+  // Rely on optionalAuth providing req.user
+  if (!req.user || req.user.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ success: false, error: { message: 'Access denied' } });
+  }
+  const status = scraperService.getStatus();
+  res.json({ success: true, data: status });
+});
 
+export { router as exercisesRouter };

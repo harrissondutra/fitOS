@@ -18,7 +18,7 @@ export class WebhookValidatorService {
     ipWhitelist: string[] = [],
     maxTimestampAge: number = 300 // 5 minutos
   ) {
-    this.webhookSecret = webhookSecret || process.env.WEBHOOK_SECRET || '';
+    this.webhookSecret = webhookSecret || process.env.WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET || '';
     this.ipWhitelist = ipWhitelist.length > 0 ? ipWhitelist : this.getDefaultIpWhitelist();
     this.maxTimestampAge = maxTimestampAge;
 
@@ -93,13 +93,13 @@ export class WebhookValidatorService {
     try {
       // Converter body para string se necessário
       const bodyString = Buffer.isBuffer(body) ? body.toString('utf8') : body;
-      
+
       // Calcular HMAC esperado
       const expectedSignature = crypto
         .createHmac('sha256', this.webhookSecret)
         .update(bodyString, 'utf8')
         .digest('hex');
-      
+
       // Comparar assinaturas (timing-safe)
       const receivedSignature = signature.replace('sha256=', '');
       return crypto.timingSafeEqual(
@@ -122,17 +122,17 @@ export class WebhookValidatorService {
       const timestampNumber = parseInt(timestamp, 10);
       const currentTime = Math.floor(Date.now() / 1000);
       const age = currentTime - timestampNumber;
-      
+
       // Verificar se o timestamp não é muito antigo
       if (age > this.maxTimestampAge) {
         return false;
       }
-      
+
       // Verificar se o timestamp não é do futuro (tolerância de 5 minutos)
       if (timestampNumber > currentTime + 300) {
         return false;
       }
-      
+
       return true;
     } catch (error) {
       console.error('Timestamp validation error:', error);
@@ -242,7 +242,7 @@ export class WebhookValidatorService {
       .createHmac('sha256', this.webhookSecret)
       .update(bodyString, 'utf8')
       .digest('hex');
-    
+
     return `sha256=${signature}`;
   }
 

@@ -93,14 +93,14 @@ export class PlansConfig {
         },
         adsEnabled: true, // Individual (Free) tem anúncios
         stripePriceId: {
-          monthly: 'price_individual_free',
-          yearly: 'price_individual_free'
+          monthly: 'price_free',
+          yearly: 'price_free'
         }
       },
       {
         id: 'starter',
         name: 'Starter',
-        description: 'Perfeito para academias pequenas e personal trainers',    
+        description: 'Perfeito para academias pequenas e personal trainers',
         price: {
           monthly: 99.90,
           yearly: 799.20 // 20% desconto anual
@@ -132,8 +132,8 @@ export class PlansConfig {
         },
         adsEnabled: true, // Starter tem anúncios
         stripePriceId: {
-          monthly: 'price_starter_monthly',
-          yearly: 'price_starter_yearly'
+          monthly: 'price_1SfS7B0aTWFI2uJk0N6BzbHg',
+          yearly: 'price_1SfS7B0aTWFI2uJkkxjbTdzb'
         }
       },
       {
@@ -176,8 +176,8 @@ export class PlansConfig {
         recommended: true,
         adsEnabled: true, // Professional tem anúncios
         stripePriceId: {
-          monthly: 'price_professional_monthly',
-          yearly: 'price_professional_yearly'
+          monthly: 'price_1SfS7C0aTWFI2uJkpcJzmABE',
+          yearly: 'price_1SfS7C0aTWFI2uJklGdLCSit'
         }
       },
       {
@@ -221,8 +221,8 @@ export class PlansConfig {
         },
         adsEnabled: false, // Enterprise não tem anúncios
         stripePriceId: {
-          monthly: 'price_enterprise_monthly',
-          yearly: 'price_enterprise_yearly'
+          monthly: 'price_1SfS7D0aTWFI2uJkaVHSmL9K',
+          yearly: 'price_1SfS7E0aTWFI2uJkfQMHjTsx'
         }
       }
     ];
@@ -233,7 +233,7 @@ export class PlansConfig {
    */
   async getAllPlans(): Promise<SubscriptionPlan[]> {
     const cacheKey = 'billing:plans:all';
-    
+
     try {
       // Tentar buscar do cache primeiro
       const cached = await this.redis.get(cacheKey);
@@ -295,15 +295,15 @@ export class PlansConfig {
     if (!plan) return false;
 
     const limit = plan.limits[feature];
-    
+
     if (typeof limit === 'boolean') {
       return limit;
     }
-    
+
     if (typeof limit === 'number') {
       return limit > 0 || limit === -1; // -1 = ilimitado
     }
-    
+
     return false;
   }
 
@@ -315,12 +315,12 @@ export class PlansConfig {
     if (!plan) return 0;
 
     const limitValue = plan.limits[limit];
-    
+
     // Se for 'support', retornar como boolean (true se não for 'email')
     if (typeof limitValue === 'string' && (limitValue === 'email' || limitValue === 'priority' || limitValue === '24x7')) {
       return limitValue !== 'email';
     }
-    
+
     // Caso contrário, retornar como number ou boolean
     return limitValue as number | boolean;
   }
@@ -337,7 +337,7 @@ export class PlansConfig {
   }> {
     const plans = await this.getAllPlans();
     const selectedPlans = plans.filter(plan => planIds.includes(plan.id));
-    
+
     const comparison = [
       {
         feature: 'Preço Mensal',
@@ -408,7 +408,7 @@ export class PlansConfig {
    */
   async suggestPlanByClientCount(clientCount: number): Promise<SubscriptionPlan | null> {
     const plans = await this.getAllPlans();
-    
+
     // Ordenar planos por limite de clientes
     const sortedPlans = plans.sort((a, b) => {
       const aLimit = a.limits.clients === -1 ? Infinity : a.limits.clients;
@@ -461,7 +461,7 @@ export class PlansConfig {
    */
   async updatePlan(planId: string, updates: Partial<SubscriptionPlan>): Promise<SubscriptionPlan | null> {
     const planIndex = this.plans.findIndex(plan => plan.id === planId);
-    
+
     if (planIndex === -1) {
       return null;
     }

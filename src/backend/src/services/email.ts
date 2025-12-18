@@ -529,6 +529,38 @@ class EmailService {
     };
   }
 
+  getAdminSubscriptionTemplate(data: { email: string, name: string, plan: string, interval: string, amount: string }): EmailTemplate {
+    return {
+      subject: `📢 Nova Assinatura: ${data.name} (${data.plan})`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #10b981;">🚀 Nova Assinatura Realizada!</h2>
+          <p>Um novo usuário acaba de assinar o FitOS.</p>
+          <hr />
+          <p><strong>Cliente:</strong> ${data.name}</p>
+          <p><strong>Email:</strong> ${data.email}</p>
+          <p><strong>Plano:</strong> ${data.plan}</p>
+          <p><strong>Ciclo:</strong> ${data.interval}</p>
+          <p><strong>Valor:</strong> ${data.amount}</p>
+          <hr />
+          <p>Acesse o painel do Stripe para mais detalhes.</p>
+        </div>
+      `,
+      text: `Nova Assinatura Realizada!\n\nCliente: ${data.name}\nEmail: ${data.email}\nPlano: ${data.plan}\nCiclo: ${data.interval}\nValor: ${data.amount}`
+    };
+  }
+
+  async sendAdminNotification(data: { email: string, name: string, plan: string, interval: string, amount: string }): Promise<boolean> {
+    const adminEmail = process.env.CONTACT_SALES_EMAIL || 'sistudofitness@gmail.com';
+    const template = this.getAdminSubscriptionTemplate(data);
+    return this.sendEmail({
+      to: adminEmail,
+      subject: template.subject,
+      html: template.html,
+      text: template.text
+    });
+  }
+
   async sendVerificationEmail(to: string, userName: string, verifyUrl: string): Promise<boolean> {
     const template = this.getVerificationEmailTemplate(userName, verifyUrl);
     return this.sendEmail({
@@ -538,6 +570,75 @@ class EmailService {
       text: template.text,
     });
   }
+
+  // Novos templates para Billing (Stripe Integration 100%)
+
+  getTrialEndingTemplate(userName: string, planName: string, endDate: string): EmailTemplate {
+    return {
+      subject: 'Seu período de teste está acabando! ⏳',
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #f59e0b;">⏳ O teste gratuito está acabando</h2>
+          <p>Olá ${userName},</p>
+          <p>Esperamos que você esteja aproveitando o <strong>FitOS</strong> e alcançando seus objetivos!</p>
+          <p>Seu período de teste do plano <strong>${planName}</strong> termina em <strong>${endDate}</strong>.</p>
+          <p>Para continuar sem interrupções, certifique-se de que seu método de pagamento está atualizado.</p>
+          <p>Se tiver dúvidas, entre em contato com nosso suporte.</p>
+        </div>
+      `,
+      text: `Olá ${userName}, seu teste do plano ${planName} acaba em ${endDate}. Mantenha seu pagamento em dia para continuar.`
+    };
+  }
+
+  getPaymentFailedTemplate(userName: string, planName: string, updateLink: string): EmailTemplate {
+    return {
+      subject: 'Houve um problema com seu pagamento ❌',
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #ef4444;">❌ Falha no Pagamento</h2>
+          <p>Olá ${userName},</p>
+          <p>Não conseguimos processar o pagamento da sua assinatura do plano <strong>${planName}</strong>.</p>
+          <p>Isso pode acontecer por cartão expirado ou falta de limite.</p>
+          <p>Por favor, atualize seus dados de pagamento para evitar o bloqueio do acesso:</p>
+          <a href="${updateLink}" style="background-color: #ef4444; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Atualizar Pagamento</a>
+        </div>
+      `,
+      text: `Olá ${userName}, falha no pagamento do plano ${planName}. Atualize seus dados em: ${updateLink}`
+    };
+  }
+
+  getRefundIssuedTemplate(userName: string, amount: string): EmailTemplate {
+    return {
+      subject: 'Reembolso Processado 💸',
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #10b981;">💸 Reembolso Confirmado</h2>
+          <p>Olá ${userName},</p>
+          <p>O reembolso no valor de <strong>${amount}</strong> foi processado com sucesso.</p>
+          <p>O valor deve aparecer na sua fatura em 5 a 10 dias úteis, dependendo do seu banco.</p>
+        </div>
+      `,
+      text: `Olá ${userName}, seu reembolso de ${amount} foi processado.`
+    };
+  }
+
+  // Métodos de envio
+
+  async sendTrialEndingEmail(to: string, userName: string, planName: string, endDate: string): Promise<boolean> {
+    const template = this.getTrialEndingTemplate(userName, planName, endDate);
+    return this.sendEmail({ to, subject: template.subject, html: template.html, text: template.text });
+  }
+
+  async sendPaymentFailedEmail(to: string, userName: string, planName: string, updateLink: string): Promise<boolean> {
+    const template = this.getPaymentFailedTemplate(userName, planName, updateLink);
+    return this.sendEmail({ to, subject: template.subject, html: template.html, text: template.text });
+  }
+
+  async sendRefundIssuedEmail(to: string, userName: string, amount: string): Promise<boolean> {
+    const template = this.getRefundIssuedTemplate(userName, amount);
+    return this.sendEmail({ to, subject: template.subject, html: template.html, text: template.text });
+  }
 }
+
 
 export const emailService = new EmailService();

@@ -7,7 +7,7 @@ import { MigrationOrchestratorService } from '../services/migration-orchestrator
 import { MetricsCollectionService } from '../services/metrics-collection.service';
 import { AlertingService } from '../services/alerting.service';
 import { HealthCheckService } from '../services/health-check.service';
-import { ConnectionManagerService } from '../services/connection-manager.service';
+import { ConnectionManagerService, connectionManager } from '../services/connection-manager.service';
 import { ServerScanAutomationService } from '../services/server-scan-automation.service';
 import { ProviderIntegrationService } from '../services/provider-integration.service';
 import { getPrismaClient } from '../config/database';
@@ -78,7 +78,7 @@ async function startServerMetricsPoller(): Promise<void> {
 }
 
 // Start poller lazily on first import
-startServerMetricsPoller().catch(() => {});
+startServerMetricsPoller().catch(() => { });
 // In-memory server metrics history (runtime persistence)
 const serverMetricsHistory: Map<string, Array<{ ts: number; data: any }>> = new Map();
 const pushServerMetric = (serverId: string, data: any, max: number = 500) => {
@@ -121,7 +121,7 @@ async function rpushServerMetric(serverId: string, payload: { ts: number; data: 
     if (ttl) {
       await r.expire(key, ttl);
     }
-  } catch {}
+  } catch { }
 }
 async function rgetServerMetrics(serverId: string, limit: number = 200): Promise<Array<{ ts: number; data: any }>> {
   const r = getRedis();
@@ -163,8 +163,9 @@ const migrationService = new MigrationOrchestratorService();
 const metricsService = new MetricsCollectionService();
 const alertingService = new AlertingService();
 const healthCheckService = new HealthCheckService();
-const connectionManager = new ConnectionManagerService();
+// connectionManager imported from service
 const encryptionService = new EncryptionService();
+
 const serverScanService = new ServerScanAutomationService();
 
 // Middleware: Requer SUPER_ADMIN para todas as rotas (lazy evaluation)
@@ -813,7 +814,7 @@ router.post('/migrations/:id/pause', async (req: Request, res: Response) => {
   const prisma = getPrismaClient();
   try {
     const { id } = req.params;
-    
+
     const migration = await prisma.migrationJob.findUnique({
       where: { id },
     });
@@ -978,8 +979,8 @@ router.post('/migrations/:id/rollback', async (req: Request, res: Response) => {
 router.get('/dashboard', async (req: Request, res: Response) => {
   const prisma = getPrismaClient();
   try {
-  // Tornar dashboard resiliente a falhas em métricas agregadas
-  const [
+    // Tornar dashboard resiliente a falhas em métricas agregadas
+    const [
       totalOrganizations,
       totalConnections,
       totalBackups,
@@ -1065,15 +1066,15 @@ router.get('/connections', async (req: Request, res: Response) => {
       }),
       prisma.databaseConnection.count({ where }),
     ]);
-    res.json({ 
-      success: true, 
-      data: serializeBigInt({ 
-        items, 
-        total, 
-        page: Number(page), 
-        limit: Number(limit), 
-        hasMore: Number(page) * Number(limit) < total 
-      }) 
+    res.json({
+      success: true,
+      data: serializeBigInt({
+        items,
+        total,
+        page: Number(page),
+        limit: Number(limit),
+        hasMore: Number(page) * Number(limit) < total
+      })
     });
   } catch (error) {
     logger.error('Error listing database connections:', error);
@@ -1124,12 +1125,12 @@ router.get('/redis/status', async (req: Request, res: Response) => {
  */
 async function getServerSSHData(id: string) {
   const prisma = getPrismaClient();
-  const server = await prisma.databaseConnection.findUnique({ 
+  const server = await prisma.databaseConnection.findUnique({
     where: { id },
-    select: { 
-      id: true, 
-      host: true, 
-      port: true, 
+    select: {
+      id: true,
+      host: true,
+      port: true,
       username: true,
       sshHost: true,
       sshPort: true,
@@ -1138,9 +1139,9 @@ async function getServerSSHData(id: string) {
       sshEnabled: true
     }
   });
-  
+
   if (!server) return null;
-  
+
   // Se é formato novo (databaseName = '__server__'), usar host/port/username
   if (server.databaseName === '__server__') {
     return {
@@ -1149,7 +1150,7 @@ async function getServerSSHData(id: string) {
       username: server.username || 'root',
     };
   }
-  
+
   // Se é formato antigo (sshEnabled = true), usar sshHost/sshPort/sshUsername
   if (server.sshEnabled && server.sshHost && server.sshUsername) {
     return {
@@ -1158,7 +1159,7 @@ async function getServerSSHData(id: string) {
       username: server.sshUsername,
     };
   }
-  
+
   return null;
 }
 
@@ -1182,30 +1183,30 @@ router.get('/servers', async (req: Request, res: Response) => {
     const [newFormatServers, oldFormatServers] = await Promise.all([
       prisma.databaseConnection.findMany({
         where: { databaseName: '__server__' },
-        select: { 
-          id: true, 
-          name: true, 
-          host: true, 
-          port: true, 
-          username: true, 
-          createdAt: true 
+        select: {
+          id: true,
+          name: true,
+          host: true,
+          port: true,
+          username: true,
+          createdAt: true
         },
       }),
       prisma.databaseConnection.findMany({
-        where: { 
+        where: {
           sshEnabled: true,
           sshHost: { not: null },
           sshUsername: { not: null },
           // Excluir os que já estão no formato novo
           databaseName: { not: '__server__' }
         },
-        select: { 
-          id: true, 
-          name: true, 
+        select: {
+          id: true,
+          name: true,
           sshHost: true,
           sshPort: true,
           sshUsername: true,
-          createdAt: true 
+          createdAt: true
         },
       }),
     ]);
@@ -1242,7 +1243,7 @@ router.post('/servers', async (req: Request, res: Response) => {
   try {
     const { name, host, port, username } = req.body || {};
     if (!name || !host || !username) return res.status(400).json({ success: false, error: 'name, host e username são obrigatórios' });
-    
+
     // Garantir que a organização 'sistema' existe
     let sistemaOrg = await prisma.tenant.findUnique({ where: { id: 'sistema' } });
     if (!sistemaOrg) {
@@ -1261,7 +1262,7 @@ router.post('/servers', async (req: Request, res: Response) => {
         }
       });
     }
-    
+
     const conn = await prisma.databaseConnection.create({
       data: {
         organizationId: 'sistema',
@@ -1474,7 +1475,7 @@ router.post('/servers/:id/docker/import/postgres', async (req: Request, res: Res
         }
       });
     }
-    
+
     const connection = await prisma.databaseConnection.create({
       data: {
         organizationId: targetOrgId,
@@ -1522,7 +1523,7 @@ router.post('/servers/:id/docker/import/redis', async (req: Request, res: Respon
     const match = containers.find(c => c.containerName === containerName);
     if (!match) return res.status(404).json({ success: false, error: 'Container não encontrado' });
     if (!match.hostPort) return res.status(400).json({ success: false, error: 'Container sem porta mapeada no host (6379). Exponha a porta.' });
-    
+
     // Garantir que a organização existe
     const targetOrgId = organizationId || 'sistema';
     let org = await prisma.tenant.findUnique({ where: { id: targetOrgId } });
@@ -1541,7 +1542,7 @@ router.post('/servers/:id/docker/import/redis', async (req: Request, res: Respon
         }
       });
     }
-    
+
     const encryptedPassword = match.password ? encryptionService.encrypt(match.password) : null;
     const connection = await prisma.databaseConnection.create({
       data: {
@@ -1577,7 +1578,7 @@ router.get('/servers/:id/scan-results', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const result = await serverScanService.getScanResult(id);
-    
+
     if (!result) {
       return res.json({
         success: true,
@@ -1606,7 +1607,7 @@ router.get('/servers/:id/scan-results', async (req: Request, res: Response) => {
 router.get('/servers/scan-results', async (req: Request, res: Response) => {
   try {
     const results = await serverScanService.getAllScanResults();
-    
+
     res.json({
       success: true,
       data: results,
@@ -1686,7 +1687,7 @@ router.post('/servers/:id/scan-now', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const result = await serverScanService.scanServer(id);
-    
+
     res.json({
       success: true,
       data: result,
@@ -1708,7 +1709,7 @@ router.post('/servers/:id/scan-now', async (req: Request, res: Response) => {
 router.post('/servers/scan-all', async (req: Request, res: Response) => {
   try {
     await serverScanService.scanAllServers();
-    
+
     res.json({
       success: true,
       message: 'Scan de todos os servidores iniciado',
@@ -1730,7 +1731,7 @@ router.delete('/servers/:id/scan-results', async (req: Request, res: Response) =
   try {
     const { id } = req.params;
     await serverScanService.clearScanResult(id);
-    
+
     res.json({
       success: true,
       message: 'Resultado de scan removido',
@@ -1760,7 +1761,7 @@ router.get('/found-databases', async (req: Request, res: Response) => {
       }
     }
     const scanResults = await serverScanService.getAllScanResults();
-    
+
     // Buscar servidores para mapear IDs aos nomes
     const servers = await prisma.databaseConnection.findMany({
       where: {
@@ -1772,10 +1773,10 @@ router.get('/found-databases', async (req: Request, res: Response) => {
         name: true,
       },
     });
-    
+
     const serverMap = new Map(servers.map(s => [s.id, s.name]));
     const validServerIds = new Set(servers.map(s => s.id));
-    
+
     // Agregar bancos encontrados de todos os servidores
     const foundDatabases: Array<{
       containerName: string;
@@ -1791,12 +1792,12 @@ router.get('/found-databases', async (req: Request, res: Response) => {
       scannedAt?: string;
       isDocker?: boolean;
     }> = [];
-    
+
     for (const [serverId, result] of Object.entries(scanResults)) {
       // Considerar apenas servidores cadastrados
       if (!validServerIds.has(serverId)) continue;
       const serverName = serverMap.get(serverId) || 'Servidor desconhecido';
-      
+
       // Adicionar PostgreSQL encontrados
       if (result.postgres && Array.isArray(result.postgres)) {
         for (const pg of result.postgres) {
@@ -1816,7 +1817,7 @@ router.get('/found-databases', async (req: Request, res: Response) => {
           });
         }
       }
-      
+
       // Adicionar Redis encontrados
       if (result.redis && Array.isArray(result.redis)) {
         for (const rd of result.redis) {
@@ -1833,7 +1834,7 @@ router.get('/found-databases', async (req: Request, res: Response) => {
         }
       }
     }
-    
+
     // Marcar quais já estão cadastrados
     const existingConnections = await prisma.databaseConnection.findMany({
       where: {
@@ -1845,19 +1846,19 @@ router.get('/found-databases', async (req: Request, res: Response) => {
         provider: true,
       },
     });
-    
+
     const databasesWithStatus = foundDatabases.map(db => {
       const isRegistered = existingConnections.some(
-        conn => conn.host === db.host && 
-                conn.port === db.hostPort
+        conn => conn.host === db.host &&
+          conn.port === db.hostPort
       );
-      
+
       return {
         ...db,
         isRegistered,
       };
     });
-    
+
     res.json({
       success: true,
       data: databasesWithStatus,
@@ -2063,10 +2064,10 @@ router.post('/integrations/ssh/test', async (req: Request, res: Response) => {
     });
 
     const { sshHost, sshPort, sshUsername, sshKey } = req.body || {};
-    
+
     if (!sshHost || !sshUsername || !sshKey) {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         error: 'sshHost, sshUsername e sshKey são obrigatórios',
         details: {
           sshHost: !sshHost ? 'missing' : 'provided',
@@ -2075,33 +2076,33 @@ router.post('/integrations/ssh/test', async (req: Request, res: Response) => {
         }
       });
     }
-    
+
     const { ProviderIntegrationService } = await import('../services/provider-integration.service');
     const providerService = new ProviderIntegrationService();
-    
+
     logger.info('Starting SSH connection test', {
       host: sshHost,
       port: sshPort || 22,
       username: sshUsername,
     });
-    
+
     const result = await providerService.testSSHConnection({ sshHost, sshPort, sshUsername, sshKey });
-    
+
     logger.info('SSH test result', {
       success: result.success,
       message: result.message,
       host: sshHost,
     });
-    
-    return res.json({ 
-      success: result.success, 
-      data: { status: result.success ? 'connected' : 'disconnected' }, 
-      message: result.message 
+
+    return res.json({
+      success: result.success,
+      data: { status: result.success ? 'connected' : 'disconnected' },
+      message: result.message
     });
   } catch (error) {
     logger.error('Error testing SSH connection:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: error instanceof Error ? error.message : 'Internal server error',
       details: error instanceof Error ? error.stack : undefined
     });
@@ -2135,7 +2136,7 @@ router.post('/integrations/ssh/health', async (req: Request, res: Response) => {
           const { EncryptionService } = await import('../services/encryption.service');
           const enc = new EncryptionService();
           sshKey = enc.decrypt(stored);
-        } catch {}
+        } catch { }
       }
     }
 
@@ -2504,7 +2505,7 @@ router.get('/logs/export', async (req: Request, res: Response) => {
     if (format === 'csv') {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename=logs-${Date.now()}.csv`);
-      
+
       const headers = ['id', 'organizationId', 'userId', 'action', 'resource', 'hasTenantContext', 'ipAddress', 'detectedAt'];
       const csv = [
         headers.join(','),
@@ -2519,7 +2520,7 @@ router.get('/logs/export', async (req: Request, res: Response) => {
           (log as any).detectedAt?.toISOString?.() || '',
         ].join(','))
       ].join('\n');
-      
+
       res.send(csv);
     } else {
       res.setHeader('Content-Type', 'application/json');

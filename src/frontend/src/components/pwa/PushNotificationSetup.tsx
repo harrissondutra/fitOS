@@ -108,6 +108,15 @@ export function PushNotificationSetup({
     return 'secondary';
   };
 
+  const [isVisible, setIsVisible] = useState(true);
+
+  const handleDismiss = () => {
+    setIsVisible(false);
+    onDismiss?.();
+  };
+
+  if (!isVisible) return null;
+
   if (!isSupported) {
     return (
       <Card className={cn("border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950", className)}>
@@ -166,15 +175,13 @@ export function PushNotificationSetup({
               {getStatusText()}
             </Badge>
           </div>
-          {onDismiss && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onDismiss}
-            >
-              <XCircle className="h-4 w-4" />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDismiss}
+          >
+            <XCircle className="h-4 w-4" />
+          </Button>
         </div>
         <CardDescription>
           Receba lembretes de treino, mensagens do trainer e atualizações importantes

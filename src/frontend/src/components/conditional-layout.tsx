@@ -38,7 +38,8 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
     '/pricing',
     '/marketplace',
     '/store',
-    '/checkout'
+    '/checkout',
+    '/contact-sales'
   ]
 
   // Rotas que têm layouts específicos com sidebar próprio

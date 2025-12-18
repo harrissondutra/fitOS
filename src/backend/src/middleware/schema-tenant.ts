@@ -82,8 +82,24 @@ export const schemaTenantMiddleware = async (
     // Determinar o nome do schema do tenant
     const tenantSchemaName = `tenant_${tenant.id.replace(/-/g, '_')}`; // Ex: tenant_clg000000000000000000000
 
-    // Anexar o cliente Prisma dinâmico à requisição
-    req.prisma = getDynamicPrismaClient(tenantSchemaName);
+    // Selecionar o cliente Prisma correto baseado na estratégia
+    if (tenant.dbStrategy === 'row_level') {
+      // Para row-level, usar singleton global (conexão compartilhada)
+      // O isolamento é feito via filtro (tenantId) nas queries
+      const { getPrismaClient } = require('../config/database');
+      req.prisma = getPrismaClient();
+    }
+    else if (tenant.dbStrategy === 'database_level') {
+      // Para database-level, obter conexão dedicada do manager (que tem cache)
+      const { connectionManager } = require('../services/connection-manager.service');
+      // getConnection é async e gerencia cache interno
+      req.prisma = await connectionManager.getConnection(tenant.id);
+    }
+    else {
+      // Default: schema_level (schema isolado no mesmo banco)
+      // Usa dynamic prisma que muda o search_path
+      req.prisma = getDynamicPrismaClient(tenantSchemaName);
+    }
 
     // Adicionar tenant ID ao cabeçalho da resposta
     res.set('X-Tenant-ID', tenant.id);

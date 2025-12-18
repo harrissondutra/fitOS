@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient, DbStrategy } from '@prisma/client';
 import { getPrismaClient } from '../config/database';
-import { ConnectionManagerService } from '../services/connection-manager.service';
+import { ConnectionManagerService, connectionManager } from '../services/connection-manager.service';
 import { logger } from '../utils/logger';
 
 // Usar o tipo Request global já estendido em superAdmin.ts
@@ -409,7 +409,10 @@ export class TenantContextMiddleware {
       '/api/sidebar',  // Configuração de sidebar não precisa de tenant context
       '/api/settings',  // Configurações do sistema não precisam de tenant context
       '/api/subscription', // Fluxo de assinatura deve ser independente de tenant
+      '/api/contact', // Rota de contato de vendas e suporte pública
+      '/api/webhooks', // Webhooks não têm contexto de tenant
       '/api/plan-limits', // Visualização de planos deve ser pública
+      '/api/exercises', // Permite acesso público a exercícios (tratado no handler)
     ];
 
     return publicRoutes.some(route => path.startsWith(route));
@@ -458,8 +461,6 @@ export function createTenantContextMiddleware(connectionManager: ConnectionManag
  * Exportar instância padrão (opcional)
  */
 export const tenantContextMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  const connectionManager = new ConnectionManagerService();
   const middleware = new TenantContextMiddleware(connectionManager);
   return middleware.middleware(req, res, next);
 };
-

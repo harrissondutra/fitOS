@@ -31,7 +31,19 @@ import {
   Users,
   User
 } from 'lucide-react';
-import { User as UserType, UserRole, UserRoles, UserStatus, UserTableProps } from '../../../../shared/types';
+import { User as UserType, UserRole, UserRoles, UserStatus } from '@/shared/types/auth.types';
+
+export interface UserTableProps {
+  users: UserType[];
+  loading: boolean;
+  selectedUsers: string[];
+  onSelectUser: (userId: string, checked: boolean) => void;
+  onSelectAll: (checked: boolean) => void;
+  onEdit: (user: UserType) => void;
+  onDelete: (user: UserType) => void;
+  onToggleStatus: (user: UserType) => void;
+  onResetPassword: (user: UserType) => void;
+}
 
 export function UserTable({
   users,
@@ -78,6 +90,7 @@ export function UserTable({
       ACTIVE: { variant: 'default' as const, label: 'Ativo' },
       INACTIVE: { variant: 'secondary' as const, label: 'Inativo' },
       SUSPENDED: { variant: 'destructive' as const, label: 'Suspenso' },
+      PENDING: { variant: 'outline' as const, label: 'Pendente' },
       DELETED: { variant: 'outline' as const, label: 'Excluído' }
     };
 
@@ -156,12 +169,12 @@ export function UserTable({
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
-                      {user.firstName[0]}{user.lastName[0]}
+                      {user.firstName?.[0] || 'U'}{user.lastName?.[0] || ''}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <div className="font-medium">
-                      {user.firstName} {user.lastName}
+                      {user.firstName || 'Usuário'} {user.lastName || ''}
                     </div>
                     {user.phone && (
                       <div className="text-sm text-muted-foreground">{user.phone}</div>

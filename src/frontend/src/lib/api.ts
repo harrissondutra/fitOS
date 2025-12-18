@@ -30,7 +30,7 @@ export async function authenticatedApiRequest(
 ): Promise<any> {
   // Buscar accessToken (compatível com AuthContext)
   let accessToken = localStorage.getItem('accessToken');
-  
+
   // Fallback para formato antigo
   if (!accessToken) {
     const tokens = localStorage.getItem('fitos_tokens');
@@ -71,11 +71,14 @@ export async function authenticatedApiRequest(
       }
     }
 
+    // Validar se errorMessage é string antes de usar includes
+    const isStringError = typeof errorMessage === 'string';
+
     // Verificar se é erro de token expirado (TOKEN_EXPIRED ou qualquer 401)
-    const isTokenExpired = response.status === 401 || 
-                          errorMessage === 'TOKEN_EXPIRED' || 
-                          errorMessage?.includes('expired') ||
-                          errorMessage?.includes('expirou');
+    const isTokenExpired = response.status === 401 ||
+      errorMessage === 'TOKEN_EXPIRED' ||
+      (isStringError && errorMessage.includes('expired')) ||
+      (isStringError && errorMessage.includes('expirou'));
 
     if (isTokenExpired) {
       // Limpar todos os dados de autenticação
@@ -85,13 +88,13 @@ export async function authenticatedApiRequest(
         localStorage.removeItem('fitos_tokens');
         localStorage.removeItem('user');
         localStorage.removeItem('tenantId');
-        
+
         // Redirecionar para login imediatamente
         window.location.href = '/auth/login';
       }
       throw new Error('TOKEN_EXPIRED');
     }
-    
+
     throw new Error(errorMessage || 'Unauthorized');
   }
 
@@ -116,10 +119,10 @@ api.interceptors.request.use(
     if (typeof window === 'undefined') {
       return config; // SSR - skip
     }
-    
+
     // Tentar buscar token (compatível com AuthContext)
     let accessToken = localStorage.getItem('accessToken'); // Formato do AuthContext
-    
+
     // Fallback para formato antigo (fitos_tokens)
     if (!accessToken) {
       const tokens = localStorage.getItem('fitos_tokens');
@@ -133,14 +136,17 @@ api.interceptors.request.use(
         }
       }
     }
-    
+
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
-      console.log('[API Interceptor] ✅ Authorization header added');
+      // Debug log to verify new version
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[API Interceptor v2] ✅ Authorization header added');
+      }
     } else {
-      console.warn('[API Interceptor] ⚠️ No access token found - user may not be logged in');
+      console.warn('[API Interceptor v2] ⚠️ No access token found - public access mode');
     }
-    
+
     return config;
   },
   (error) => {
@@ -155,23 +161,26 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Verificar se é erro de autenticação (401 ou TOKEN_EXPIRED)
-    const isAuthError = error.response?.status === 401 || 
-                       error.response?.status === 403 ||
-                       error.response?.data?.error === 'TOKEN_EXPIRED' ||
-                       error.response?.data?.message === 'TOKEN_EXPIRED' ||
-                       error.message === 'TOKEN_EXPIRED';
+    const isAuthError = error.response?.status === 401 ||
+      error.response?.status === 403 ||
+      error.response?.data?.error === 'TOKEN_EXPIRED' ||
+      error.response?.data?.message === 'TOKEN_EXPIRED' ||
+      error.message === 'TOKEN_EXPIRED';
 
     if (isAuthError && !originalRequest._retry) {
       originalRequest._retry = true;
 
       // Verificar se a mensagem de erro indica token expirado
-      const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.message || 
-                          error.message || '';
-      const isTokenExpired = errorMessage === 'TOKEN_EXPIRED' || 
-                            errorMessage?.includes('expired') ||
-                            errorMessage?.includes('expirou') ||
-                            error.response?.status === 401;
+      const errorMessage = error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message || '';
+      // Validar se errorMessage é string antes de usar includes
+      const isStringError = typeof errorMessage === 'string';
+
+      const isTokenExpired = errorMessage === 'TOKEN_EXPIRED' ||
+        (isStringError && errorMessage.includes('expired')) ||
+        (isStringError && errorMessage.includes('expirou')) ||
+        error.response?.status === 401;
 
       // Se for token expirado, não tentar refresh - redirecionar direto
       if (isTokenExpired) {
@@ -182,7 +191,7 @@ api.interceptors.response.use(
           localStorage.removeItem('fitos_tokens');
           localStorage.removeItem('user');
           localStorage.removeItem('tenantId');
-          
+
           // Redirecionar para login imediatamente
           window.location.href = '/auth/login';
         }
@@ -193,7 +202,7 @@ api.interceptors.response.use(
       try {
         // Buscar refreshToken (compatível com AuthContext)
         let refreshToken = localStorage.getItem('refreshToken');
-        
+
         // Fallback para formato antigo
         if (!refreshToken) {
           const tokens = localStorage.getItem('fitos_tokens');
@@ -201,7 +210,7 @@ api.interceptors.response.use(
             try {
               const parsedTokens = JSON.parse(tokens);
               refreshToken = parsedTokens.refreshToken;
-            } catch {}
+            } catch { }
           }
         }
 
@@ -213,11 +222,11 @@ api.interceptors.response.use(
           if (response.data.success) {
             const newAccessToken = response.data.data?.accessToken || response.data.accessToken;
             const newRefreshToken = response.data.data?.refreshToken || response.data.refreshToken;
-            
+
             // Salvar tokens (compatível com AuthContext)
             localStorage.setItem('accessToken', newAccessToken);
             localStorage.setItem('refreshToken', newRefreshToken);
-            
+
             // Retry original request with new token
             originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
             return api(originalRequest);

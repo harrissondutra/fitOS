@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { getPrismaClient } from '../config/database';
 import { logger } from '../utils/logger';
-import { ConnectionManagerService } from './connection-manager.service';
+import { ConnectionManagerService, connectionManager } from './connection-manager.service';
 
 export interface HealthStatus {
   organizationId: string;
@@ -24,7 +24,7 @@ export class HealthCheckService {
 
   constructor() {
     this.prisma = getPrismaClient();
-    this.connectionManager = new ConnectionManagerService();
+    this.connectionManager = connectionManager;
     logger.info('HealthCheckService initialized');
   }
 

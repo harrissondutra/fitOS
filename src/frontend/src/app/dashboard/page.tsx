@@ -16,6 +16,14 @@ import { useWorkouts } from '@/hooks/use-workouts';
 import { useAnalytics } from '@/hooks/use-analytics';
 import { PushNotificationSetup } from '@/components/pwa/PushNotificationSetup';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Dumbbell,
   Zap,
   Clock,
@@ -24,7 +32,10 @@ import {
   Activity,
   Flame,
   User,
-  MoreHorizontal
+  MoreHorizontal,
+  RefreshCw,
+  Printer,
+  Settings
 } from 'lucide-react';
 import {
   BarChart,
@@ -42,25 +53,32 @@ import {
 import { format, subDays, startOfWeek, isAfter, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
 
   const workoutFilters = useMemo(() => ({
     clientId: user?.id
   }), [user?.id]);
 
-  const { treinos: workouts, loading: workoutsLoading } = useWorkouts({
+  const { treinos: workouts, loading: workoutsLoading, refetch: refetchWorkouts } = useWorkouts({
     filters: workoutFilters,
     enabled: !!user?.id
   });
 
-  const { analytics, loading: analyticsLoading } = useAnalytics({
+  const { analytics, loading: analyticsLoading, refetch: refetchAnalytics } = useAnalytics({
     clientId: user?.id,
     enabled: !!user?.id
   });
 
   const loading = workoutsLoading || analyticsLoading;
+
+  const handleRefresh = () => {
+    refetchWorkouts();
+    refetchAnalytics();
+  };
 
   const dashboardStats = useMemo(() => {
     if (!workouts || !analytics) {
@@ -215,9 +233,32 @@ export default function DashboardPage() {
               <Flame className="w-5 h-5 text-primary fill-primary" />
               <span className="font-semibold">{dashboardStats.streak} dias de sequência</span>
             </div>
-            <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-gray-200">
-              <MoreHorizontal className="w-5 h-5" />
-            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-gray-200">
+                  <MoreHorizontal className="w-5 h-5" />
+                  <span className="sr-only">Menu de ações</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleRefresh}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Atualizar Dados
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.print()}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Imprimir
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push('/settings/preferences')}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Preferências
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

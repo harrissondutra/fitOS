@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { getPrismaClient } from '../config/database';
 import { logger } from '../utils/logger';
-import { ConnectionManagerService } from './connection-manager.service';
+import { ConnectionManagerService, connectionManager } from './connection-manager.service';
 
 /**
  * Metrics Collection Service
@@ -16,7 +16,7 @@ export class MetricsCollectionService {
   private collectionInterval: NodeJS.Timeout | null = null;
 
   constructor() {
-    this.connectionManager = new ConnectionManagerService();
+    this.connectionManager = connectionManager;
     logger.info('MetricsCollectionService initialized');
   }
 
@@ -31,18 +31,18 @@ export class MetricsCollectionService {
         const message = e?.message || '';
         const isTransient = code === 'P1017' /* server closed */ || code === 'P2024' /* pool timeout */;
         const isUnreachable = code === 'P1001';
-        
+
         // P1017: Server closed connection - não desconectar/reconectar singleton
         // O singleton já gerencia as conexões automaticamente
         if (code === 'P1017' && i < retries) {
           logger.warn(`Prisma connection closed (P1017)${operationName ? ` in ${operationName}` : ''}, retrying... Attempt ${i}/${retries}`);
-          
+
           // Aguardar antes de retry (sem desconectar/reconectar)
           await new Promise(r => setTimeout(r, 300 * i));
           lastErr = e;
           continue;
         }
-        
+
         if ((isTransient || isUnreachable) && i < retries) {
           const backoff = 200 * i + Math.floor(Math.random() * 100);
           logger.warn(`Retrying Prisma op${operationName ? ` (${operationName})` : ''} due to ${code} (attempt ${i + 1}/${retries}) after ${backoff}ms`);
@@ -125,13 +125,13 @@ export class MetricsCollectionService {
     let idx = 0;
     let successCount = 0;
     let errorCount = 0;
-    
+
     while (idx < tenants.length) {
       const batch = tenants.slice(idx, idx + concurrency);
       const results = await Promise.allSettled(
         batch.map(t => this.collectOrganizationMetrics(t.id, t.dbStrategy))
       );
-      
+
       // Contar sucessos e erros
       results.forEach((result, i) => {
         if (result.status === 'fulfilled') {
@@ -144,9 +144,9 @@ export class MetricsCollectionService {
           logger.warn(`Skipped metrics collection for organization ${tenant.id}: ${errorMsg}`);
         }
       });
-      
+
       idx += concurrency;
-      
+
       // Pequeno delay entre batches para não sobrecarregar o banco
       if (idx < tenants.length) {
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -186,8 +186,8 @@ export class MetricsCollectionService {
       // Buscar connection_id se houver (com timeout curto pois é query simples)
       const connection = await this.withPrismaRetry(
         () => this.prisma.databaseConnection.findFirst({
-        where: { organizationId },
-        select: { id: true },
+          where: { organizationId },
+          select: { id: true },
         }),
         2,
         'databaseConnection.findFirst',
@@ -197,16 +197,16 @@ export class MetricsCollectionService {
       // Salvar métricas (timeout curto pois é insert simples)
       await this.withPrismaRetry(
         () => this.prisma.databaseMetric.create({
-        data: {
-          organizationId,
-          databaseConnectionId: connection?.id || null,
-          storageUsedBytes: metrics.storageUsedBytes,
-          connectionsActive: metrics.connectionsActive,
-          queryAvgTimeMs: metrics.queryAvgTimeMs,
-          cpuUsagePercent: metrics.cpuUsagePercent,
-          memoryUsagePercent: metrics.memoryUsagePercent,
-          recordedAt: new Date(),
-        },
+          data: {
+            organizationId,
+            databaseConnectionId: connection?.id || null,
+            storageUsedBytes: metrics.storageUsedBytes,
+            connectionsActive: metrics.connectionsActive,
+            queryAvgTimeMs: metrics.queryAvgTimeMs,
+            cpuUsagePercent: metrics.cpuUsagePercent,
+            memoryUsagePercent: metrics.memoryUsagePercent,
+            recordedAt: new Date(),
+          },
         }),
         2,
         'databaseMetric.create',
@@ -216,11 +216,11 @@ export class MetricsCollectionService {
       // Atualizar storage no tenant (timeout curto pois é update simples)
       await this.withPrismaRetry(
         () => this.prisma.tenant.update({
-        where: { id: organizationId },
-        data: {
-          storageUsageBytes: metrics.storageUsedBytes,
-          connectionCount: metrics.connectionsActive,
-        },
+          where: { id: organizationId },
+          data: {
+            storageUsageBytes: metrics.storageUsedBytes,
+            connectionCount: metrics.connectionsActive,
+          },
         }),
         2,
         'tenant.update',
@@ -232,14 +232,14 @@ export class MetricsCollectionService {
       const code = error?.code || error?.meta?.code;
       const isTimeout = error?.message?.includes('timeout') || error?.message?.includes('timed out');
       const isPoolExhausted = /too many clients|connection pool/i.test(error?.message || '');
-      
+
       // P1001: banco do core fora do ar → logar warn para reduzir ruído
       // Timeout: operação demorou muito mas não é crítico, apenas logar como warn
       if (code === 'P1001') {
         logger.warn(`Core database unreachable while saving metrics for ${organizationId} (P1001). Skipping.`);
         return;
       }
-      
+
       if (isTimeout) {
         logger.warn(`Metrics collection timeout for organization ${organizationId}. Skipping this cycle.`);
         // Registrar cooldown global curto para evitar avalanche de timeouts
@@ -252,7 +252,7 @@ export class MetricsCollectionService {
         this.lastCooldownAt = Date.now();
         return;
       }
-      
+
       // Para outros erros, logar mas não lançar para não interromper outras coletas
       logger.error(`Error collecting metrics for organization ${organizationId}:`, error);
       return; // Continuar com próxima organização ao invés de lançar erro
@@ -306,7 +306,7 @@ export class MetricsCollectionService {
     } catch (e: any) {
       const code = e?.code || e?.meta?.code;
       const isTimeout = e?.message?.includes('timeout') || e?.message?.includes('timed out');
-      
+
       // Se timeout ou database unreachable, retornar valores padrão sem falhar
       if (code === 'P1001' || isTimeout) {
         logger.warn(`Metrics collection skipped for ${organizationId}: ${isTimeout ? 'timeout' : 'database unreachable (P1001)'}`);
@@ -327,7 +327,7 @@ export class MetricsCollectionService {
    */
   private async collectSchemaLevelMetrics(prisma: any, organizationId: string): Promise<any> {
     try {
-    const schemaName = `tenant_${organizationId.replace(/-/g, '_')}`;
+      const schemaName = `tenant_${organizationId.replace(/-/g, '_')}`;
 
       // Storage usado pelo schema específico (usar pg_relation_size para ser mais rápido)
       const storageResult = await this.withPrismaRetry(
@@ -342,16 +342,16 @@ export class MetricsCollectionService {
         15000
       );
 
-    const storageUsedBytes = storageResult[0]?.total_bytes || BigInt(0);
-    const connectionsActive = 1;
+      const storageUsedBytes = storageResult[0]?.total_bytes || BigInt(0);
+      const connectionsActive = 1;
 
-    return {
-      storageUsedBytes,
-      connectionsActive,
-      queryAvgTimeMs: null,
-      cpuUsagePercent: null,
-      memoryUsagePercent: null,
-    };
+      return {
+        storageUsedBytes,
+        connectionsActive,
+        queryAvgTimeMs: null,
+        cpuUsagePercent: null,
+        memoryUsagePercent: null,
+      };
     } catch (e: any) {
       const isTimeout = e?.message?.includes('timeout') || e?.message?.includes('timed out');
       if (isTimeout) {
@@ -383,16 +383,16 @@ export class MetricsCollectionService {
         20000 // pg_database_size é mais rápido, pode ter timeout menor
       );
 
-    const storageUsedBytes = storageResult[0]?.size_bytes || BigInt(0);
-    const connectionsActive = 1;
+      const storageUsedBytes = storageResult[0]?.size_bytes || BigInt(0);
+      const connectionsActive = 1;
 
-    return {
-      storageUsedBytes,
-      connectionsActive,
-      queryAvgTimeMs: null,
-      cpuUsagePercent: null,
-      memoryUsagePercent: null,
-    };
+      return {
+        storageUsedBytes,
+        connectionsActive,
+        queryAvgTimeMs: null,
+        cpuUsagePercent: null,
+        memoryUsagePercent: null,
+      };
     } catch (e: any) {
       const isTimeout = e?.message?.includes('timeout') || e?.message?.includes('timed out');
       if (isTimeout) {

@@ -14,6 +14,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaTenantWrapper } from './prisma-tenant-wrapper.service';
 import Redis from 'ioredis';
 import { PaymentCostTrackerService } from './payment-cost-tracker.service';
+import { emailService } from './email';
 
 interface BillingConfig {
   stripeSecretKey: string;
@@ -25,21 +26,7 @@ interface BillingConfig {
   mercadoPagoCardFee: number;
 }
 
-interface SubscriptionPlan {
-  id: string;
-  name: string;
-  price: number;
-  currency: string;
-  interval: 'month' | 'year';
-  trialPeriodDays?: number;
-  features: string[];
-  limits: {
-    users: number;
-    clients: number;
-    storage: number; // GB
-    apiCalls: number;
-  };
-}
+import { PlansConfig, SubscriptionPlan } from '../config/plans.config';
 
 interface CreateSubscriptionData {
   tenantId: string;
@@ -66,8 +53,10 @@ export class BillingService {
   private preference: Preference;
   private redis: Redis;
   private config: BillingConfig;
-  private useMockData: boolean;
+  private useStripeMock: boolean;
+  private useMercadoPagoMock: boolean;
   private paymentCostTracker: PaymentCostTrackerService;
+  private plansConfig: PlansConfig;
 
   constructor(private prisma: PrismaClient | PrismaTenantWrapper) {
     this.config = {
@@ -80,7 +69,9 @@ export class BillingService {
       mercadoPagoCardFee: parseFloat(process.env.COST_MERCADOPAGO_CARD_FEE || '3.99'),
     };
 
-    this.useMockData = !this.config.stripeSecretKey || !this.config.mercadoPagoAccessToken;
+    // Configurar mocks independentemente
+    this.useStripeMock = !this.config.stripeSecretKey || this.config.stripeSecretKey.includes('test_mock');
+    this.useMercadoPagoMock = !this.config.mercadoPagoAccessToken || this.config.mercadoPagoAccessToken.includes('USR_mock');
 
     // Initialize Redis
     this.redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -88,150 +79,42 @@ export class BillingService {
     // Initialize Payment Cost Tracker
     this.paymentCostTracker = new PaymentCostTrackerService();
 
-    if (!this.useMockData) {
-      // Initialize Stripe
+    // Initialize Plans Config
+    this.plansConfig = new PlansConfig();
+
+    if (!this.useStripeMock) {
       this.stripe = new Stripe(this.config.stripeSecretKey, {
         apiVersion: '2023-10-16',
       });
+    } else {
+      console.log('⚠️  BillingService: Stripe usando dados mockados');
+    }
 
-      // Initialize Mercado Pago
+    if (!this.useMercadoPagoMock) {
       this.mercadoPago = new MercadoPagoConfig({
         accessToken: this.config.mercadoPagoAccessToken,
       });
       this.payment = new Payment(this.mercadoPago);
       this.preference = new Preference(this.mercadoPago);
-    }
-
-    if (this.useMockData) {
-      console.log('⚠️  BillingService: Usando dados mockados para desenvolvimento');
+    } else {
+      console.log('⚠️  BillingService: Mercado Pago usando dados mockados');
     }
   }
 
   // ========== PLANOS E CONFIGURAÇÕES ==========
 
   /**
-   * Obter planos disponíveis (com cache Redis)
+   * Obter planos disponíveis (delegar para PlansConfig)
    */
   async getAvailablePlans(): Promise<SubscriptionPlan[]> {
-    const cacheKey = 'billing:plans:all';
-
-    try {
-      // Tentar buscar do cache primeiro
-      const cached = await this.redis.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch (error) {
-      console.warn('Erro ao buscar planos do cache Redis:', error);
-    }
-
-    const plans: SubscriptionPlan[] = [
-      {
-        id: 'free',
-        name: 'Gratuito',
-        price: 0,
-        currency: 'BRL',
-        interval: 'month',
-        features: [
-          '1 Cliente (Você mesmo)',
-          '1 Usuário',
-          '1GB de armazenamento',
-          'Funcionalidades Fitness (Treinos, Dietas)',
-          'Sem acesso administrativo'
-        ],
-        limits: {
-          users: 1,
-          clients: 1,
-          storage: 1,
-          apiCalls: 100
-        }
-      },
-      {
-        id: 'starter',
-        name: 'Starter',
-        price: 99.90,
-        currency: 'BRL',
-        interval: 'month',
-        trialPeriodDays: 14,
-        features: [
-          'Até 50 clientes',
-          '5 usuários',
-          '10GB de armazenamento',
-          'Suporte por email',
-          'Relatórios básicos'
-        ],
-        limits: {
-          users: 5,
-          clients: 50,
-          storage: 10,
-          apiCalls: 1000
-        }
-      },
-      {
-        id: 'professional',
-        name: 'Professional',
-        price: 199.90,
-        currency: 'BRL',
-        interval: 'month',
-        trialPeriodDays: 14,
-        features: [
-          'Até 200 clientes',
-          '15 usuários',
-          '50GB de armazenamento',
-          'Suporte prioritário',
-          'Relatórios avançados',
-          'Integração WhatsApp',
-          'CRM básico'
-        ],
-        limits: {
-          users: 15,
-          clients: 200,
-          storage: 50,
-          apiCalls: 5000
-        }
-      },
-      {
-        id: 'enterprise',
-        name: 'Enterprise',
-        price: 399.90,
-        currency: 'BRL',
-        interval: 'month',
-        trialPeriodDays: 14,
-        features: [
-          'Clientes ilimitados',
-          'Usuários ilimitados',
-          '200GB de armazenamento',
-          'Suporte 24/7',
-          'Relatórios personalizados',
-          'Integração completa',
-          'CRM avançado',
-          'API personalizada'
-        ],
-        limits: {
-          users: -1, // ilimitado
-          clients: -1, // ilimitado
-          storage: 200,
-          apiCalls: -1 // ilimitado
-        }
-      }
-    ];
-
-    // Cache por 1 hora
-    try {
-      await this.redis.setex(cacheKey, 3600, JSON.stringify(plans));
-    } catch (error) {
-      console.warn('Erro ao cachear planos no Redis:', error);
-    }
-
-    return plans;
+    return this.plansConfig.getAllPlans();
   }
 
   /**
    * Obter plano específico
    */
   async getPlanById(planId: string): Promise<SubscriptionPlan | null> {
-    const plans = await this.getAvailablePlans();
-    return plans.find(plan => plan.id === planId) || null;
+    return this.plansConfig.getPlanById(planId);
   }
 
   // ========== STRIPE - ASSINATURAS RECORRENTES ==========
@@ -244,7 +127,7 @@ export class BillingService {
     clientSecret: string;
     customerId: string;
   }> {
-    if (this.useMockData) {
+    if (this.useStripeMock) {
       return {
         subscriptionId: `sub_mock_${Date.now()}`,
         clientSecret: `pi_mock_${Date.now()}_secret_mock`,
@@ -272,34 +155,46 @@ export class BillingService {
         });
       }
 
-      // Criar price
+      // Criar ou buscar subscription price
       const plan = await this.getPlanById(data.planId);
       if (!plan) {
         throw new Error('Plano não encontrado');
       }
 
-      const price = await this.stripe.prices.create({
-        unit_amount: Math.round(plan.price * 100), // Converter para centavos
-        currency: plan.currency.toLowerCase(),
-        recurring: {
-          interval: plan.interval === 'month' ? 'month' : 'year'
-        },
-        product_data: {
-          name: plan.name
-        }
-      });
+      let priceId = '';
+
+      // Tentar usar Price ID configurado
+      if (plan.stripePriceId) {
+        priceId = data.billingCycle === 'yearly' ? plan.stripePriceId.yearly : plan.stripePriceId.monthly;
+      }
+
+      // Se não tiver ID configurado, criar dinamicamente (fallback)
+      if (!priceId) {
+        console.warn(`⚠️ Warning: No Stripe Price ID found for plan ${plan.id} (${data.billingCycle}). Creating dynamic price.`);
+        const price = await this.stripe.prices.create({
+          unit_amount: Math.round((data.billingCycle === 'yearly' ? plan.price.yearly : plan.price.monthly) * 100), // Converter para centavos
+          currency: plan.currency.toLowerCase(),
+          recurring: {
+            interval: data.billingCycle === 'monthly' ? 'month' : 'year'
+          },
+          product_data: {
+            name: `${plan.name} (${data.billingCycle === 'yearly' ? 'Anual' : 'Mensal'})`
+          }
+        });
+        priceId = price.id;
+      }
 
       // Criar subscription
       const subscriptionParams: Stripe.SubscriptionCreateParams = {
         customer: customer.id,
-        items: [{ price: price.id }],
+        items: [{ price: priceId }],
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
         expand: ['latest_invoice.payment_intent']
       };
 
-      if (plan.trialPeriodDays) {
-        subscriptionParams.trial_period_days = plan.trialPeriodDays;
+      if ((plan as any).trialPeriodDays) {
+        subscriptionParams.trial_period_days = (plan as any).trialPeriodDays;
       }
 
       const subscription = await this.stripe.subscriptions.create(subscriptionParams);
@@ -322,7 +217,7 @@ export class BillingService {
    * Buscar detalhes da assinatura Stripe
    */
   async getStripeSubscriptionDetails(subscriptionId: string) {
-    if (this.useMockData) {
+    if (this.useStripeMock) {
       return {
         id: subscriptionId,
         status: 'active',
@@ -358,7 +253,7 @@ export class BillingService {
    * Cancelar assinatura Stripe
    */
   async cancelStripeSubscription(subscriptionId: string, cancelAtPeriodEnd = true) {
-    if (this.useMockData) {
+    if (this.useStripeMock) {
       return {
         id: subscriptionId,
         cancel_at_period_end: cancelAtPeriodEnd,
@@ -384,7 +279,7 @@ export class BillingService {
    * Criar pagamento PIX
    */
   async createPIXPayment(tenantId: string, amount: number, description: string): Promise<PaymentIntentResult> {
-    if (this.useMockData) {
+    if (this.useMercadoPagoMock) {
       const mockPaymentId = `mp_pix_${Date.now()}`;
       return {
         id: mockPaymentId,
@@ -449,7 +344,7 @@ export class BillingService {
    * Verificar status do pagamento Mercado Pago
    */
   async checkMercadoPagoPaymentStatus(paymentId: string) {
-    if (this.useMockData) {
+    if (this.useMercadoPagoMock) {
       return {
         id: paymentId,
         status: 'approved',
@@ -486,9 +381,10 @@ export class BillingService {
       return await this.createStripeSubscription(data);
     } else {
       // Para Mercado Pago, criar pagamento único
+      const price = data.billingCycle === 'yearly' ? plan.price.yearly : plan.price.monthly;
       const payment = await this.createPIXPayment(
         data.tenantId,
-        plan.price,
+        price,
         `Assinatura ${plan.name} - ${data.billingCycle}`
       );
 
@@ -542,6 +438,53 @@ export class BillingService {
     await this.invalidateTenantCache(subscription.tenantId);
 
     return updatedSubscription;
+  }
+
+  /**
+   * Sincronizar assinatura com Stripe manualmente
+   */
+  async syncSubscription(tenantId: string) {
+    const subscription = await (this.prisma as any).subscription.findFirst({
+      where: { tenantId }
+    });
+
+    if (!subscription || !subscription.stripeSubscriptionId) {
+      // Se não tiver ID do Stripe, talvez seja MP ou não exista
+      if (subscription?.mercadoPagoId && !this.useMercadoPagoMock) {
+        // TODO: Implementar sync do mercado pago se necessário
+        return subscription;
+      }
+      if (!subscription) throw new Error('Assinatura não encontrada');
+      return subscription;
+    }
+
+    if (this.useStripeMock) {
+      return subscription;
+    }
+
+    try {
+      const stripeSubscription = await this.stripe.subscriptions.retrieve(subscription.stripeSubscriptionId);
+
+      const updated = await (this.prisma as any).subscription.update({
+        where: { id: subscription.id },
+        data: {
+          status: stripeSubscription.status,
+          currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
+          currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
+          cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+          updatedAt: new Date()
+        }
+      });
+
+      if (updated.status === 'active') {
+        await this.activateTenantSubscription(tenantId, subscription.planId);
+      }
+
+      return updated;
+    } catch (error) {
+      console.error('Erro ao sincronizar assinatura:', error);
+      throw new Error('Falha ao sincronizar com Stripe');
+    }
   }
 
   // ========== CACHE MANAGEMENT ==========
@@ -607,6 +550,9 @@ export class BillingService {
         case 'payment_intent.succeeded':
           await this.handleStripePaymentSuccess(event.data.object as Stripe.PaymentIntent);
           break;
+        case 'checkout.session.completed':
+          await this.handleStripeCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
+          break;
         case 'invoice.payment_succeeded':
           await this.handleStripeInvoiceSuccess(event.data.object as Stripe.Invoice);
           break;
@@ -618,6 +564,24 @@ export class BillingService {
           break;
         case 'customer.subscription.deleted':
           await this.handleStripeSubscriptionDeleted(event.data.object as Stripe.Subscription);
+          break;
+        case 'charge.refunded':
+          await this.handleStripeChargeRefunded(event.data.object as Stripe.Charge);
+          break;
+        case 'customer.updated':
+          await this.handleStripeCustomerUpdated(event.data.object as Stripe.Customer);
+          break;
+        case 'customer.subscription.trial_will_end':
+          await this.handleStripeTrialWillEnd(event.data.object as Stripe.Subscription);
+          break;
+        case 'charge.dispute.created':
+          await this.handleStripeChargeDisputeCreated(event.data.object as Stripe.Dispute);
+          break;
+        case 'charge.dispute.closed':
+          await this.handleStripeChargeDisputeClosed(event.data.object as Stripe.Dispute);
+          break;
+        case 'invoice.upcoming':
+          console.log(`Próxima fatura gerada para ${event.data.object.customer}`);
           break;
       }
     } catch (error) {
@@ -647,6 +611,164 @@ export class BillingService {
   }
 
   // ========== WEBHOOK HANDLERS PRIVADOS ==========
+
+  private async handleStripeCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
+    console.log('Finalizando Checkout Session:', session.id);
+    const { planId, interval } = session.metadata || {};
+    const email = session.customer_details?.email;
+    const name = session.customer_details?.name || 'Cliente';
+    const stripeCustomerId = session.customer as string;
+    const stripeSubscriptionId = session.subscription as string;
+
+    if (!email || !planId) {
+      console.error('Dados incompletos no webhook checkout.session.completed');
+      return;
+    }
+
+    try {
+      // Encontrar ou criar usuário
+      let user = await (this.prisma as any).user.findUnique({ where: { email } });
+      let tenantId = '';
+
+      if (!user) {
+        // Criar tenant e usuário juntos
+        console.log('Criando novo usuário e tenant via webhook:', email);
+        const newTenant = await (this.prisma as any).tenant.create({
+          data: {
+            name: `Assinatura de ${name.split(' ')[0]}`,
+            subdomain: email.split('@')[0] + '-' + Date.now().toString(36).substring(0, 8),
+            billingEmail: email,
+            users: {
+              create: {
+                email,
+                name,
+                password: '', // Sem senha, redefinir depois
+                role: 'OWNER' // Admin do tenant
+              }
+            }
+          },
+          include: {
+            users: true
+          }
+        });
+        tenantId = newTenant.id;
+        // user = newTenant.users[0]; // (Opcional se precisar do objeto user depois)
+      } else {
+        // Usuário existe
+        if (user.tenantId) {
+          // Já tem tenant. Usar o existente.
+          // TODO: Talvez verificar se o tenant está ativo?
+          tenantId = user.tenantId;
+          console.log(`Usuário já possui tenant: ${tenantId}`);
+        } else {
+          // Usuário existe mas não tem tenant. Criar um.
+          console.log('Usuário existente sem tenant. Criando tenant...');
+          const newTenant = await (this.prisma as any).tenant.create({
+            data: {
+              name: `Workspace de ${name.split(' ')[0]}`,
+              subdomain: email.split('@')[0] + '-' + Date.now().toString(36).substring(0, 8),
+              billingEmail: email,
+              users: {
+                connect: { id: user.id }
+              }
+            }
+          });
+          tenantId = newTenant.id;
+
+          // Garantir que o usuário seja OWNER
+          await (this.prisma as any).user.update({
+            where: { id: user.id },
+            data: { role: 'OWNER' }
+          });
+        }
+      }
+
+      console.log(`Vinculando assinatura ${stripeSubscriptionId} ao tenant ${tenantId}`);
+
+      // Garantir que o plano existe no banco
+      const dbPlan = await (this.prisma as any).subscriptionPlan.findUnique({
+        where: { id: planId }
+      });
+
+      if (!dbPlan) {
+        console.log(`Plano ${planId} não encontrado no banco. Criando automaticamente...`);
+        await (this.prisma as any).subscriptionPlan.create({
+          data: {
+            id: planId,
+            name: planId.charAt(0).toUpperCase() + planId.slice(1),
+            displayName: planId.charAt(0).toUpperCase() + planId.slice(1),
+            price: 0, // Preço será atualizado via sincronização ou config
+            interval: interval || 'monthly',
+            isActive: true
+          }
+        });
+      }
+
+      // Atualizar customer ID no tenant
+      await (this.prisma as any).tenant.update({
+        where: { id: tenantId },
+        data: { stripeCustomerId: stripeCustomerId }
+      });
+
+      const subscriptionData = {
+        tenantId: tenantId,
+        planId: planId,
+        status: 'active',
+        stripeSubscriptionId: stripeSubscriptionId,
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + (interval === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000),
+        metadata: {
+          billingCycle: interval === 'yearly' ? 'yearly' : 'monthly',
+          provider: 'stripe'
+        }
+      };
+
+      const existingSub = await (this.prisma as any).subscription.findFirst({
+        where: { tenantId }
+      });
+
+      if (existingSub) {
+        await (this.prisma as any).subscription.update({
+          where: { id: existingSub.id },
+          data: subscriptionData
+        });
+      } else {
+        await (this.prisma as any).subscription.create({
+          data: subscriptionData
+        });
+      }
+
+      // Notificar Admin
+      try {
+        await emailService.sendAdminNotification({
+          name: name,
+          email: email,
+          plan: planId,
+          interval: interval || 'monthly',
+          amount: 'R$ ' + ((dbPlan?.price || 0)).toFixed(2) // Assumindo preço no plano
+        });
+        console.log('Admin notificado sobre nova assinatura');
+      } catch (err) {
+        console.error('Erro ao notificar admin:', err);
+      }
+
+      // Enviar email de boas-vindas ao usuário
+      try {
+        // Gerar token de login se necessário ou apenas link para login
+        const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL}/login`;
+        await emailService.sendWelcomeEmail(email, name.split(' ')[0], loginUrl);
+        console.log('Email de boas-vindas enviado para:', email);
+      } catch (err) {
+        console.error('Erro ao enviar email de boas-vindas:', err);
+      }
+
+      console.log('Assinatura e Tenant processados com sucesso via Webhook');
+
+    } catch (e) {
+      console.error('Erro ao processar checkout.session.completed:', e);
+      throw e;
+    }
+  }
 
   private async handleStripePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
     // Implementar lógica de sucesso do pagamento
@@ -744,7 +866,7 @@ export class BillingService {
 
   private async handleStripeSubscriptionUpdated(subscription: Stripe.Subscription) {
     // Implementar lógica de atualização da assinatura
-    console.log('Assinatura Stripe atualizada:', subscription.id);
+    console.log(`Assinatura Stripe atualizada: ${subscription.id} - Status: ${subscription.status}`);
 
     try {
       const localSubscription = await (this.prisma as any).subscription.findFirst({
@@ -763,13 +885,173 @@ export class BillingService {
           }
         });
 
-        // Se ativa, garantir que tenant está ativo
-        if (subscription.status === 'active') {
+        // Se ativa ou em trial, garantir que tenant está ativo
+        if (subscription.status === 'active' || subscription.status === 'trialing') {
           await this.activateTenantSubscription(localSubscription.tenantId, localSubscription.planId);
         }
+      } else if (subscription.status === 'active' || subscription.status === 'trialing') {
+        // Se a assinatura não existe localmente mas está ativa/trialing, 
+        // significa que foi criada via Elements e precisamos provisionar o tenant agora.
+        console.log('Nova assinatura detectada via webhook (Elementos). Provisionando...');
+
+        // Buscar cliente para obter email e nome
+        const customer = await this.stripe.customers.retrieve(subscription.customer as string) as Stripe.Customer;
+
+        await this.handleNewSubscriptionProvisioning({
+          email: customer.email!,
+          name: customer.name || customer.email!.split('@')[0],
+          planId: subscription.metadata.planId,
+          interval: subscription.metadata.interval,
+          stripeSubscriptionId: subscription.id,
+          stripeCustomerId: customer.id,
+          status: subscription.status
+        });
       }
     } catch (error) {
       console.error('Erro ao processar atualização de assinatura Stripe:', error);
+    }
+  }
+
+  /**
+   * Helper para provisionar tenant, usuário e assinatura quando uma nova assinatura é confirmada
+   */
+  private async handleNewSubscriptionProvisioning(data: {
+    email: string;
+    name: string;
+    planId: string;
+    interval: string;
+    stripeSubscriptionId: string;
+    stripeCustomerId: string;
+    status: string;
+  }) {
+    const { email, name, planId, interval, stripeSubscriptionId, stripeCustomerId, status } = data;
+
+    try {
+      // 1. Encontrar ou criar usuário
+      let user = await (this.prisma as any).user.findUnique({ where: { email } });
+      let tenantId = '';
+
+      if (!user) {
+        console.log('Criando novo usuário e tenant para assinatura:', email);
+        const newTenant = await (this.prisma as any).tenant.create({
+          data: {
+            name: `Assinatura de ${name.split(' ')[0]}`,
+            subdomain: email.split('@')[0] + '-' + Math.random().toString(36).substring(0, 5),
+            billingEmail: email,
+            stripeCustomerId: stripeCustomerId,
+            users: {
+              create: {
+                email,
+                name,
+                password: '', // Sem senha, redefinir depois
+                role: 'OWNER'
+              }
+            }
+          }
+        });
+        tenantId = newTenant.id;
+
+        // SINCRO COM DASHBOARD DO STRIPE: Atualizar cliente com informações do Tenant
+        try {
+          await this.stripe.customers.update(stripeCustomerId, {
+            name: name,
+            metadata: {
+              tenantId: tenantId,
+              subdomain: newTenant.subdomain,
+              userEmail: email,
+              provisionedAt: new Date().toISOString()
+            }
+          });
+        } catch (err) {
+          console.error('Erro ao sincronizar metadados do cliente no Stripe:', err);
+        }
+      } else {
+        if (!user.tenantId) {
+          const newTenant = await (this.prisma as any).tenant.create({
+            data: {
+              name: `Workspace de ${name.split(' ')[0]}`,
+              subdomain: email.split('@')[0] + '-' + Math.random().toString(36).substring(0, 5),
+              billingEmail: email,
+              stripeCustomerId: stripeCustomerId,
+            }
+          });
+          tenantId = newTenant.id;
+          await (this.prisma as any).user.update({
+            where: { id: user.id },
+            data: { tenantId, role: 'OWNER' }
+          });
+        } else {
+          tenantId = user.tenantId;
+          // Atualizar stripeCustomerId no tenant se necessário
+          const updatedTenant = await (this.prisma as any).tenant.update({
+            where: { id: tenantId },
+            data: { stripeCustomerId }
+          });
+
+          // SINCRO COM DASHBOARD DO STRIPE: Atualizar cliente existente
+          try {
+            await this.stripe.customers.update(stripeCustomerId, {
+              metadata: {
+                tenantId: tenantId,
+                subdomain: updatedTenant.subdomain,
+                updatedAt: new Date().toISOString()
+              }
+            });
+          } catch (err) {
+            console.error('Erro ao sincronizar metadados do cliente existente no Stripe:', err);
+          }
+        }
+      }
+
+      // 2. Criar ou atualizar assinatura local
+      const plan = await (this.prisma as any).subscriptionPlan.findFirst({
+        where: { id: planId }
+      });
+
+      if (!plan) {
+        // Garantir que o plano existe (fallback de segurança)
+        await (this.prisma as any).subscriptionPlan.create({
+          data: { id: planId, name: planId.toUpperCase(), price: 0 }
+        });
+      }
+
+      await (this.prisma as any).subscription.create({
+        data: {
+          tenantId,
+          planId,
+          status: status,
+          provider: 'stripe',
+          stripeSubscriptionId: stripeSubscriptionId,
+          billingCycle: interval === 'yearly' ? 'yearly' : 'monthly',
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + (interval === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000),
+          metadata: {
+            billingCycle: interval === 'yearly' ? 'yearly' : 'monthly',
+            provider: 'stripe'
+          }
+        }
+      });
+
+      // 3. Ativar tenant
+      await this.activateTenantSubscription(tenantId, planId);
+
+      // 4. NOTIFICAÇÃO DE GESTÃO (Administrativa)
+      try {
+        await emailService.sendAdminNotification({
+          email,
+          name,
+          plan: planId,
+          interval: interval,
+          amount: interval === 'yearly' ? 'R$ 799,20+' : 'R$ 99,90+' // Valores base aproximados
+        });
+        console.log('Notificação administrativa enviada para:', email);
+      } catch (err) {
+        console.error('Erro ao enviar notificação administrativa:', err);
+      }
+
+    } catch (e) {
+      console.error('Erro no provisionamento de nova assinatura:', e);
+      throw e;
     }
   }
 
@@ -844,8 +1126,77 @@ export class BillingService {
   }
 
   private async handleMercadoPagoPaymentFailed(payment: any) {
-    // Implementar lógica de falha no pagamento Mercado Pago
     console.log('Falha no pagamento Mercado Pago:', payment.id);
+  }
+
+  // ========== NOVOS HANDLERS DE COBERTURA 100% ==========
+
+  private async handleStripeChargeRefunded(charge: Stripe.Charge) {
+    console.log(`Reembolso Stripe processado: ${charge.id}, Valor: ${charge.amount_refunded}`);
+
+    try {
+      const customerId = typeof charge.customer === 'string' ? charge.customer : charge.customer?.id;
+      if (!customerId) return;
+
+      // Buscar usuário para notificar
+      const user = await (this.prisma as any).user.findFirst({
+        where: { tenant: { stripeCustomerId: customerId } }
+      });
+
+      if (user && user.email) {
+        const amount = (charge.amount_refunded / 100).toLocaleString('pt-BR', { style: 'currency', currency: charge.currency });
+        await emailService.sendRefundIssuedEmail(user.email, user.name, amount);
+        console.log(`Notificação de reembolso enviada para ${user.email}`);
+      }
+    } catch (e) {
+      console.error('Erro ao processar reembolso:', e);
+    }
+  }
+
+  private async handleStripeCustomerUpdated(stripeCustomer: Stripe.Customer) {
+    console.log(`Cliente Stripe atualizado: ${stripeCustomer.id}`);
+
+    // Opcional: Sincronizar dados de volta para o Tenant se a fonte da verdade for o Stripe
+    // Por enquanto, apenas logamos, pois geralmente o app é a fonte da verdade.
+  }
+
+  private async handleStripeTrialWillEnd(subscription: Stripe.Subscription) {
+    console.log(`Periodo de teste acabando para ${subscription.id}`);
+
+    try {
+      const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id;
+      if (!customerId) return;
+
+      const user = await (this.prisma as any).user.findFirst({
+        where: { tenant: { stripeCustomerId: customerId } }
+      });
+
+      if (user && user.email) {
+        const endDate = new Date(subscription.trial_end! * 1000).toLocaleDateString('pt-BR');
+        const planName = subscription.items?.data[0]?.price?.product || 'Plano Pro'; // Simplificação
+
+        await emailService.sendTrialEndingEmail(user.email, user.name, (planName as string), endDate);
+        console.log(`Aviso de fim de trial enviado para ${user.email}`);
+      }
+    } catch (e) {
+      console.error('Erro ao processar fim de trial:', e);
+    }
+  }
+
+  private async handleStripeChargeDisputeCreated(dispute: Stripe.Dispute) {
+    console.warn(`⚠️ DISPUTA CRIADA: ${dispute.id} - Motivo: ${dispute.reason}`);
+
+    // Notificar Admin imediatamente
+    const adminEmail = process.env.CONTACT_SALES_EMAIL || 'sistudofitness@gmail.com';
+    await emailService.sendEmail({
+      to: adminEmail,
+      subject: `⚠️ ALERTA DE CHARGEBACK: ${dispute.amount / 100} ${dispute.currency}`,
+      text: `Uma disputa foi aberta. ID: ${dispute.id}. Motivo: ${dispute.reason}. Verifique o painel do Stripe imediatamente.`
+    });
+  }
+
+  private async handleStripeChargeDisputeClosed(dispute: Stripe.Dispute) {
+    console.log(`Disputa fechada: ${dispute.id} - Status: ${dispute.status}`);
   }
 
   // ========== SUBSCRIPTION MANAGEMENT ==========

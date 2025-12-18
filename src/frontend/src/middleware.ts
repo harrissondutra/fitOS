@@ -33,7 +33,7 @@ const PUBLIC_ROUTES = [
   '/offline.html',
   '/robots.txt',
   '/sitemap.xml',
-  '/sitemap.xml',
+  '/contact-sales',
   // PWA assets
   '/icons/',
   '/screenshots/',

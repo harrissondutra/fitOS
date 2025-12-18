@@ -188,7 +188,19 @@ export class WorkoutService {
     const [workouts, total] = await Promise.all([
       this.prisma.workout.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          // exercises: false, // EXCLUDED explicitly to prevent OOM
+          clientId: true,
+          userId: true,
+          tenantId: true,
+          aiGenerated: true,
+          completed: true,
+          completedAt: true,
+          createdAt: true,
+          updatedAt: true,
           user: {
             select: {
               id: true,
@@ -653,9 +665,12 @@ export class WorkoutService {
     const averageWorkoutsPerWeek = (workoutsLast30Days / 30) * 7;
 
     // Obter exercícios mais usados
+    // OTIMIZAÇÃO: Limitar a análise aos últimos 100 treinos para evitar OOM
     const allWorkouts = await this.prisma.workout.findMany({
       where,
-      select: { exercises: true }
+      select: { exercises: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100
     });
 
     const exerciseCounts: Record<string, { name: string; count: number }> = {};

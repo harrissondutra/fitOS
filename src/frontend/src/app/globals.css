@@ -85,37 +85,51 @@
   }
 
   .dark {
-    /* Mapeamento Dark Mode para manter identidade mas legível */
-    --background: 222 47% 11%;
+    /* Mapeamento Dark Mode ajustado para cinza/preto (#1C222B) */
+    --background: 216 21% 14%;
+    /* #1C222B */
     --foreground: 210 40% 98%;
 
-    --card: 224 71% 4%;
+    --card: 216 21% 12%;
+    /* Um pouco mais escuro que o background para criar profundidade */
     --card-foreground: 210 40% 98%;
 
-    --popover: 224 71% 4%;
+    --popover: 216 21% 12%;
     --popover-foreground: 210 40% 98%;
 
     /* Primary: #10B981 mantido mesmo no dark */
     --primary: 159 84% 39%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 19% 27%;
+    --secondary: 216 21% 20%;
+    /* Ajustado para acompanhar o tom cinza */
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217 19% 27%;
+    --muted: 216 21% 20%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 217 19% 27%;
+    --accent: 216 21% 20%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 217 19% 27%;
-    --input: 217 19% 27%;
+    --border: 216 21% 20%;
+    --input: 216 21% 20%;
     --ring: 159 84% 39%;
 
     --link: 189 94% 43%;
+
+    /* Sidebar Variables - Dark Mode */
+    --sidebar-background: 216 21% 12%;
+    /* Mantendo coerência com card */
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 159 84% 39%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 216 21% 20%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 216 21% 20%;
+    --sidebar-ring: 159 84% 39%;
   }
 }
 

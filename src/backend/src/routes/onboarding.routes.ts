@@ -38,7 +38,7 @@ const createTenantSchema = z.object({
   subdomain: z.string().min(3, 'Subdomain é obrigatório'),
   billingEmail: z.string().email('Email de cobrança inválido'),
   gymType: z.enum(['academia', 'personal_trainer', 'crossfit', 'pilates', 'outro']),
-  
+
   // Owner Information
   ownerName: z.string().min(2, 'Nome do proprietário é obrigatório'),
   ownerEmail: z.string().email('Email do proprietário inválido'),
@@ -51,7 +51,7 @@ const createTenantSchema = z.object({
     zipCode: z.string().min(8, 'CEP é obrigatório'),
     country: z.string().default('BR')
   }),
-  
+
   // Plan Selection
   planId: z.enum(['starter', 'professional', 'enterprise']),
   billingCycle: z.enum(['monthly', 'yearly']),
@@ -67,15 +67,15 @@ const createTenantSchema = z.object({
 router.post('/validate-subdomain', async (req, res) => {
   try {
     const { subdomain } = validateSubdomainSchema.parse(req.body);
-    
+
     // Rate limiting com Redis
     const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
     const rateLimitKey = `ratelimit:onboarding:${clientIp}`;
-    
+
     try {
       const redis = require('ioredis').default(process.env.REDIS_URL || 'redis://localhost:6379');
       const attempts = await redis.get(rateLimitKey);
-      
+
       if (attempts && parseInt(attempts) >= 10) {
         res.status(429).json({
           success: false,
@@ -83,7 +83,7 @@ router.post('/validate-subdomain', async (req, res) => {
         });
         return;
       }
-      
+
       await redis.incr(rateLimitKey);
       await redis.expire(rateLimitKey, 60); // 1 minuto
     } catch (redisError) {
@@ -91,13 +91,13 @@ router.post('/validate-subdomain', async (req, res) => {
     }
 
     const isValid = await subdomainValidator.validateSubdomain(subdomain);
-    
+
     res.json({
       success: true,
       available: isValid,
       subdomain,
-      message: isValid 
-        ? 'Subdomain disponível' 
+      message: isValid
+        ? 'Subdomain disponível'
         : 'Subdomain já está em uso'
     });
   } catch (error) {
@@ -109,7 +109,7 @@ router.post('/validate-subdomain', async (req, res) => {
       });
       return;
     }
-    
+
     console.error('Erro ao validar subdomain:', error);
     res.status(500).json({
       success: false,
@@ -125,7 +125,7 @@ router.post('/validate-subdomain', async (req, res) => {
 router.get('/plans', async (req, res) => {
   try {
     const plans = await billingService.getAvailablePlans();
-    
+
     res.json({
       success: true,
       plans: plans.map(plan => ({
@@ -133,12 +133,9 @@ router.get('/plans', async (req, res) => {
         name: plan.name,
         price: plan.price,
         currency: plan.currency,
-        interval: plan.interval,
         features: plan.features,
         limits: plan.limits,
-        // Calcular desconto anual
-        yearlyDiscount: plan.interval === 'month' ? 0.2 : 0, // 20% desconto anual
-        yearlyPrice: plan.interval === 'month' ? plan.price * 12 * 0.8 : plan.price
+        yearlyDiscount: 0.2 // 20% hardcoded or calculated: (plan.price.monthly * 12 - plan.price.yearly) / (plan.price.monthly * 12)
       }))
     });
   } catch (error) {
@@ -157,7 +154,7 @@ router.get('/plans', async (req, res) => {
 router.post('/create-tenant', async (req, res) => {
   try {
     const data = createTenantSchema.parse(req.body);
-    
+
     // Validar subdomain novamente
     const isSubdomainAvailable = await subdomainValidator.validateSubdomain(data.subdomain);
     if (!isSubdomainAvailable) {
@@ -171,7 +168,7 @@ router.post('/create-tenant', async (req, res) => {
     const existingUser = await prisma.user.findFirst({
       where: { email: data.ownerEmail }
     });
-    
+
     if (existingUser) {
       return res.status(400).json({
         success: false,
@@ -206,7 +203,7 @@ router.post('/create-tenant', async (req, res) => {
     // Enterprise e Custom Plan → role = ADMIN (quem assina tem controle administrativo)
     // Starter e Professional → role = ADMIN (padrão)
     const ownerRole = (['enterprise', 'custom'].includes(data.planId)) ? 'ADMIN' : 'ADMIN';
-    
+
     const owner = await prisma.user.create({
       data: {
         email: data.ownerEmail,
@@ -267,7 +264,7 @@ router.post('/create-tenant', async (req, res) => {
         details: error.errors
       });
     }
-    
+
     console.error('Erro ao criar tenant:', error);
     res.status(500).json({
       success: false,
@@ -283,7 +280,7 @@ router.post('/create-tenant', async (req, res) => {
 router.post('/complete', async (req, res) => {
   try {
     const { tenantId, paymentId } = req.body;
-    
+
     if (!tenantId) {
       res.status(400).json({
         success: false,
@@ -304,7 +301,7 @@ router.post('/complete', async (req, res) => {
     // Se for pagamento Mercado Pago, verificar status
     if (paymentId) {
       const paymentStatus = await billingService.checkMercadoPagoPaymentStatus(paymentId);
-      
+
       if (paymentStatus.status !== 'approved') {
         return res.status(400).json({
           success: false,
@@ -381,7 +378,7 @@ router.post('/complete', async (req, res) => {
 router.get('/status/:tenantId', async (req, res) => {
   try {
     const { tenantId } = req.params;
-    
+
     const tenant = await tenantService.getTenantById(tenantId);
     if (!tenant) {
       res.status(404).json({

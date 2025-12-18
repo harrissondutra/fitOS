@@ -2,7 +2,7 @@ import { PrismaClient, DbStrategy, MigrationStatus } from '@prisma/client';
 import { getPrismaClient } from '../config/database';
 import { logger } from '../utils/logger';
 import { BackupService } from './backup.service';
-import { ConnectionManagerService } from './connection-manager.service';
+import { ConnectionManagerService, connectionManager } from './connection-manager.service';
 
 export interface MigrationProgress {
   migrationJobId: string;
@@ -24,7 +24,7 @@ export class MigrationOrchestratorService {
   constructor() {
     this.prisma = getPrismaClient();
     this.backupService = new BackupService();
-    this.connectionManager = new ConnectionManagerService();
+    this.connectionManager = connectionManager;
     logger.info('MigrationOrchestratorService initialized');
   }
 
@@ -72,7 +72,7 @@ export class MigrationOrchestratorService {
       await this.validateDataIntegrity(organizationId);
 
       await this.updateProgress(migrationJob.id, 20, 'Starting data migration...');
-      
+
       if (fromStrategy === 'row_level' && toStrategy === 'schema_level') {
         await this.migrateRowToSchema(organizationId, migrationJob.id);
       } else if (fromStrategy === 'row_level' && toStrategy === 'database_level') {
@@ -199,19 +199,19 @@ export class MigrationOrchestratorService {
    */
   private async migrateRowToSchema(organizationId: string, migrationJobId: string): Promise<void> {
     await this.updateProgress(migrationJobId, 30, 'Creating dedicated schema...');
-    
+
     const schemaName = `tenant_${organizationId.replace(/-/g, '_')}`;
     const prisma = await this.connectionManager.getConnection(organizationId);
-    
+
     // Criar schema
     await prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`);
-    
+
     await this.updateProgress(migrationJobId, 45, 'Preparing schema structure...');
     await this.prepareTenantSchemaFromFitos(prisma, schemaName);
 
     await this.updateProgress(migrationJobId, 65, 'Copying data to schema...');
     await this.copyTenantDataToSchema(prisma, organizationId, schemaName);
-    
+
     await this.updateProgress(migrationJobId, 80, 'Verifying data copy...');
     await this.verifySchemaDataCounts(prisma, organizationId, schemaName);
   }
@@ -222,10 +222,10 @@ export class MigrationOrchestratorService {
   private async migrateRowToDatabase(organizationId: string, migrationJobId: string): Promise<void> {
     await this.updateProgress(migrationJobId, 30, 'Provisioning dedicated database...');
     // TODO: Provision database via ProviderIntegrationService
-    
+
     await this.updateProgress(migrationJobId, 50, 'Copying data to database...');
     // TODO: Copiar dados para database dedicado
-    
+
     await this.updateProgress(migrationJobId, 70, 'Verifying data copy...');
     // TODO: Verificar dados
   }
@@ -236,10 +236,10 @@ export class MigrationOrchestratorService {
   private async migrateSchemaToDatabase(organizationId: string, migrationJobId: string): Promise<void> {
     await this.updateProgress(migrationJobId, 30, 'Provisioning dedicated database...');
     // TODO: Provisioning
-    
+
     await this.updateProgress(migrationJobId, 50, 'Migrating schema to database...');
     // TODO: Migrar schema completo para database dedicado
-    
+
     await this.updateProgress(migrationJobId, 70, 'Verifying migration...');
     // TODO: Verificar
   }
@@ -250,10 +250,10 @@ export class MigrationOrchestratorService {
   private async migrateDatabaseToSchema(organizationId: string, migrationJobId: string): Promise<void> {
     await this.updateProgress(migrationJobId, 30, 'Preparing schema...');
     // TODO: Preparar schema no banco principal
-    
+
     await this.updateProgress(migrationJobId, 50, 'Migrating data from database...');
     // TODO: Copiar dados do database dedicado para schema
-    
+
     await this.updateProgress(migrationJobId, 70, 'Verifying migration...');
     // TODO: Verificar
   }
@@ -264,10 +264,10 @@ export class MigrationOrchestratorService {
   private async migrateDatabaseToRow(organizationId: string, migrationJobId: string): Promise<void> {
     await this.updateProgress(migrationJobId, 30, 'Preparing row-level tables...');
     // TODO: Preparar tabelas do row-level
-    
+
     await this.updateProgress(migrationJobId, 50, 'Migrating data from database...');
     // TODO: Copiar dados do database dedicado para row-level
-    
+
     await this.updateProgress(migrationJobId, 70, 'Verifying migration...');
     // TODO: Verificar
   }
@@ -278,10 +278,10 @@ export class MigrationOrchestratorService {
   private async migrateSchemaToRow(organizationId: string, migrationJobId: string): Promise<void> {
     await this.updateProgress(migrationJobId, 30, 'Preparing row-level tables...');
     // TODO: Preparar
-    
+
     await this.updateProgress(migrationJobId, 50, 'Migrating data from schema...');
     // TODO: Copiar dados do schema para row-level
-    
+
     await this.updateProgress(migrationJobId, 70, 'Verifying migration...');
     // TODO: Verificar
   }
@@ -290,9 +290,9 @@ export class MigrationOrchestratorService {
    * Faz rollback de uma migração
    */
   private async rollbackMigration(migrationJobId: string, backupId: string): Promise<void> {
-    
+
     logger.warn(`Rolling back migration ${migrationJobId} using backup ${backupId}`);
-    
+
     const migrationJob = await this.prisma.migrationJob.findUnique({
       where: { id: migrationJobId },
     });
@@ -304,7 +304,7 @@ export class MigrationOrchestratorService {
     try {
       // Restaurar backup
       await this.backupService.restoreBackup(backupId);
-      
+
       // Atualizar job
       await this.prisma.migrationJob.update({
         where: { id: migrationJobId },

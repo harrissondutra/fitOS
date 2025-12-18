@@ -289,5 +289,38 @@ router.post('/cancel',
   }
 );
 
+/**
+ * POST /api/billing/sync
+ * Sincronizar assinatura manualmente
+ */
+router.post('/sync',
+  authenticateToken,
+  tenantMiddleware,
+  async (req, res, next) => {
+    try {
+      const { tenantId } = req;
+
+      if (!tenantId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Tenant ID is required'
+        });
+      }
+
+      const billingService = await createBillingService(req);
+      const result = await billingService.syncSubscription(tenantId);
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Assinatura sincronizada com sucesso'
+      });
+    } catch (error) {
+      logger.error('Error syncing subscription:', error);
+      next(error);
+    }
+  }
+);
+
 export default router;
 

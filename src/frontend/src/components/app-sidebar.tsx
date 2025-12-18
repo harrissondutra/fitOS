@@ -423,6 +423,7 @@ const getAdminMenuItems = (userRole: UserRole) => {
           items: [
             { title: "White Label", url: "/super-admin/white-label" },
             { title: "Calendário da Equipe", url: "/professional/team-calendar" },
+            { title: "Importador de Exercícios", url: "/superuser/exercises-scraping" },
             { title: "Configurações", url: "/super-admin/system/config" },
             { title: "Logs", url: "/super-admin/system/logs" },
             { title: "Backup", url: "/super-admin/system/backup" },

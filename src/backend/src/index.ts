@@ -1,4 +1,4 @@
-// Load environment variables FIRST
+// Load environment variables FIRST - Trigger restart
 import dotenv from 'dotenv';
 dotenv.config({ path: '../../.env' });
 
@@ -32,7 +32,7 @@ import { abortedRequestHandler } from './middleware/aborted-request-handler';
 import { rateLimiter, tenantRateLimiterMiddleware, roleBasedRateLimiterMiddleware } from './middleware/rateLimiter';
 // import { tenantMiddleware } from './middleware/tenant';
 import { createTenantContextMiddleware } from './middleware/tenant-context.middleware';
-import { ConnectionManagerService } from './services/connection-manager.service';
+import { ConnectionManagerService, connectionManager } from './services/connection-manager.service';
 
 // Import routes
 import { tenantExampleRoutes } from './routes/tenant-example';
@@ -47,7 +47,7 @@ import superAdminRoutes from './routes/super-admin';
 import settingsRoutes from './routes/settings';
 import schemaUserRoutes from './routes/schema-users';
 // New Sprint 3 routes
-import { exerciseRoutes } from './routes/exercises';
+import { exercisesRouter } from './routes/exercises';
 import { clientRoutes } from './routes/clients';
 import { planLimitsRoutes } from './routes/plan-limits';
 // Authentication routes
@@ -127,6 +127,7 @@ import marketplaceRoutes from './routes/marketplace';
 
 // Subscription routes (SAAS Billing)
 import subscriptionRoutes from './routes/subscription.routes';
+import contactRoutes from './routes/contact.routes';
 
 // Sprint 5 - Admin Business Routes
 import tenantAdminRoutes from './routes/admin/tenants';
@@ -186,7 +187,20 @@ class FitOSServer {
     // Rate limiting
     this.app.use(rateLimiter);
 
-    // Body parsing
+    // 1. Webhooks - DEVEM vir antes do global express.json para preservar o raw body
+    // Usamos express.raw para capturar o corpo binário exato necessário para validação do Stripe
+    const billingWebhooks = require('./routes/webhooks/billing.routes').default;
+    this.app.use('/api/webhooks', express.raw({ type: '*/*', limit: '10mb' }), (req, res, next) => {
+      // O express.raw coloca o Buffer em req.body. Vamos mover para rawBody para manter compatibilidade
+      if (Buffer.isBuffer(req.body)) {
+        (req as any).rawBody = req.body;
+      }
+      // Debug log para garantir que o middleware está rodando
+      console.log(`Webhook middleware hit: ${req.method} ${req.url}, rawBody present: ${!!(req as any).rawBody}, length: ${(req as any).rawBody?.length}`);
+      next();
+    }, billingWebhooks);
+
+    // 2. Body parsing global para outras rotas
     this.app.use(express.json({ limit: '10mb' }));
 
     // Tratar requisições abortadas pelo cliente (deve vir após express.json)
@@ -194,7 +208,6 @@ class FitOSServer {
     this.app.use(express.urlencoded({ extended: true }));
 
     // Tenant resolution (context by strategy: row/schema/database)
-    const connectionManager = new ConnectionManagerService();
     const tenantContext = createTenantContextMiddleware(connectionManager);
     this.app.use(tenantContext);
 
@@ -235,6 +248,8 @@ class FitOSServer {
     // Cost Management routes (protegidas por middleware)
     this.app.use('/api/costs', costsRoutes);
 
+    // Webhooks routes are now handled in setupMiddleware to preserve rawBody
+
     // Middleware de autenticação opcional para rotas de API - usar lazy evaluation
     // Não criar aqui, será criado quando necessário
 
@@ -250,7 +265,7 @@ class FitOSServer {
     this.app.use('/api/tenants', (req, res, next) => getAuthMiddlewareLazy().optionalAuth(req, res, next), tenantRoutes);
 
     // New Sprint 3 API routes (com autenticação opcional)
-    this.app.use('/api/exercises', (req, res, next) => getAuthMiddlewareLazy().optionalAuth(req, res, next), exerciseRoutes);
+    this.app.use('/api/exercises', (req, res, next) => getAuthMiddlewareLazy().optionalAuth(req, res, next), exercisesRouter);
     this.app.use('/api/clients', (req, res, next) => getAuthMiddlewareLazy().optionalAuth(req, res, next), clientRoutes);
     this.app.use('/api/analytics', (req, res, next) => getAuthMiddlewareLazy().optionalAuth(req, res, next), analyticsRoutes);
     this.app.use('/api/plan-limits', (req, res, next) => getAuthMiddlewareLazy().optionalAuth(req, res, next), planLimitsRoutes);
@@ -266,6 +281,10 @@ class FitOSServer {
 
     // Subscription API routes (SAAS Billing) (com autenticação)
     this.app.use('/api/subscription', subscriptionRoutes);
+
+    // Contact API routes (Vendas/Suporte) (público)
+    this.app.use('/api/contact', contactRoutes);
+
 
     // Sprint 4 API routes (com autenticação opcional)
     // Sprint 4 - Novas rotas

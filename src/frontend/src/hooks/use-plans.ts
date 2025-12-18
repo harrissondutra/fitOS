@@ -42,7 +42,7 @@ export function usePlans() {
     const fetchPlans = async () => {
       try {
         setIsLoading(true);
-        const data = await fetcher('/api/plans');
+        const data = await fetcher('/api/subscription/plans');
         setPlans(data);
       } catch (err) {
         setError(err as Error);

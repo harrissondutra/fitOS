@@ -12,9 +12,9 @@
 import { Request, Response } from 'express';
 import { config } from '../config/config-simple';
 import { logger } from '../utils/logger';
-import { 
-  globalRateLimiter, 
-  authRateLimiter, 
+import {
+  globalRateLimiter,
+  authRateLimiter,
   chatRateLimiter,
   tenantRateLimiter,
   progressiveAuthRateLimiter,
@@ -30,7 +30,7 @@ const checkRedisAvailability = async (): Promise<boolean> => {
   if (redisCheckPromise) {
     return redisCheckPromise;
   }
-  
+
   redisCheckPromise = redisService.healthCheck()
     .then(health => {
       isRedisAvailable = health.status === 'healthy';
@@ -42,7 +42,7 @@ const checkRedisAvailability = async (): Promise<boolean> => {
       logger.warn('Redis not available, using memory-based rate limiting');
       return false;
     });
-    
+
   return redisCheckPromise;
 };
 
@@ -51,24 +51,24 @@ const checkRedisAvailability = async (): Promise<boolean> => {
  */
 const memoryRateLimiter = {
   store: new Map<string, { count: number; resetTime: number }>(),
-  
+
   checkLimit(key: string, windowMs: number, max: number) {
     const now = Date.now();
     const window = Math.floor(now / windowMs);
     const windowKey = `${key}:${window}`;
     const resetTime = (window + 1) * windowMs;
-    
+
     const current = this.store.get(windowKey) || { count: 0, resetTime };
     current.count++;
     this.store.set(windowKey, current);
-    
+
     // Limpar entradas expiradas
     for (const [k, v] of this.store.entries()) {
       if (v.resetTime < now) {
         this.store.delete(k);
       }
     }
-    
+
     return {
       limit: max,
       current: current.count,
@@ -84,8 +84,12 @@ const memoryRateLimiter = {
 function createHybridRateLimiter(redisLimiter: any, windowMs: number, max: number) {
   return async (req: Request, res: Response, next: Function) => {
     try {
-      // Pular rate limiting para rotas de autenticação e health check
-      if (req.url?.startsWith('/api/auth/') || req.url?.startsWith('/api/health')) {
+      // Pular rate limiting para rotas de autenticação, health check e webhooks
+      if (
+        req.url?.startsWith('/api/auth/') ||
+        req.url?.startsWith('/api/health') ||
+        req.url?.startsWith('/api/webhooks')
+      ) {
         return next();
       }
 
@@ -96,7 +100,7 @@ function createHybridRateLimiter(redisLimiter: any, windowMs: number, max: numbe
           const token = authHeader.split(' ')[1];
           const jwt = require('jsonwebtoken');
           const decoded = jwt.verify(token, config.jwt.secret);
-          
+
           if (decoded.role === 'SUPER_ADMIN') {
             logger.debug('Rate limiting bypassed for SUPER_ADMIN (JWT)', {
               ip: req.ip,
@@ -114,7 +118,7 @@ function createHybridRateLimiter(redisLimiter: any, windowMs: number, max: numbe
       // Pular rate limiting para SUPER_ADMIN (fallback com verificação melhorada)
       const userRole = (req as any).user?.role;
       const userId = (req as any).user?.id;
-      
+
       if (userRole === 'SUPER_ADMIN') {
         logger.debug('Rate limiting bypassed for SUPER_ADMIN', {
           ip: req.ip,
@@ -134,12 +138,12 @@ function createHybridRateLimiter(redisLimiter: any, windowMs: number, max: numbe
 
       const ip = req.ip || req.connection.remoteAddress || 'unknown';
       const key = `ratelimit:${ip}`;
-      
+
       let result;
-      
+
       // Verificar disponibilidade do Redis de forma lazy
       const redisAvailable = await checkRedisAvailability();
-      
+
       if (redisAvailable) {
         // Usar Redis
         result = await redisLimiter.checkLimit(key);
@@ -147,17 +151,17 @@ function createHybridRateLimiter(redisLimiter: any, windowMs: number, max: numbe
         // Usar memória local
         result = memoryRateLimiter.checkLimit(key, windowMs, max);
       }
-      
+
       // Adicionar headers
       res.set({
         'X-RateLimit-Limit': result.limit.toString(),
         'X-RateLimit-Remaining': result.remaining.toString(),
         'X-RateLimit-Reset': Math.ceil(result.resetTime.getTime() / 1000).toString()
       });
-      
+
       if (result.current > result.limit) {
         const retryAfter = Math.ceil(result.resetTime.getTime() / 1000);
-        
+
         logger.warn('Rate limit exceeded', {
           ip: req.ip,
           url: req.url,
@@ -166,7 +170,7 @@ function createHybridRateLimiter(redisLimiter: any, windowMs: number, max: numbe
           limit: result.limit,
           current: result.current
         });
-        
+
         res.status(429).json({
           success: false,
           error: {
@@ -179,7 +183,7 @@ function createHybridRateLimiter(redisLimiter: any, windowMs: number, max: numbe
         });
         return;
       }
-      
+
       next();
     } catch (error) {
       logger.error('Rate limiter error:', error);
@@ -245,12 +249,12 @@ export const createCustomRateLimiter = (windowMs: number, max: number, message?:
         const window = Math.floor(now / windowMs);
         const windowKey = `${key}:${window}`;
         const resetTime = new Date((window + 1) * windowMs);
-        
+
         const current = await redisService.incrWithTTL(
           windowKey,
           Math.ceil(windowMs / 1000)
         );
-        
+
         return {
           limit: max,
           current,
@@ -320,7 +324,7 @@ export const roleBasedRateLimiter = (roleLimits: Record<string, { windowMs: numb
       }
 
       const userRole = (req as any).user?.role || 'CLIENT';
-      
+
       // SUPER_ADMIN não tem nenhum limite de rate limiting
       if (userRole === 'SUPER_ADMIN') {
         logger.debug('Role-based rate limiting bypassed for SUPER_ADMIN', {
@@ -332,29 +336,29 @@ export const roleBasedRateLimiter = (roleLimits: Record<string, { windowMs: numb
         res.set({ 'X-RateLimit-Bypass': 'SUPER_ADMIN' });
         return next();
       }
-      
+
       const limits = roleLimits[userRole] || roleLimits['CLIENT'];
-      
+
       if (!limits) {
         return next();
       }
-      
+
       const ip = req.ip || req.connection.remoteAddress || 'unknown';
       const key = `ratelimit:role:${userRole}:${ip}`;
-      
+
       let result;
-      
+
       if (isRedisAvailable) {
         const now = Date.now();
         const window = Math.floor(now / limits.windowMs);
         const windowKey = `${key}:${window}`;
         const resetTime = new Date((window + 1) * limits.windowMs);
-        
+
         const current = await redisService.incrWithTTL(
           windowKey,
           Math.ceil(limits.windowMs / 1000)
         );
-        
+
         result = {
           limit: limits.max,
           current,
@@ -364,17 +368,17 @@ export const roleBasedRateLimiter = (roleLimits: Record<string, { windowMs: numb
       } else {
         result = memoryRateLimiter.checkLimit(key, limits.windowMs, limits.max);
       }
-      
+
       // Adicionar headers
       res.set({
         'X-RateLimit-Limit': result.limit.toString(),
         'X-RateLimit-Remaining': result.remaining.toString(),
         'X-RateLimit-Reset': Math.ceil(result.resetTime.getTime() / 1000).toString()
       });
-      
+
       if (result.current > result.limit) {
         const retryAfter = Math.ceil(result.resetTime.getTime() / 1000);
-        
+
         logger.warn('Role-based rate limit exceeded', {
           ip: req.ip,
           role: userRole,
@@ -383,7 +387,7 @@ export const roleBasedRateLimiter = (roleLimits: Record<string, { windowMs: numb
           limit: result.limit,
           current: result.current
         });
-        
+
         res.status(429).json({
           success: false,
           error: {
@@ -396,7 +400,7 @@ export const roleBasedRateLimiter = (roleLimits: Record<string, { windowMs: numb
         });
         return;
       }
-      
+
       next();
     } catch (error) {
       logger.error('Role-based rate limiter error:', error);
@@ -435,30 +439,30 @@ export const skipRateLimit = (conditions: {
     if (config.rateLimit.disabled) {
       return true;
     }
-    
+
     // Health check
     if (conditions.healthCheck && req.url === '/api/health') {
       return true;
     }
-    
+
     // AI management routes
     if (conditions.aiManagement && (
-      req.url.startsWith('/api/super-admin/ai-') || 
+      req.url.startsWith('/api/super-admin/ai-') ||
       req.url.startsWith('/api/webhooks/ai-')
     )) {
       return true;
     }
-    
+
     // SUPER_ADMIN
     if (conditions.superAdmin && req.headers['x-user-role'] === 'SUPER_ADMIN') {
       return true;
     }
-    
+
     // Custom condition
     if (conditions.custom && conditions.custom(req)) {
       return true;
     }
-    
+
     return false;
   };
 };
@@ -474,11 +478,11 @@ export const getRateLimitStats = async () => {
       message: 'Using memory-based rate limiting'
     };
   }
-  
+
   try {
     const stats = await redisService.getStats();
     const health = await redisService.healthCheck();
-    
+
     return {
       redisAvailable: true,
       redisHealth: health,

@@ -1,5 +1,6 @@
 import { PrismaClient, Exercise } from '@prisma/client';
 import { PrismaTenantWrapper } from './prisma-tenant-wrapper.service';
+import { getPrismaClient } from '../config/database';
 import { logger } from '../utils/logger';
 
 export interface ExerciseFilters {
@@ -32,26 +33,36 @@ export interface ExerciseFormData {
 }
 
 export class ExerciseService {
-  constructor(private prisma: PrismaClient | PrismaTenantWrapper) {} // Aceita PrismaClient ou PrismaTenantWrapper
+  constructor(private prisma: PrismaClient | PrismaTenantWrapper) { } // Aceita PrismaClient ou PrismaTenantWrapper
 
   /**
    * Listar exercícios com filtros
    */
+  /**
+   * Listar exercícios com filtros
+   */
   async getExercises(filters: ExerciseFilters, tenantId: string, role?: string) {
-    const where: any = { tenantId };
-    
+    // IMPORTANTE: Usar getPrismaClient() (raw) para bypassar restrições
+    // Exercícios são globais para todos os assinantes da aplicação
+    const rawPrisma = getPrismaClient();
+
+    // Filtros base (sem restrição de tenantId ou isPublic)
+    const where: any = {};
+
     if (filters.search) {
       where.OR = [
         { name: { contains: filters.search, mode: 'insensitive' } },
         { description: { contains: filters.search, mode: 'insensitive' } }
       ];
     }
-    
+
     if (filters.category) where.category = filters.category;
     if (filters.difficulty) where.difficulty = filters.difficulty;
+    // Se isPublic for explicitamente passado, filtra, caso contrário não filtra mais
     if (filters.isPublic !== undefined) where.isPublic = filters.isPublic;
+    // createdBy pode ser usado para filtrar "Meus Exercícios" no front, se desejado
     if (filters.createdBy) where.createdBy = filters.createdBy;
-    
+
     if (filters.muscleGroups && filters.muscleGroups.length > 0) {
       where.muscleGroups = { hasSome: filters.muscleGroups };
     }
@@ -65,25 +76,40 @@ export class ExerciseService {
     const sortBy = filters.sortBy || 'createdAt';
     const sortOrder = filters.sortOrder || 'desc';
 
-    return await this.prisma.exercise.findMany({
-      where,
-      skip,
-      take: limit,
-      include: {
-        creator: {
-          select: { id: true, firstName: true, lastName: true }
-        }
-      },
-      orderBy: { [sortBy]: sortOrder }
-    });
+    const [exercises, total] = await Promise.all([
+      rawPrisma.exercise.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          creator: {
+            select: { id: true, firstName: true, lastName: true }
+          }
+        },
+        orderBy: { [sortBy]: sortOrder }
+      }),
+      rawPrisma.exercise.count({ where })
+    ]);
+
+    return {
+      exercises,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    };
   }
 
   /**
    * Buscar exercício por ID
    */
   async getExerciseById(id: string, tenantId: string): Promise<Exercise | null> {
-    return await this.prisma.exercise.findFirst({
-      where: { id, tenantId }
+    // Usar cliente raw para permitir acesso global a exercícios de outros tenants/admin
+    const rawPrisma = getPrismaClient();
+    return await rawPrisma.exercise.findUnique({
+      where: { id }
     });
   }
 
