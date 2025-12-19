@@ -1011,7 +1011,12 @@ export class BillingService {
       if (!plan) {
         // Garantir que o plano existe (fallback de segurança)
         await (this.prisma as any).subscriptionPlan.create({
-          data: { id: planId, name: planId.toUpperCase(), price: 0 }
+          data: {
+            id: planId,
+            name: planId.toUpperCase(),
+            displayName: planId.charAt(0).toUpperCase() + planId.slice(1),
+            price: 0
+          }
         });
       }
 
