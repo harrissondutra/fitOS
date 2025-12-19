@@ -1015,7 +1015,8 @@ export class BillingService {
             id: planId,
             name: planId.toUpperCase(),
             displayName: planId.charAt(0).toUpperCase() + planId.slice(1),
-            price: 0
+            price: 0,
+            interval: interval || 'monthly'
           }
         });
       }
