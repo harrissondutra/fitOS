@@ -1010,13 +1010,16 @@ export class BillingService {
 
       if (!plan) {
         // Garantir que o plano existe (fallback de segurança)
+        console.log(`DEBUG: Criando plano fallback '${planId}' com interval: ${interval || 'monthly'}`);
         await (this.prisma as any).subscriptionPlan.create({
           data: {
             id: planId,
             name: planId.toUpperCase(),
             displayName: planId.charAt(0).toUpperCase() + planId.slice(1),
             price: 0,
-            interval: interval || 'monthly'
+            interval: interval || 'monthly',
+            features: [],
+            limits: {}
           }
         });
       }
@@ -1026,9 +1029,7 @@ export class BillingService {
           tenantId,
           planId,
           status: status,
-          provider: 'stripe',
           stripeSubscriptionId: stripeSubscriptionId,
-          billingCycle: interval === 'yearly' ? 'yearly' : 'monthly',
           currentPeriodStart: new Date(),
           currentPeriodEnd: new Date(Date.now() + (interval === 'yearly' ? 365 : 30) * 24 * 60 * 60 * 1000),
           metadata: {
