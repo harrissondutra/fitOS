@@ -513,8 +513,7 @@ export class BillingService {
         where: { id: tenantId },
         data: {
           plan: planId,
-          status: 'ACTIVE',
-          subscriptionStatus: 'ACTIVE'
+          status: 'active'
         }
       });
 
